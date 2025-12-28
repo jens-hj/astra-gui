@@ -112,20 +112,22 @@ impl Default for Layout {
     }
 }
 
-/// Position offset from the parent's origin
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Offset {
+/// 2D translation offset
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Translation {
     pub x: f32,
     pub y: f32,
 }
 
-impl Offset {
+impl Translation {
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
+
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
 
     pub const fn zero() -> Self {
-        Self { x: 0.0, y: 0.0 }
+        Self::ZERO
     }
 
     pub const fn x(x: f32) -> Self {
@@ -134,6 +136,164 @@ impl Offset {
 
     pub const fn y(y: f32) -> Self {
         Self { x: 0.0, y }
+    }
+}
+
+/// Backward compatibility alias
+#[deprecated(since = "0.2.0", note = "Use Translation instead")]
+pub type Offset = Translation;
+
+/// Transform origin for rotation (CSS-like percentage + pixel offset)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TransformOrigin {
+    /// X position as percentage of width (0.0 = left, 0.5 = center, 1.0 = right)
+    pub x_percent: f32,
+    /// Y position as percentage of height (0.0 = top, 0.5 = center, 1.0 = bottom)
+    pub y_percent: f32,
+    /// Additional X offset in pixels
+    pub x_offset: f32,
+    /// Additional Y offset in pixels
+    pub y_offset: f32,
+}
+
+impl TransformOrigin {
+    pub const fn center() -> Self {
+        Self {
+            x_percent: 0.5,
+            y_percent: 0.5,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        }
+    }
+
+    pub const fn top_left() -> Self {
+        Self {
+            x_percent: 0.0,
+            y_percent: 0.0,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        }
+    }
+
+    pub const fn top_right() -> Self {
+        Self {
+            x_percent: 1.0,
+            y_percent: 0.0,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        }
+    }
+
+    pub const fn bottom_left() -> Self {
+        Self {
+            x_percent: 0.0,
+            y_percent: 1.0,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        }
+    }
+
+    pub const fn bottom_right() -> Self {
+        Self {
+            x_percent: 1.0,
+            y_percent: 1.0,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        }
+    }
+
+    /// Compute absolute position given rect size
+    pub fn resolve(&self, width: f32, height: f32) -> (f32, f32) {
+        (
+            self.x_percent * width + self.x_offset,
+            self.y_percent * height + self.y_offset,
+        )
+    }
+}
+
+impl Default for TransformOrigin {
+    fn default() -> Self {
+        Self::center()
+    }
+}
+
+/// 2D transform combining translation, rotation, and origin
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Transform2D {
+    pub translation: Translation,
+    pub rotation: f32, // Radians, clockwise positive (CSS convention)
+    pub origin: TransformOrigin,
+}
+
+impl Transform2D {
+    pub const IDENTITY: Self = Self {
+        translation: Translation::ZERO,
+        rotation: 0.0,
+        origin: TransformOrigin {
+            x_percent: 0.5,
+            y_percent: 0.5,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        },
+    };
+
+    /// Apply transform to a point (forward transform)
+    pub fn apply(&self, point: [f32; 2], rect_size: [f32; 2]) -> [f32; 2] {
+        let (origin_x, origin_y) = self.origin.resolve(rect_size[0], rect_size[1]);
+
+        // Translate to origin
+        let x = point[0] - origin_x;
+        let y = point[1] - origin_y;
+
+        // Rotate (clockwise positive)
+        let cos_r = self.rotation.cos();
+        let sin_r = self.rotation.sin();
+        let rx = x * cos_r + y * sin_r;
+        let ry = -x * sin_r + y * cos_r;
+
+        // Translate back and apply translation
+        [
+            rx + origin_x + self.translation.x,
+            ry + origin_y + self.translation.y,
+        ]
+    }
+
+    /// Apply inverse transform (for hit testing)
+    pub fn apply_inverse(&self, point: [f32; 2], rect_size: [f32; 2]) -> [f32; 2] {
+        let (origin_x, origin_y) = self.origin.resolve(rect_size[0], rect_size[1]);
+
+        // Remove translation
+        let x = point[0] - self.translation.x - origin_x;
+        let y = point[1] - self.translation.y - origin_y;
+
+        // Inverse rotate (negate angle)
+        let cos_r = self.rotation.cos();
+        let sin_r = self.rotation.sin();
+        let rx = x * cos_r - y * sin_r;
+        let ry = x * sin_r + y * cos_r;
+
+        // Translate back from origin
+        [rx + origin_x, ry + origin_y]
+    }
+
+    /// Compose two transforms (apply self, then other)
+    pub fn then(&self, other: &Transform2D, _rect_size: [f32; 2]) -> Transform2D {
+        // For hierarchical transforms, accumulate rotations and translations
+        // This is a simplified composition that works for most cases
+        Transform2D {
+            translation: Translation {
+                x: self.translation.x + other.translation.x,
+                y: self.translation.y + other.translation.y,
+            },
+            rotation: self.rotation + other.rotation,
+            origin: other.origin, // Use child's origin
+        }
+    }
+}
+
+impl Default for Transform2D {
+    fn default() -> Self {
+        Self::IDENTITY
     }
 }
 

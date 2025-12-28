@@ -112,12 +112,38 @@ pub fn lerp_style(from: &Style, to: &Style, t: f32) -> Style {
             (Some(a), None) => Some(a),
             (None, None) => None,
         },
+        translation_x: match (from.translation_x, to.translation_x) {
+            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
+            (None, Some(b)) => Some(b),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
+        },
+        translation_y: match (from.translation_y, to.translation_y) {
+            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
+            (None, Some(b)) => Some(b),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
+        },
+        rotation: match (from.rotation, to.rotation) {
+            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
+            (None, Some(b)) => Some(b),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
+        },
+        transform_origin: match (from.transform_origin, to.transform_origin) {
+            // For transform origin, we don't interpolate - just snap to the target
+            (_, Some(b)) => Some(b),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
+        },
+        #[allow(deprecated)]
         offset_x: match (from.offset_x, to.offset_x) {
             (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
             (None, Some(b)) => Some(b),
             (Some(a), None) => Some(a),
             (None, None) => None,
         },
+        #[allow(deprecated)]
         offset_y: match (from.offset_y, to.offset_y) {
             (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
             (None, Some(b)) => Some(b),

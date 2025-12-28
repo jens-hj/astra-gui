@@ -1,5 +1,6 @@
 use crate::color::Color;
 use crate::content::{HorizontalAlign, TextContent, VerticalAlign};
+use crate::layout::Transform2D;
 
 /// A 2D point in screen space
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -232,15 +233,42 @@ impl Shape {
     }
 }
 
-/// A shape with a clip rectangle
+/// A shape with a clip rectangle and transform
 #[derive(Clone, Debug)]
 pub struct ClippedShape {
-    pub clip_rect: Rect,
+    pub node_rect: Rect, // Untransformed rect
+    pub clip_rect: Rect, // Clip rect in world space
     pub shape: Shape,
+    pub transform: Transform2D, // Accumulated transform from hierarchy
 }
 
 impl ClippedShape {
     pub fn new(clip_rect: Rect, shape: Shape) -> Self {
-        Self { clip_rect, shape }
+        // Backward compatibility - extract rect from shape if it's a Rect
+        let node_rect = match &shape {
+            Shape::Rect(styled_rect) => styled_rect.rect,
+            Shape::Text(text_shape) => text_shape.rect,
+        };
+
+        Self {
+            node_rect,
+            clip_rect,
+            shape,
+            transform: Transform2D::IDENTITY,
+        }
+    }
+
+    pub fn with_transform(
+        clip_rect: Rect,
+        node_rect: Rect,
+        shape: Shape,
+        transform: Transform2D,
+    ) -> Self {
+        Self {
+            node_rect,
+            clip_rect,
+            shape,
+            transform,
+        }
     }
 }

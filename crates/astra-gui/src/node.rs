@@ -1,5 +1,8 @@
 use crate::content::Content;
-use crate::layout::{ComputedLayout, Layout, Offset, Overflow, Size, Spacing};
+use crate::layout::{
+    ComputedLayout, Layout, Offset, Overflow, Size, Spacing, Transform2D, TransformOrigin,
+    Translation,
+};
 use crate::measure::{ContentMeasurer, IntrinsicSize, MeasureTextRequest};
 use crate::primitives::{Rect, Shape};
 use crate::style::Style;
@@ -48,8 +51,12 @@ pub struct Node {
     width: Size,
     /// Height of the node
     height: Size,
-    /// Offset from the default position
-    offset: Offset,
+    /// Translation from the default position (post-layout transform)
+    translation: Translation,
+    /// Rotation in radians, clockwise positive (CSS convention)
+    rotation: f32,
+    /// Transform origin for rotation
+    transform_origin: TransformOrigin,
     /// Padding inside the node
     padding: Spacing,
     /// Margin outside the node
@@ -95,7 +102,9 @@ impl Node {
             id: None,
             width: Size::default(),
             height: Size::default(),
-            offset: Offset::zero(),
+            translation: Translation::ZERO,
+            rotation: 0.0,
+            transform_origin: TransformOrigin::default(),
             padding: Spacing::default(),
             margin: Spacing::default(),
             gap: 0.0,
@@ -157,9 +166,28 @@ impl Node {
             .with_height(Size::px(height))
     }
 
-    /// Set the offset
+    /// Set the translation (post-layout offset)
+    pub fn with_translation(mut self, translation: Translation) -> Self {
+        self.translation = translation;
+        self
+    }
+
+    /// Set the offset (deprecated, use with_translation)
+    #[deprecated(since = "0.2.0", note = "Use with_translation instead")]
     pub fn with_offset(mut self, offset: Offset) -> Self {
-        self.offset = offset;
+        self.translation = offset;
+        self
+    }
+
+    /// Set the rotation in radians (clockwise positive, CSS convention)
+    pub fn with_rotation(mut self, rotation: f32) -> Self {
+        self.rotation = rotation;
+        self
+    }
+
+    /// Set the transform origin for rotation
+    pub fn with_transform_origin(mut self, origin: TransformOrigin) -> Self {
+        self.transform_origin = origin;
         self
     }
 
@@ -288,14 +316,46 @@ impl Node {
         self.opacity = opacity;
     }
 
-    /// Get the offset
-    pub(crate) fn offset(&self) -> Offset {
-        self.offset
+    /// Get the translation
+    pub(crate) fn translation(&self) -> Translation {
+        self.translation
     }
 
-    /// Set the offset (used by style system)
+    /// Set the translation (used by style system)
+    pub(crate) fn set_translation(&mut self, translation: Translation) {
+        self.translation = translation;
+    }
+
+    /// Get the offset (deprecated, use translation)
+    #[deprecated(since = "0.2.0", note = "Use translation instead")]
+    pub(crate) fn offset(&self) -> Offset {
+        self.translation
+    }
+
+    /// Set the offset (deprecated, use set_translation)
+    #[deprecated(since = "0.2.0", note = "Use set_translation instead")]
     pub(crate) fn set_offset(&mut self, offset: Offset) {
-        self.offset = offset;
+        self.translation = offset;
+    }
+
+    /// Get the rotation
+    pub(crate) fn rotation(&self) -> f32 {
+        self.rotation
+    }
+
+    /// Set the rotation (used by style system)
+    pub(crate) fn set_rotation(&mut self, rotation: f32) {
+        self.rotation = rotation;
+    }
+
+    /// Get the transform origin
+    pub(crate) fn transform_origin(&self) -> TransformOrigin {
+        self.transform_origin
+    }
+
+    /// Set the transform origin (used by style system)
+    pub(crate) fn set_transform_origin(&mut self, origin: TransformOrigin) {
+        self.transform_origin = origin;
     }
 
     /// Get the overflow policy
@@ -647,13 +707,10 @@ impl Node {
         let content_width = width - self.padding.left - self.padding.right;
         let content_height = height - self.padding.top - self.padding.bottom;
 
-        // Store computed layout for this node, with offset applied
+        // Store computed layout for this node (untransformed - translation applied during rendering)
         self.computed = Some(ComputedLayout::new(Rect::new(
-            [outer_x + self.offset.x, outer_y + self.offset.y],
-            [
-                outer_x + width + self.offset.x,
-                outer_y + height + self.offset.y,
-            ],
+            [outer_x, outer_y],
+            [outer_x + width, outer_y + height],
         )));
 
         // Layout children (same as original, but passing measurer through)
@@ -876,13 +933,10 @@ impl Node {
         let content_width = width - self.padding.left - self.padding.right;
         let content_height = height - self.padding.top - self.padding.bottom;
 
-        // Store computed layout for this node, with offset applied
+        // Store computed layout for this node (untransformed - translation applied during rendering)
         self.computed = Some(ComputedLayout::new(Rect::new(
-            [outer_x + self.offset.x, outer_y + self.offset.y],
-            [
-                outer_x + width + self.offset.x,
-                outer_y + height + self.offset.y,
-            ],
+            [outer_x, outer_y],
+            [outer_x + width, outer_y + height],
         )));
 
         // Layout children

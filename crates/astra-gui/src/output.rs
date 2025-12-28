@@ -1,4 +1,4 @@
-use crate::layout::Overflow;
+use crate::layout::{Overflow, Transform2D, Translation};
 use crate::measure::ContentMeasurer;
 use crate::node::Node;
 use crate::primitives::{ClippedShape, Rect, Shape};
@@ -68,13 +68,14 @@ impl FullOutput {
             &root,
             window_rect,
             window_rect,
+            Transform2D::IDENTITY, // Start with identity transform
             debug_options,
             &mut raw_shapes,
         );
 
         let shapes = raw_shapes
             .into_iter()
-            .map(|(rect, clip_rect, shape)| {
+            .map(|(rect, clip_rect, shape, transform)| {
                 // Apply the rect to the shape if it's a StyledRect.
                 // Text already carries its own bounding rect internally (TextShape::rect).
                 let shape_with_rect = match shape {
@@ -85,7 +86,7 @@ impl FullOutput {
                     Shape::Text(text_shape) => Shape::Text(text_shape),
                 };
 
-                ClippedShape::new(clip_rect, shape_with_rect)
+                ClippedShape::with_transform(clip_rect, rect, shape_with_rect, transform)
             })
             .collect();
 
@@ -98,13 +99,15 @@ fn collect_clipped_shapes(
     node: &Node,
     window_rect: Rect,
     inherited_clip_rect: Rect,
+    parent_transform: Transform2D,
     debug_options: Option<crate::debug::DebugOptions>,
-    out: &mut Vec<(Rect, Rect, Shape)>,
+    out: &mut Vec<(Rect, Rect, Shape, Transform2D)>,
 ) {
     collect_clipped_shapes_with_opacity(
         node,
         window_rect,
         inherited_clip_rect,
+        parent_transform,
         debug_options,
         out,
         1.0,
@@ -116,8 +119,9 @@ fn collect_clipped_shapes_with_opacity(
     node: &Node,
     window_rect: Rect,
     inherited_clip_rect: Rect,
+    parent_transform: Transform2D,
     debug_options: Option<crate::debug::DebugOptions>,
-    out: &mut Vec<(Rect, Rect, Shape)>,
+    out: &mut Vec<(Rect, Rect, Shape, Transform2D)>,
     parent_opacity: f32,
 ) {
     let combined_opacity = parent_opacity * node.opacity();
@@ -133,10 +137,31 @@ fn collect_clipped_shapes_with_opacity(
 
     let node_rect = layout.rect;
 
+    // Build local transform from node properties
+    let local_transform = Transform2D {
+        translation: node.translation(),
+        rotation: node.rotation(),
+        origin: node.transform_origin(),
+    };
+
+    // Compute rect size for transform operations
+    let rect_size = [
+        node_rect.max[0] - node_rect.min[0],
+        node_rect.max[1] - node_rect.min[1],
+    ];
+
+    // Accumulate transforms: parent → local
+    let world_transform = parent_transform.then(&local_transform, rect_size);
+
+    // Compute AABB (axis-aligned bounding box) of transformed rect for clipping
+    let transformed_aabb = compute_transformed_aabb(node_rect, &world_transform);
+
     // Update effective clip rect based on this node's overflow policy.
     let effective_clip_rect = match node.overflow() {
         Overflow::Visible => inherited_clip_rect,
-        Overflow::Hidden | Overflow::Scroll => intersect_rect(inherited_clip_rect, node_rect),
+        Overflow::Hidden | Overflow::Scroll => {
+            intersect_rect(inherited_clip_rect, transformed_aabb)
+        }
     };
 
     // If a node is fully clipped out, we can early-out (and skip its subtree).
@@ -153,7 +178,12 @@ fn collect_clipped_shapes_with_opacity(
         if combined_opacity < 1.0 {
             shape_with_opacity.apply_opacity(combined_opacity);
         }
-        out.push((node_rect, inherited_clip_rect, shape_with_opacity));
+        out.push((
+            node_rect,
+            inherited_clip_rect,
+            shape_with_opacity,
+            world_transform,
+        ));
     }
 
     // Content (if any)
@@ -178,7 +208,12 @@ fn collect_clipped_shapes_with_opacity(
                 if combined_opacity < 1.0 {
                     text_shape.apply_opacity(combined_opacity);
                 }
-                out.push((node_rect, effective_clip_rect, Shape::Text(text_shape)));
+                out.push((
+                    node_rect,
+                    effective_clip_rect,
+                    Shape::Text(text_shape),
+                    world_transform,
+                ));
             }
         }
     }
@@ -186,14 +221,21 @@ fn collect_clipped_shapes_with_opacity(
     // Debug overlays (if enabled) must also be overflow-clipped consistently.
     if let Some(options) = debug_options {
         if options.is_enabled() {
-            collect_debug_shapes_clipped(node, node_rect, effective_clip_rect, &options, out);
+            collect_debug_shapes_clipped(
+                node,
+                node_rect,
+                effective_clip_rect,
+                &options,
+                &world_transform,
+                out,
+            );
         }
     }
 
     // Collect gap debug shapes between children
     if let Some(options) = debug_options {
         if options.show_gaps && node.gap() > 0.0 {
-            collect_gap_debug_shapes(node, effective_clip_rect, &options, out);
+            collect_gap_debug_shapes(node, effective_clip_rect, &options, &world_transform, out);
         }
     }
 
@@ -202,6 +244,7 @@ fn collect_clipped_shapes_with_opacity(
             child,
             window_rect,
             effective_clip_rect,
+            world_transform, // Pass accumulated transform
             debug_options,
             out,
             combined_opacity,
@@ -220,12 +263,42 @@ fn is_empty_rect(r: Rect) -> bool {
     r.max[0] <= r.min[0] || r.max[1] <= r.min[1]
 }
 
+/// Compute axis-aligned bounding box of a transformed rect
+fn compute_transformed_aabb(rect: Rect, transform: &Transform2D) -> Rect {
+    let width = rect.max[0] - rect.min[0];
+    let height = rect.max[1] - rect.min[1];
+
+    // Transform all four corners
+    let corners = [
+        [rect.min[0], rect.min[1]],
+        [rect.max[0], rect.min[1]],
+        [rect.max[0], rect.max[1]],
+        [rect.min[0], rect.max[1]],
+    ];
+
+    let mut min_x = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+    let mut min_y = f32::INFINITY;
+    let mut max_y = f32::NEG_INFINITY;
+
+    for corner in corners {
+        let transformed = transform.apply(corner, [width, height]);
+        min_x = min_x.min(transformed[0]);
+        max_x = max_x.max(transformed[0]);
+        min_y = min_y.min(transformed[1]);
+        max_y = max_y.max(transformed[1]);
+    }
+
+    Rect::new([min_x, min_y], [max_x, max_y])
+}
+
 fn collect_debug_shapes_clipped(
     node: &Node,
     node_rect: Rect,
     clip_rect: Rect,
     options: &crate::debug::DebugOptions,
-    out: &mut Vec<(Rect, Rect, Shape)>,
+    transform: &Transform2D,
+    out: &mut Vec<(Rect, Rect, Shape, Transform2D)>,
 ) {
     use crate::color::Color;
     use crate::primitives::{Stroke, StyledRect};
@@ -252,6 +325,7 @@ fn collect_debug_shapes_clipped(
                     Default::default(),
                     Color::new(1.0, 0.0, 0.0, 0.2),
                 )),
+                *transform,
             ));
         }
         // Draw right margin (excluding top and bottom corners)
@@ -266,6 +340,7 @@ fn collect_debug_shapes_clipped(
                     Default::default(),
                     Color::new(1.0, 0.0, 0.0, 0.2),
                 )),
+                *transform,
             ));
         }
         // Draw bottom margin (full width including corners)
@@ -283,6 +358,7 @@ fn collect_debug_shapes_clipped(
                     Default::default(),
                     Color::new(1.0, 0.0, 0.0, 0.2),
                 )),
+                *transform,
             ));
         }
         // Draw left margin (excluding top and bottom corners)
@@ -297,6 +373,7 @@ fn collect_debug_shapes_clipped(
                     Default::default(),
                     Color::new(1.0, 0.0, 0.0, 0.2),
                 )),
+                *transform,
             ));
         }
     }
@@ -322,6 +399,7 @@ fn collect_debug_shapes_clipped(
                 StyledRect::new(Default::default(), Color::transparent())
                     .with_stroke(Stroke::new(1.0, Color::new(1.0, 1.0, 0.0, 0.5))),
             ),
+            *transform,
         ));
     }
 
@@ -341,6 +419,7 @@ fn collect_debug_shapes_clipped(
                     Default::default(),
                     Color::new(0.0, 0.0, 1.0, 0.2),
                 )),
+                *transform,
             ));
         }
         // Draw right padding (excluding top and bottom corners)
@@ -358,6 +437,7 @@ fn collect_debug_shapes_clipped(
                     Default::default(),
                     Color::new(0.0, 0.0, 1.0, 0.2),
                 )),
+                *transform,
             ));
         }
         // Draw bottom padding (full width)
@@ -372,6 +452,7 @@ fn collect_debug_shapes_clipped(
                     Default::default(),
                     Color::new(0.0, 0.0, 1.0, 0.2),
                 )),
+                *transform,
             ));
         }
         // Draw left padding (excluding top and bottom corners)
@@ -389,6 +470,7 @@ fn collect_debug_shapes_clipped(
                     Default::default(),
                     Color::new(0.0, 0.0, 1.0, 0.2),
                 )),
+                *transform,
             ));
         }
     }
@@ -402,6 +484,7 @@ fn collect_debug_shapes_clipped(
                 StyledRect::new(Default::default(), Color::transparent())
                     .with_stroke(Stroke::new(1.0, Color::new(0.0, 1.0, 0.0, 0.5))),
             ),
+            *transform,
         ));
     }
 
@@ -414,6 +497,7 @@ fn collect_debug_shapes_clipped(
                 StyledRect::new(Default::default(), Color::transparent())
                     .with_stroke(Stroke::new(2.0, Color::new(1.0, 0.0, 0.0, 0.8))),
             ),
+            *transform,
         ));
     }
 }
@@ -422,7 +506,8 @@ fn collect_gap_debug_shapes(
     node: &Node,
     clip_rect: Rect,
     _options: &crate::debug::DebugOptions,
-    out: &mut Vec<(Rect, Rect, Shape)>,
+    transform: &Transform2D,
+    out: &mut Vec<(Rect, Rect, Shape, Transform2D)>,
 ) {
     use crate::color::Color;
     use crate::layout::Layout;
@@ -481,6 +566,7 @@ fn collect_gap_debug_shapes(
                 Default::default(),
                 Color::new(0.5, 0.0, 0.5, 0.3), // Purple with 30% opacity
             )),
+            *transform,
         ));
     }
 }

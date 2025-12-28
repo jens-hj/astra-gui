@@ -1,5 +1,6 @@
 use crate::color::Color;
 use crate::content::Content;
+use crate::layout::{TransformOrigin, Translation};
 use crate::node::Node;
 use crate::primitives::{CornerShape, Shape};
 
@@ -30,10 +31,24 @@ pub struct Style {
     /// Cursor/caret color (for text input cursors, falls back to text_color if not set)
     pub cursor_color: Option<Color>,
 
-    /// Horizontal offset from default position
+    /// Horizontal translation from default position
+    pub translation_x: Option<f32>,
+
+    /// Vertical translation from default position
+    pub translation_y: Option<f32>,
+
+    /// Rotation in radians (clockwise positive, CSS convention)
+    pub rotation: Option<f32>,
+
+    /// Transform origin for rotation
+    pub transform_origin: Option<TransformOrigin>,
+
+    /// Deprecated: use translation_x
+    #[deprecated(since = "0.2.0", note = "Use translation_x instead")]
     pub offset_x: Option<f32>,
 
-    /// Vertical offset from default position
+    /// Deprecated: use translation_y
+    #[deprecated(since = "0.2.0", note = "Use translation_y instead")]
     pub offset_y: Option<f32>,
 }
 
@@ -80,7 +95,13 @@ impl Style {
             opacity: other.opacity.or(self.opacity),
             text_color: other.text_color.or(self.text_color),
             cursor_color: other.cursor_color.or(self.cursor_color),
+            translation_x: other.translation_x.or(self.translation_x),
+            translation_y: other.translation_y.or(self.translation_y),
+            rotation: other.rotation.or(self.rotation),
+            transform_origin: other.transform_origin.or(self.transform_origin),
+            #[allow(deprecated)]
             offset_x: other.offset_x.or(self.offset_x),
+            #[allow(deprecated)]
             offset_y: other.offset_y.or(self.offset_y),
         }
     }
@@ -124,12 +145,36 @@ impl Style {
             }
         }
 
-        // Apply offset if present
-        if self.offset_x.is_some() || self.offset_y.is_some() {
-            let current_offset = node.offset();
-            let new_x = self.offset_x.unwrap_or(current_offset.x);
-            let new_y = self.offset_y.unwrap_or(current_offset.y);
-            node.set_offset(crate::layout::Offset::new(new_x, new_y));
+        // Apply translation if present (check both new and deprecated fields)
+        #[allow(deprecated)]
+        let has_translation = self.translation_x.is_some()
+            || self.translation_y.is_some()
+            || self.offset_x.is_some()
+            || self.offset_y.is_some();
+
+        if has_translation {
+            let current_translation = node.translation();
+            #[allow(deprecated)]
+            let new_x = self
+                .translation_x
+                .or(self.offset_x)
+                .unwrap_or(current_translation.x);
+            #[allow(deprecated)]
+            let new_y = self
+                .translation_y
+                .or(self.offset_y)
+                .unwrap_or(current_translation.y);
+            node.set_translation(Translation::new(new_x, new_y));
+        }
+
+        // Apply rotation if present
+        if let Some(rotation) = self.rotation {
+            node.set_rotation(rotation);
+        }
+
+        // Apply transform origin if present
+        if let Some(origin) = self.transform_origin {
+            node.set_transform_origin(origin);
         }
     }
 }
