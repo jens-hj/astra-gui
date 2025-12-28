@@ -489,6 +489,7 @@ fn collect_debug_shapes_clipped(
     }
 
     // Draw clip rectangle (red outline showing the clipping boundary)
+    // Clip rects are in world space and should NOT be transformed
     if options.show_clip_rects {
         out.push((
             clip_rect,
@@ -496,6 +497,82 @@ fn collect_debug_shapes_clipped(
             Shape::Rect(
                 StyledRect::new(Default::default(), Color::transparent())
                     .with_stroke(Stroke::new(2.0, Color::new(1.0, 0.0, 0.0, 0.8))),
+            ),
+            Transform2D::IDENTITY, // Clip rects are already in world space
+        ));
+    }
+
+    // Draw transform origin crosshair
+    if options.show_transform_origins {
+        let width = node_rect.max[0] - node_rect.min[0];
+        let height = node_rect.max[1] - node_rect.min[1];
+        let (origin_x, origin_y) = node.transform_origin().resolve(width, height);
+        let origin_world_x = node_rect.min[0] + origin_x;
+        let origin_world_y = node_rect.min[1] + origin_y;
+
+        let crosshair_size = 10.0;
+        let crosshair_thickness = 2.0;
+
+        // Horizontal line
+        out.push((
+            Rect::new(
+                [
+                    origin_world_x - crosshair_size,
+                    origin_world_y - crosshair_thickness / 2.0,
+                ],
+                [
+                    origin_world_x + crosshair_size,
+                    origin_world_y + crosshair_thickness / 2.0,
+                ],
+            ),
+            clip_rect,
+            Shape::Rect(StyledRect::new(
+                Default::default(),
+                Color::new(1.0, 0.5, 0.0, 0.9), // Orange
+            )),
+            *transform,
+        ));
+
+        // Vertical line
+        out.push((
+            Rect::new(
+                [
+                    origin_world_x - crosshair_thickness / 2.0,
+                    origin_world_y - crosshair_size,
+                ],
+                [
+                    origin_world_x + crosshair_thickness / 2.0,
+                    origin_world_y + crosshair_size,
+                ],
+            ),
+            clip_rect,
+            Shape::Rect(StyledRect::new(
+                Default::default(),
+                Color::new(1.0, 0.5, 0.0, 0.9), // Orange
+            )),
+            *transform,
+        ));
+
+        // Circle at center (hollow with stroke)
+        use crate::primitives::CornerShape;
+        let circle_radius = 8.0;
+        let circle_rect = Rect::new(
+            [
+                origin_world_x - circle_radius,
+                origin_world_y - circle_radius,
+            ],
+            [
+                origin_world_x + circle_radius,
+                origin_world_y + circle_radius,
+            ],
+        );
+        out.push((
+            circle_rect,
+            clip_rect,
+            Shape::Rect(
+                StyledRect::new(circle_rect, Color::transparent())
+                    .with_corner_shape(CornerShape::Round(circle_radius))
+                    .with_stroke(Stroke::new(2.0, Color::new(1.0, 0.5, 0.0, 0.9))), // Orange stroke
             ),
             *transform,
         ));

@@ -13,6 +13,8 @@ pub struct DebugOptions {
     pub show_clip_rects: bool,
     /// Show gaps between children (purple overlay)
     pub show_gaps: bool,
+    /// Show transform origins (crosshair)
+    pub show_transform_origins: bool,
 }
 
 impl DebugOptions {
@@ -25,6 +27,7 @@ impl DebugOptions {
             show_content_area: false,
             show_clip_rects: false,
             show_gaps: false,
+            show_transform_origins: false,
         }
     }
 
@@ -37,6 +40,7 @@ impl DebugOptions {
             show_content_area: true,
             show_clip_rects: true,
             show_gaps: true,
+            show_transform_origins: true,
         }
     }
 
@@ -76,6 +80,12 @@ impl DebugOptions {
         self
     }
 
+    /// Enable transform origin visualization
+    pub const fn with_transform_origins(mut self, enabled: bool) -> Self {
+        self.show_transform_origins = enabled;
+        self
+    }
+
     /// Check if any debug visualization is enabled
     pub const fn is_enabled(&self) -> bool {
         self.show_margins
@@ -84,5 +94,6 @@ impl DebugOptions {
             || self.show_content_area
             || self.show_clip_rects
             || self.show_gaps
+            || self.show_transform_origins
     }
 }

@@ -24,12 +24,13 @@ const DEBUG_HELP_TEXT: &str = "Debug controls:
   C - Toggle content area (yellow outline)
   R - Toggle clip rects (red outline)
   G - Toggle gaps (purple overlay)
+  O - Toggle transform origins (orange crosshair)
   D - Toggle all debug visualizations
   S - Toggle render mode (SDF/Mesh)
   ESC - Exit";
 
 const DEBUG_HELP_TEXT_ONELINE: &str =
-    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | D:All | S:RenderMode | ESC:Exit";
+    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | D:All | S:RenderMode | ESC:Exit";
 
 fn handle_debug_keybinds(
     event: &WindowEvent,
@@ -78,6 +79,14 @@ fn handle_debug_keybinds(
         winit::keyboard::KeyCode::KeyG => {
             debug_options.show_gaps = !debug_options.show_gaps;
             println!("Gaps: {}", debug_options.show_gaps);
+            true
+        }
+        winit::keyboard::KeyCode::KeyO => {
+            debug_options.show_transform_origins = !debug_options.show_transform_origins;
+            println!(
+                "Transform origins: {}",
+                debug_options.show_transform_origins
+            );
             true
         }
         winit::keyboard::KeyCode::KeyD => {
