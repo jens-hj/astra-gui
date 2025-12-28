@@ -18,12 +18,16 @@ struct VertexInput {
 struct InstanceInput {
     @location(1) center: vec2<f32>,
     @location(2) half_size: vec2<f32>,
-    @location(3) fill_color: vec4<f32>,
-    @location(4) stroke_color: vec4<f32>,
-    @location(5) stroke_width: f32,
-    @location(6) corner_type: u32,
-    @location(7) corner_param1: f32,
-    @location(8) corner_param2: f32,
+    @location(3) translation: vec2<f32>,
+    @location(4) rotation: f32,
+    @location(5) transform_origin: vec2<f32>,
+    // location 6 is padding, skipped
+    @location(7) fill_color: vec4<f32>,
+    @location(8) stroke_color: vec4<f32>,
+    @location(9) stroke_width: f32,
+    @location(10) corner_type: u32,
+    @location(11) corner_param1: f32,
+    @location(12) corner_param2: f32,
 }
 
 struct VertexOutput {
@@ -50,11 +54,26 @@ var<uniform> uniforms: Uniforms;
 fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     var out: VertexOutput;
 
-    // Expand unit quad to screen-space rectangle
+    // Expand unit quad to local-space rectangle
     // Add padding for stroke (only half stroke width since it's centered on the edge)
     let padding = inst.stroke_width * 0.5;
     let expanded_size = inst.half_size + vec2<f32>(padding);
-    out.world_pos = inst.center + vert.pos * expanded_size;
+    let local_pos = inst.center + vert.pos * expanded_size;
+
+    // Apply transform: origin → rotate → translate
+    // 1. Translate to transform origin
+    let centered = local_pos - inst.transform_origin;
+
+    // 2. Rotate (clockwise positive, CSS convention)
+    let cos_r = cos(inst.rotation);
+    let sin_r = sin(inst.rotation);
+    let rotated = vec2<f32>(
+        centered.x * cos_r + centered.y * sin_r,
+        -centered.x * sin_r + centered.y * cos_r
+    );
+
+    // 3. Translate back from origin and apply translation offset
+    out.world_pos = rotated + inst.transform_origin + inst.translation;
 
     // Convert to normalized device coordinates (NDC)
     // Add 0.5 to world_pos to account for pixel centers being at half-integer coordinates
@@ -63,6 +82,7 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
 
     // Pass through instance data to fragment shader
     // local_pos is relative to the shape boundary (not the expanded quad with stroke padding)
+    // SDF computation uses unrotated local space
     out.local_pos = vert.pos * inst.half_size;
     out.fill_color = inst.fill_color;
     out.stroke_color = inst.stroke_color;

@@ -568,7 +568,7 @@ impl Renderer {
         let mut geometry_draws: Vec<ClippedDraw> = Vec::new();
 
         for clipped in &output.shapes {
-            let Shape::Rect(rect) = &clipped.shape else {
+            let Shape::Rect(_rect) = &clipped.shape else {
                 continue;
             };
 
@@ -581,7 +581,7 @@ impl Renderer {
 
             if use_sdf {
                 // Use SDF rendering (analytical anti-aliasing)
-                self.sdf_instances.push(RectInstance::from(rect));
+                self.sdf_instances.push(RectInstance::from(clipped));
             } else {
                 // Use mesh tessellation - collect for batch processing
                 // (Tessellator processes all shapes at once)

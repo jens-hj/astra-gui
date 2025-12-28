@@ -1,4 +1,4 @@
-use astra_gui::{CornerShape, StyledRect};
+use astra_gui::{ClippedShape, CornerShape, Shape, StyledRect};
 
 /// Instance data for SDF-based rectangle rendering.
 ///
@@ -7,10 +7,18 @@ use astra_gui::{CornerShape, StyledRect};
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct RectInstance {
-    /// Center position in screen-space pixels
+    /// Center position in untransformed screen-space pixels
     pub center: [f32; 2],
     /// Half-size (width/2, height/2) in pixels
     pub half_size: [f32; 2],
+    /// Translation offset (post-layout transform)
+    pub translation: [f32; 2],
+    /// Rotation in radians (clockwise positive, CSS convention)
+    pub rotation: f32,
+    /// Transform origin (absolute pixels from rect origin)
+    pub transform_origin: [f32; 2],
+    /// Padding for alignment
+    pub _padding1: f32,
     /// Fill color (RGBA, normalized to 0-255)
     pub fill_color: [u8; 4],
     /// Stroke color (RGBA, normalized to 0-255)
@@ -23,8 +31,6 @@ pub struct RectInstance {
     pub corner_param1: f32,
     /// Second corner parameter (smoothness for squircle, unused for others)
     pub corner_param2: f32,
-    /// Padding for 16-byte alignment
-    pub _padding: [u32; 2],
 }
 
 impl RectInstance {
@@ -39,54 +45,63 @@ impl RectInstance {
             },
             // half_size: vec2<f32> at location 2
             wgpu::VertexAttribute {
-                offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                offset: 8,
                 shader_location: 2,
                 format: wgpu::VertexFormat::Float32x2,
             },
-            // fill_color: vec4<f32> at location 3 (Unorm8x4)
+            // translation: vec2<f32> at location 3
             wgpu::VertexAttribute {
-                offset: (std::mem::size_of::<[f32; 2]>() * 2) as wgpu::BufferAddress,
+                offset: 16,
                 shader_location: 3,
-                format: wgpu::VertexFormat::Unorm8x4,
+                format: wgpu::VertexFormat::Float32x2,
             },
-            // stroke_color: vec4<f32> at location 4 (Unorm8x4)
+            // rotation: f32 at location 4
             wgpu::VertexAttribute {
-                offset: (std::mem::size_of::<[f32; 2]>() * 2 + std::mem::size_of::<[u8; 4]>())
-                    as wgpu::BufferAddress,
+                offset: 24,
                 shader_location: 4,
-                format: wgpu::VertexFormat::Unorm8x4,
-            },
-            // stroke_width: f32 at location 5
-            wgpu::VertexAttribute {
-                offset: (std::mem::size_of::<[f32; 2]>() * 2 + std::mem::size_of::<[u8; 4]>() * 2)
-                    as wgpu::BufferAddress,
-                shader_location: 5,
                 format: wgpu::VertexFormat::Float32,
             },
-            // corner_type: u32 at location 6
+            // transform_origin: vec2<f32> at location 5
             wgpu::VertexAttribute {
-                offset: (std::mem::size_of::<[f32; 2]>() * 2
-                    + std::mem::size_of::<[u8; 4]>() * 2
-                    + std::mem::size_of::<f32>()) as wgpu::BufferAddress,
-                shader_location: 6,
+                offset: 28,
+                shader_location: 5,
+                format: wgpu::VertexFormat::Float32x2,
+            },
+            // _padding1: f32 (skip, location 6 unused)
+            // fill_color: vec4<f32> at location 7 (Unorm8x4)
+            wgpu::VertexAttribute {
+                offset: 40,
+                shader_location: 7,
+                format: wgpu::VertexFormat::Unorm8x4,
+            },
+            // stroke_color: vec4<f32> at location 8 (Unorm8x4)
+            wgpu::VertexAttribute {
+                offset: 44,
+                shader_location: 8,
+                format: wgpu::VertexFormat::Unorm8x4,
+            },
+            // stroke_width: f32 at location 9
+            wgpu::VertexAttribute {
+                offset: 48,
+                shader_location: 9,
+                format: wgpu::VertexFormat::Float32,
+            },
+            // corner_type: u32 at location 10
+            wgpu::VertexAttribute {
+                offset: 52,
+                shader_location: 10,
                 format: wgpu::VertexFormat::Uint32,
             },
-            // corner_param1: f32 at location 7
+            // corner_param1: f32 at location 11
             wgpu::VertexAttribute {
-                offset: (std::mem::size_of::<[f32; 2]>() * 2
-                    + std::mem::size_of::<[u8; 4]>() * 2
-                    + std::mem::size_of::<f32>()
-                    + std::mem::size_of::<u32>()) as wgpu::BufferAddress,
-                shader_location: 7,
+                offset: 56,
+                shader_location: 11,
                 format: wgpu::VertexFormat::Float32,
             },
-            // corner_param2: f32 at location 8
+            // corner_param2: f32 at location 12
             wgpu::VertexAttribute {
-                offset: (std::mem::size_of::<[f32; 2]>() * 2
-                    + std::mem::size_of::<[u8; 4]>() * 2
-                    + std::mem::size_of::<f32>() * 2
-                    + std::mem::size_of::<u32>()) as wgpu::BufferAddress,
-                shader_location: 8,
+                offset: 60,
+                shader_location: 12,
                 format: wgpu::VertexFormat::Float32,
             },
         ];
@@ -99,17 +114,36 @@ impl RectInstance {
     }
 }
 
-impl From<&StyledRect> for RectInstance {
-    fn from(rect: &StyledRect) -> Self {
-        // Calculate center and half-size
+impl From<&ClippedShape> for RectInstance {
+    fn from(clipped: &ClippedShape) -> Self {
+        // Extract StyledRect from the shape
+        let rect = match &clipped.shape {
+            Shape::Rect(styled_rect) => styled_rect,
+            _ => panic!("RectInstance can only be created from Shape::Rect"),
+        };
+
+        // Calculate center and half-size from untransformed rect
         let center = [
-            (rect.rect.min[0] + rect.rect.max[0]) * 0.5,
-            (rect.rect.min[1] + rect.rect.max[1]) * 0.5,
+            (clipped.node_rect.min[0] + clipped.node_rect.max[0]) * 0.5,
+            (clipped.node_rect.min[1] + clipped.node_rect.max[1]) * 0.5,
         ];
         let half_size = [
-            (rect.rect.max[0] - rect.rect.min[0]) * 0.5,
-            (rect.rect.max[1] - rect.rect.min[1]) * 0.5,
+            (clipped.node_rect.max[0] - clipped.node_rect.min[0]) * 0.5,
+            (clipped.node_rect.max[1] - clipped.node_rect.min[1]) * 0.5,
         ];
+
+        // Extract transform data
+        let translation = [
+            clipped.transform.translation.x,
+            clipped.transform.translation.y,
+        ];
+        let rotation = clipped.transform.rotation;
+
+        // Resolve transform origin to absolute pixels
+        let width = clipped.node_rect.max[0] - clipped.node_rect.min[0];
+        let height = clipped.node_rect.max[1] - clipped.node_rect.min[1];
+        let (origin_x, origin_y) = clipped.transform.origin.resolve(width, height);
+        let transform_origin = [origin_x, origin_y];
 
         // Convert fill color
         let fill_color = [
@@ -146,13 +180,16 @@ impl From<&StyledRect> for RectInstance {
         Self {
             center,
             half_size,
+            translation,
+            rotation,
+            transform_origin,
+            _padding1: 0.0,
             fill_color,
             stroke_color,
             stroke_width,
             corner_type,
             corner_param1: param1,
             corner_param2: param2,
-            _padding: [0, 0],
         }
     }
 }
