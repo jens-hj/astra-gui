@@ -778,7 +778,17 @@ impl Renderer {
                     continue;
                 };
 
-                let rect = text_shape.rect;
+                // Apply transform translation to text rect (for now, only translation, no rotation)
+                let rect = astra_gui::Rect::new(
+                    [
+                        text_shape.rect.min[0] + clipped.transform.translation.x,
+                        text_shape.rect.min[1] + clipped.transform.translation.y,
+                    ],
+                    [
+                        text_shape.rect.max[0] + clipped.transform.translation.x,
+                        text_shape.rect.max[1] + clipped.transform.translation.y,
+                    ],
+                );
                 let text = text_shape.text.as_str();
 
                 if text.is_empty() {
