@@ -3,7 +3,7 @@
 //! This module provides functions to determine which node(s) are at a given point,
 //! respecting the layout hierarchy and overflow clipping.
 
-use crate::layout::Overflow;
+use crate::layout::{Overflow, Transform2D};
 use crate::node::{Node, NodeId};
 use crate::primitives::{Point, Rect};
 
@@ -21,7 +21,8 @@ pub struct HitTestResult {
 /// Hit-test a point against a node tree
 ///
 /// Returns all nodes that contain the point, ordered from root to leaf (shallow to deep).
-/// This respects overflow clipping - nodes outside their parent's clip rect are excluded.
+/// This respects overflow clipping and transforms - nodes outside their parent's clip rect
+/// or transformed space are excluded.
 ///
 /// # Arguments
 /// * `root` - The root node to test against
@@ -31,7 +32,7 @@ pub struct HitTestResult {
 /// Vector of hit test results, ordered from shallowest (root) to deepest (leaf)
 pub fn hit_test_point(root: &Node, point: Point) -> Vec<HitTestResult> {
     let mut results = Vec::new();
-    hit_test_recursive(root, point, None, &mut results);
+    hit_test_recursive(root, point, None, Transform2D::IDENTITY, &mut results);
     results
 }
 
@@ -54,32 +55,56 @@ pub fn hit_test_deepest(root: &Node, point: Point) -> Option<HitTestResult> {
 ///
 /// # Arguments
 /// * `node` - Current node being tested
-/// * `point` - The point in screen coordinates
+/// * `point` - The point in world screen coordinates
 /// * `clip_rect` - The current clipping rectangle (None means no clipping)
+/// * `parent_transform` - Accumulated transform from parent nodes
 /// * `results` - Accumulator for hit test results
 fn hit_test_recursive(
     node: &Node,
     point: Point,
     clip_rect: Option<Rect>,
+    parent_transform: Transform2D,
     results: &mut Vec<HitTestResult>,
 ) {
-    // Get the computed layout for this node
+    // Get the computed layout for this node (untransformed rect)
     let Some(computed) = node.computed_layout() else {
         return; // Node hasn't been laid out yet, skip it
     };
 
-    // Use the computed rect directly
     let node_rect = computed.rect;
 
-    // Check if point is within the current clip rect
+    // Build local transform from node properties
+    let local_transform = Transform2D {
+        translation: node.translation(),
+        rotation: node.rotation(),
+        origin: node.transform_origin(),
+    };
+
+    // Compute rect size for transform operations
+    let rect_size = [
+        node_rect.max[0] - node_rect.min[0],
+        node_rect.max[1] - node_rect.min[1],
+    ];
+
+    // Accumulate transforms: parent → local
+    let world_transform = parent_transform.then(&local_transform, rect_size);
+
+    // Transform the point to local (untransformed) space using inverse transform
+    let local_point_array = world_transform.apply_inverse([point.x, point.y], rect_size);
+    let local_test_point = Point {
+        x: local_point_array[0],
+        y: local_point_array[1],
+    };
+
+    // Check if point is within the current clip rect (in world space)
     if let Some(clip) = clip_rect {
         if !clip.contains(point) {
             return; // Point is outside clip rect, early exit
         }
     }
 
-    // Check if point is within this node's bounds
-    if !node_rect.contains(point) {
+    // Check if transformed point is within this node's untransformed bounds
+    if !node_rect.contains(local_test_point) {
         return; // Point is outside this node, skip it and children
     }
 
@@ -87,9 +112,10 @@ fn hit_test_recursive(
     // However, we still need to test their children (they might not be disabled)
     if !node.is_disabled() {
         // Point is within this node! Add it to results
+        // Use the transformed local point for the local position
         let local_pos = Point {
-            x: point.x - node_rect.min[0],
-            y: point.y - node_rect.min[1],
+            x: local_test_point.x - node_rect.min[0],
+            y: local_test_point.y - node_rect.min[1],
         };
 
         results.push(HitTestResult {
@@ -126,8 +152,8 @@ fn hit_test_recursive(
         }
     };
 
-    // Recursively test children
+    // Recursively test children with accumulated transform
     for child in node.children() {
-        hit_test_recursive(child, point, child_clip_rect, results);
+        hit_test_recursive(child, point, child_clip_rect, world_transform, results);
     }
 }
