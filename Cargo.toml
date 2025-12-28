@@ -1,0 +1,38 @@
+[workspace]
+members = [
+    "crates/astra-gui",
+    "crates/astra-gui-fonts",
+    "crates/astra-gui-text",
+    "crates/astra-gui-wgpu",
+    "crates/astra-gui-interactive",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Core wgpu for GPU programming
+wgpu = "27.0"
+# Window creation and event handling
+winit = "0.30"
+# Async runtime for wgpu initialization
+pollster = "0.4"
+# Linear algebra for 3D math
+glam = "0.30"
+# Byte conversion for GPU buffers
+bytemuck = { version = "1.24", features = ["derive"] }
+# Text shaping and rendering
+cosmic-text = "0.15"
+# Logging
+log = "0.4"
+env_logger = "0.11"
+# Astra GUI
+astra-gui = { path = "crates/astra-gui" }
+astra-gui-fonts = { path = "crates/astra-gui-fonts" }
+astra-gui-text = { path = "crates/astra-gui-text" }
+astra-gui-wgpu = { path = "crates/astra-gui-wgpu" }
+astra-gui-interactive = { path = "crates/astra-gui-interactive" }
