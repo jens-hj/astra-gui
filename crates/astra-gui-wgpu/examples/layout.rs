@@ -1,7 +1,7 @@
 ///! Demonstrates the node-based layout system with nested elements
 use astra_gui::{
     catppuccin::mocha, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout,
-    Node, Offset, Shape, Size, Spacing, Stroke, StyledRect, TextContent, VerticalAlign,
+    Node, Shape, Size, Spacing, Stroke, StyledRect, TextContent, VerticalAlign,
 };
 use astra_gui_wgpu::{RenderMode, Renderer};
 use std::sync::Arc;
@@ -392,7 +392,6 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
             // Footer - 10% height with three Fill children laid out horizontally with gap
             Node::new()
                 .with_height(Size::fraction(0.1))
-                .with_offset(Offset::new(0.0, 0.0))
                 .with_padding(Spacing::all(20.0))
                 .with_gap(20.0)
                 .with_layout_direction(Layout::Horizontal)

@@ -5,7 +5,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign,
-    Layout, Node, Offset, Overflow, Rect, Shape, Size, Spacing, Stroke, StyledRect, TextContent,
+    Layout, Node, Overflow, Rect, Shape, Size, Spacing, Stroke, StyledRect, TextContent,
     VerticalAlign,
 };
 use astra_gui_wgpu::{RenderMode, Renderer};
@@ -418,8 +418,6 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                                         .with_corner_shape(CornerShape::Round(14.0))
                                         .with_stroke(Stroke::new(2.0, mocha::SURFACE0)),
                                 ))
-                                // Optional offset to demonstrate bounds interactions.
-                                .with_offset(Offset::new(0.0, 0.0))
                                 .with_children(vec![label(
                                     "This string is intentionally very long to demonstrate clipping/scissoring. So let's make this even longer to make sure it clips.",
                                     18.0,
