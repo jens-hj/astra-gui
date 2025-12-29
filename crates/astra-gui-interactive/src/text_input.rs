@@ -3,8 +3,8 @@
 //! Provides an editable text input field with cursor, selection, and keyboard support.
 
 use astra_gui::{
-    catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, Offset, Rect,
-    Shape, Size, Spacing, Style, StyledRect, TextContent, Transition, VerticalAlign,
+    catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, Rect, Shape,
+    Size, Spacing, Style, StyledRect, TextContent, Transition, Translation, VerticalAlign,
 };
 use astra_gui_wgpu::{InteractionEvent, Key, NamedKey, TargetedEvent};
 use std::time::Duration;
@@ -205,7 +205,7 @@ pub fn text_input(
                 Node::new()
                     .with_width(Size::px(selection_width))
                     .with_height(Size::px(style.font_size))
-                    .with_offset(Offset::x(selection_x_offset))
+                    .with_translation(Translation::x(selection_x_offset))
                     .with_shape(Shape::Rect(StyledRect {
                         rect: Rect::default(),
                         corner_shape: CornerShape::Round(2.0), // Slightly rounded
@@ -248,7 +248,7 @@ pub fn text_input(
                 Node::new()
                     .with_width(Size::px(style.cursor_style.thickness))
                     .with_height(Size::px(style.font_size))
-                    .with_offset(Offset::x(cursor_x_offset))
+                    .with_translation(Translation::x(cursor_x_offset))
                     .with_shape(Shape::Rect(StyledRect::new(Rect::default(), cursor_color)))
             }
             CursorShape::Underline => {
@@ -272,7 +272,7 @@ pub fn text_input(
                 Node::new()
                     .with_width(Size::px(cursor_width))
                     .with_height(Size::px(style.cursor_style.thickness))
-                    .with_offset(Offset::new(cursor_x_offset, style.font_size))
+                    .with_translation(Translation::new(cursor_x_offset, style.font_size))
                     .with_shape(Shape::Rect(StyledRect::new(Rect::default(), cursor_color)))
             }
             CursorShape::Block => {
@@ -296,7 +296,7 @@ pub fn text_input(
                 Node::new()
                     .with_width(Size::px(cursor_width))
                     .with_height(Size::px(style.font_size))
-                    .with_offset(Offset::x((cursor_x_offset - cursor_width).max(0.0)))
+                    .with_translation(Translation::x((cursor_x_offset - cursor_width).max(0.0)))
                     .with_shape(Shape::Rect(StyledRect::new(
                         Rect::default(),
                         cursor_color.with_alpha(0.3), // Semi-transparent

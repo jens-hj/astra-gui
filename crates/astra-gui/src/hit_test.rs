@@ -78,6 +78,7 @@ fn hit_test_recursive(
         translation: node.translation(),
         rotation: node.rotation(),
         origin: node.transform_origin(),
+        absolute_origin: None,
     };
 
     // Compute rect size for transform operations
@@ -87,7 +88,15 @@ fn hit_test_recursive(
     ];
 
     // Accumulate transforms: parent → local
-    let world_transform = parent_transform.then(&local_transform, rect_size);
+    let mut world_transform = parent_transform.then(&local_transform, rect_size);
+
+    // If this node has rotation and no absolute origin is set yet, resolve it now
+    // This matches the logic in output.rs to ensure hit testing uses the same transform
+    if world_transform.rotation.abs() > 0.0001 && world_transform.absolute_origin.is_none() {
+        let (origin_x, origin_y) = world_transform.origin.resolve(rect_size[0], rect_size[1]);
+        world_transform.absolute_origin =
+            Some([node_rect.min[0] + origin_x, node_rect.min[1] + origin_y]);
+    }
 
     // Transform the point to local (untransformed) space using inverse transform
     let local_point_array = world_transform.apply_inverse([point.x, point.y], rect_size);

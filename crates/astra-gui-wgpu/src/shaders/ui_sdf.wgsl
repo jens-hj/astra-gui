@@ -58,13 +58,16 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     // Add padding for stroke (only half stroke width since it's centered on the edge)
     let padding = inst.stroke_width * 0.5;
     let expanded_size = inst.half_size + vec2<f32>(padding);
-    let local_pos = inst.center + vert.pos * expanded_size;
 
-    // Apply transform: origin → rotate → translate
-    // 1. Translate to transform origin
+    // Apply translation first (post-layout offset), then rotation
+    // 1. Start with center position + translation
+    let translated_center = inst.center + inst.translation;
+    let local_pos = translated_center + vert.pos * expanded_size;
+
+    // 2. Translate to transform origin for rotation
     let centered = local_pos - inst.transform_origin;
 
-    // 2. Rotate (clockwise positive, CSS convention)
+    // 3. Rotate (clockwise positive, CSS convention)
     let cos_r = cos(inst.rotation);
     let sin_r = sin(inst.rotation);
     let rotated = vec2<f32>(
@@ -72,8 +75,8 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
         -centered.x * sin_r + centered.y * cos_r
     );
 
-    // 3. Translate back from origin and apply translation offset
-    out.world_pos = rotated + inst.transform_origin + inst.translation;
+    // 4. Translate back from origin
+    out.world_pos = rotated + inst.transform_origin;
 
     // Convert to normalized device coordinates (NDC)
     // Add 0.5 to world_pos to account for pixel centers being at half-integer coordinates

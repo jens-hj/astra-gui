@@ -3,8 +3,8 @@
 //! Provides a draggable slider for selecting values within a range.
 
 use astra_gui::{
-    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Offset, Rect, Shape, Size, Style,
-    StyledRect, Transition,
+    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Rect, Shape, Size, Style,
+    StyledRect, Transition, Translation,
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 use std::ops::RangeInclusive;
@@ -99,8 +99,7 @@ pub fn slider(
             Node::new()
                 .with_width(Size::px(style.track_width))
                 .with_height(Size::px(style.track_height))
-                .with_offset(Offset::new(
-                    0.0,
+                .with_translation(Translation::y(
                     (style.thumb_size - style.track_height) / 2.0,
                 ))
                 .with_shape(Shape::Rect(StyledRect {
@@ -119,7 +118,7 @@ pub fn slider(
             Node::new()
                 .with_width(Size::px(filled_width))
                 .with_height(Size::px(style.track_height))
-                .with_offset(astra_gui::Offset::new(0.0, -thumb_inset))
+                .with_translation(Translation::y(-thumb_inset))
                 .with_shape(astra_gui::Shape::Rect(
                     StyledRect::new(Default::default(), style.filled_color)
                         .with_corner_shape(CornerShape::Round(style.track_height / 2.0)),
@@ -137,7 +136,7 @@ pub fn slider(
             Node::new()
                 .with_width(Size::px(style.thumb_size))
                 .with_height(Size::px(style.thumb_size))
-                .with_offset(Offset::new(thumb_offset_x, 0.0))
+                .with_translation(Translation::x(thumb_offset_x))
                 .with_shape(Shape::Rect(StyledRect {
                     rect: Rect::default(),
                     corner_shape: CornerShape::Round(style.thumb_size / 2.0),

@@ -27,12 +27,13 @@ const DEBUG_HELP_TEXT: &str = "Debug controls:
   C - Toggle content area (yellow outline)
   R - Toggle clip rects (red outline)
   G - Toggle gaps (purple overlay)
+  O - Toggle transform origins (orange crosshair)
   D - Toggle all debug visualizations
   S - Toggle render mode (SDF/Mesh)
   ESC - Exit";
 
 const DEBUG_HELP_TEXT_ONELINE: &str =
-    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | D:All | S:RenderMode | ESC:Exit";
+    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | D:All | S:RenderMode | ESC:Exit";
 
 fn handle_debug_keybinds(
     event: &WindowEvent,
@@ -81,6 +82,14 @@ fn handle_debug_keybinds(
         winit::keyboard::KeyCode::KeyG => {
             debug_options.show_gaps = !debug_options.show_gaps;
             println!("Gaps: {}", debug_options.show_gaps);
+            true
+        }
+        winit::keyboard::KeyCode::KeyO => {
+            debug_options.show_transform_origins = !debug_options.show_transform_origins;
+            println!(
+                "Transform origins: {}",
+                debug_options.show_transform_origins
+            );
             true
         }
         winit::keyboard::KeyCode::KeyD => {
@@ -156,8 +165,8 @@ impl App {
             input_state: InputState::new(),
             event_dispatcher: EventDispatcher::new(),
             interactive_state_manager: InteractiveStateManager::new(),
-            outer_rotation: 15.0,
-            inner_rotation: -30.0,
+            outer_rotation: 30.0,
+            inner_rotation: 0.0,
             counter: 0,
             toggle_state: true,
             debug_options: DebugOptions::none(),
@@ -322,6 +331,8 @@ impl App {
             .with_layout_direction(Layout::Vertical)
             .with_gap(24.0)
             .with_children(vec![
+                // Spacer
+                Node::new().with_height(Size::Fill),
                 // Title
                 Node::new()
                     .with_width(Size::Fill)
@@ -352,6 +363,8 @@ impl App {
                     .with_layout_direction(Layout::Horizontal)
                     .with_gap(40.0)
                     .with_children(vec![
+                        // Spacer
+                        Node::new().with_width(Size::Fill),
                         // Left side - Outer rotation control
                         Node::new()
                             .with_width(Size::px(300.0))
@@ -577,7 +590,11 @@ impl App {
                                             ]),
                                     ]),
                             ]),
+                        // Spacer
+                        Node::new().with_width(Size::Fill),
                     ]),
+                // Spacer
+                Node::new().with_height(Size::Fill),
                 // Help bar
                 Node::new()
                     .with_width(Size::Fill)

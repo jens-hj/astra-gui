@@ -223,6 +223,9 @@ pub struct Transform2D {
     pub translation: Translation,
     pub rotation: f32, // Radians, clockwise positive (CSS convention)
     pub origin: TransformOrigin,
+    /// Absolute world-space origin position (resolved during transform composition)
+    /// This is used for hierarchical rotations - children rotate around this point
+    pub absolute_origin: Option<[f32; 2]>,
 }
 
 impl Transform2D {
@@ -235,6 +238,7 @@ impl Transform2D {
             x_offset: 0.0,
             y_offset: 0.0,
         },
+        absolute_origin: None,
     };
 
     /// Apply transform to a point (forward transform)
@@ -278,15 +282,25 @@ impl Transform2D {
 
     /// Compose two transforms (apply self, then other)
     pub fn then(&self, other: &Transform2D, _rect_size: [f32; 2]) -> Transform2D {
-        // For hierarchical transforms, accumulate rotations and translations
-        // This is a simplified composition that works for most cases
+        // If parent has rotation or an absolute origin, use parent's absolute origin
+        // Otherwise, use child's origin (will be resolved later)
+        let (effective_origin, absolute_origin) =
+            if self.rotation.abs() > 0.0001 || self.absolute_origin.is_some() {
+                // Parent is rotated or has inherited rotation - use parent's absolute origin
+                (self.origin, self.absolute_origin)
+            } else {
+                // Parent is not rotated - use child's origin (no absolute origin yet)
+                (other.origin, None)
+            };
+
         Transform2D {
             translation: Translation {
                 x: self.translation.x + other.translation.x,
                 y: self.translation.y + other.translation.y,
             },
             rotation: self.rotation + other.rotation,
-            origin: other.origin, // Use child's origin
+            origin: effective_origin,
+            absolute_origin,
         }
     }
 }

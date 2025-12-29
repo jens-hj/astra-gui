@@ -139,11 +139,20 @@ impl From<&ClippedShape> for RectInstance {
         ];
         let rotation = clipped.transform.rotation;
 
-        // Resolve transform origin to absolute pixels
-        let width = clipped.node_rect.max[0] - clipped.node_rect.min[0];
-        let height = clipped.node_rect.max[1] - clipped.node_rect.min[1];
-        let (origin_x, origin_y) = clipped.transform.origin.resolve(width, height);
-        let transform_origin = [origin_x, origin_y];
+        // Resolve transform origin to absolute world-space pixels
+        // If absolute_origin is set (from hierarchical rotation), use it
+        // Otherwise, resolve the percentage-based origin relative to this rect
+        let transform_origin = if let Some(abs_origin) = clipped.transform.absolute_origin {
+            abs_origin
+        } else {
+            let width = clipped.node_rect.max[0] - clipped.node_rect.min[0];
+            let height = clipped.node_rect.max[1] - clipped.node_rect.min[1];
+            let (origin_x, origin_y) = clipped.transform.origin.resolve(width, height);
+            [
+                clipped.node_rect.min[0] + origin_x,
+                clipped.node_rect.min[1] + origin_y,
+            ]
+        };
 
         // Convert fill color
         let fill_color = [

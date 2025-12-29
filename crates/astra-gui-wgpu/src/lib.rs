@@ -778,17 +778,8 @@ impl Renderer {
                     continue;
                 };
 
-                // Apply transform translation to text rect (for now, only translation, no rotation)
-                let rect = astra_gui::Rect::new(
-                    [
-                        text_shape.rect.min[0] + clipped.transform.translation.x,
-                        text_shape.rect.min[1] + clipped.transform.translation.y,
-                    ],
-                    [
-                        text_shape.rect.max[0] + clipped.transform.translation.x,
-                        text_shape.rect.max[1] + clipped.transform.translation.y,
-                    ],
-                );
+                // Use untransformed rect for shaping - transforms will be applied to vertices
+                let rect = text_shape.rect;
                 let text = text_shape.text.as_str();
 
                 if text.is_empty() {
@@ -879,6 +870,58 @@ impl Renderer {
                     let x1 = x0 + bitmap.size_px[0] as f32;
                     let y1 = y0 + bitmap.size_px[1] as f32;
 
+                    // Apply full transform (translation + rotation) to the glyph quad vertices
+                    let rotation = clipped.transform.rotation;
+                    let translation = clipped.transform.translation;
+                    let transform_origin =
+                        if let Some(abs_origin) = clipped.transform.absolute_origin {
+                            abs_origin
+                        } else {
+                            // Fallback: resolve origin relative to the node rect
+                            let node_width = clipped.node_rect.max[0] - clipped.node_rect.min[0];
+                            let node_height = clipped.node_rect.max[1] - clipped.node_rect.min[1];
+                            let (origin_x, origin_y) =
+                                clipped.transform.origin.resolve(node_width, node_height);
+                            [
+                                clipped.node_rect.min[0] + origin_x,
+                                clipped.node_rect.min[1] + origin_y,
+                            ]
+                        };
+
+                    // Helper to apply translation first, then rotation around the transform origin
+                    let apply_transform = |pos: [f32; 2]| -> [f32; 2] {
+                        // 1. Apply translation first
+                        let mut x = pos[0] + translation.x;
+                        let mut y = pos[1] + translation.y;
+
+                        // 2. Apply rotation if present
+                        if rotation.abs() > 0.0001 {
+                            // Translate to origin
+                            x -= transform_origin[0];
+                            y -= transform_origin[1];
+
+                            // Rotate (clockwise positive)
+                            let cos_r = rotation.cos();
+                            let sin_r = rotation.sin();
+                            let rx = x * cos_r + y * sin_r;
+                            let ry = -x * sin_r + y * cos_r;
+
+                            x = rx;
+                            y = ry;
+
+                            // Translate back from origin
+                            x += transform_origin[0];
+                            y += transform_origin[1];
+                        }
+
+                        [x, y]
+                    };
+
+                    let p0 = apply_transform([x0, y0]);
+                    let p1 = apply_transform([x1, y0]);
+                    let p2 = apply_transform([x1, y1]);
+                    let p3 = apply_transform([x0, y1]);
+
                     let color = [
                         text_shape.color.r,
                         text_shape.color.g,
@@ -889,22 +932,22 @@ impl Renderer {
 
                     let base = self.text_vertices.len() as u32;
                     self.text_vertices.push(text::vertex::TextVertex::new(
-                        [x0, y0],
+                        p0,
                         [uv.min[0], uv.min[1]],
                         color,
                     ));
                     self.text_vertices.push(text::vertex::TextVertex::new(
-                        [x1, y0],
+                        p1,
                         [uv.max[0], uv.min[1]],
                         color,
                     ));
                     self.text_vertices.push(text::vertex::TextVertex::new(
-                        [x1, y1],
+                        p2,
                         [uv.max[0], uv.max[1]],
                         color,
                     ));
                     self.text_vertices.push(text::vertex::TextVertex::new(
-                        [x0, y1],
+                        p3,
                         [uv.min[0], uv.max[1]],
                         color,
                     ));

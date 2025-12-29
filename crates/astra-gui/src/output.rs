@@ -142,6 +142,7 @@ fn collect_clipped_shapes_with_opacity(
         translation: node.translation(),
         rotation: node.rotation(),
         origin: node.transform_origin(),
+        absolute_origin: None, // Will be set during composition if needed
     };
 
     // Compute rect size for transform operations
@@ -151,7 +152,14 @@ fn collect_clipped_shapes_with_opacity(
     ];
 
     // Accumulate transforms: parent → local
-    let world_transform = parent_transform.then(&local_transform, rect_size);
+    let mut world_transform = parent_transform.then(&local_transform, rect_size);
+
+    // If this node has rotation and no absolute origin is set yet, resolve it now
+    if world_transform.rotation.abs() > 0.0001 && world_transform.absolute_origin.is_none() {
+        let (origin_x, origin_y) = world_transform.origin.resolve(rect_size[0], rect_size[1]);
+        world_transform.absolute_origin =
+            Some([node_rect.min[0] + origin_x, node_rect.min[1] + origin_y]);
+    }
 
     // Compute AABB (axis-aligned bounding box) of transformed rect for clipping
     let transformed_aabb = compute_transformed_aabb(node_rect, &world_transform);
