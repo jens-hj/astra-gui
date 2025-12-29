@@ -134,6 +134,17 @@ pub struct Renderer {
     // Backend-agnostic text shaping/raster engine (Inter via astra-gui-fonts).
     #[cfg(feature = "text-cosmic")]
     text_engine: gui_text::Engine,
+
+    // Text shaping cache - stores pre-shaped text to avoid expensive reshaping every frame
+    // Key: (text, font_size, width, height)
+    #[cfg(feature = "text-cosmic")]
+    shape_cache: std::collections::HashMap<
+        (String, u32, u32, u32),
+        (gui_text::ShapedLine, gui_text::LinePlacement),
+    >,
+
+    // Performance profiling
+    frame_counter: u64,
 }
 
 impl Renderer {
@@ -546,6 +557,10 @@ impl Renderer {
             atlas,
             #[cfg(feature = "text-cosmic")]
             text_engine: gui_text::Engine::new_default(),
+            #[cfg(feature = "text-cosmic")]
+            shape_cache: std::collections::HashMap::new(),
+
+            frame_counter: 0,
         }
     }
 
@@ -569,6 +584,8 @@ impl Renderer {
         screen_height: f32,
         output: &FullOutput,
     ) {
+        let render_start = std::time::Instant::now();
+
         // Separate shapes into SDF-renderable and tessellated.
         // SDF rendering is used for simple shapes (currently: all fills, simple strokes).
         // OPTIMIZATION: Pre-allocate based on previous frame to reduce allocations
@@ -828,6 +845,8 @@ impl Renderer {
             render_pass.set_scissor_rect(0, 0, screen_width as u32, screen_height as u32);
         }
 
+        let text_start = std::time::Instant::now();
+
         // Draw text: shape (backend-agnostic) + rasterize (backend-agnostic) + atlas upload + quads.
         //
         // IMPORTANT: scissor/clipping is render-pass state. To respect `ClippedShape::clip_rect`,
@@ -843,6 +862,12 @@ impl Renderer {
             self.text_indices.reserve(self.last_frame_text_index_count);
 
             let mut draws: Vec<ClippedDraw> = Vec::new();
+
+            let mut shape_time = std::time::Duration::ZERO;
+            let mut atlas_time = std::time::Duration::ZERO;
+            let mut vertex_time = std::time::Duration::ZERO;
+            let mut cache_hits = 0;
+            let mut cache_misses = 0;
 
             for clipped in &output.shapes {
                 let Shape::Text(text_shape) = &clipped.shape else {
@@ -875,15 +900,37 @@ impl Renderer {
                 // Start of this shape's indices in the final index buffer.
                 let index_start = self.text_indices.len() as u32;
 
-                // Shape + placement (backend-agnostic).
-                let (shaped, placement) = self.text_engine.shape_line(gui_text::ShapeLineRequest {
-                    text,
-                    rect,
-                    font_px: text_shape.font_size,
-                    h_align: text_shape.h_align,
-                    v_align: text_shape.v_align,
-                    family: None,
-                });
+                // Shape + placement (backend-agnostic) with caching
+                let shape_start = std::time::Instant::now();
+
+                // Create cache key from text + font size + rect dimensions
+                let cache_key = (
+                    text.to_string(),
+                    text_shape.font_size as u32,
+                    (rect.max[0] - rect.min[0]) as u32,
+                    (rect.max[1] - rect.min[1]) as u32,
+                );
+
+                let (shaped, placement) = if let Some(cached) = self.shape_cache.get(&cache_key) {
+                    // Cache hit - reuse shaped text
+                    cache_hits += 1;
+                    cached.clone()
+                } else {
+                    // Cache miss - shape the text
+                    cache_misses += 1;
+                    let result = self.text_engine.shape_line(gui_text::ShapeLineRequest {
+                        text,
+                        rect,
+                        font_px: text_shape.font_size,
+                        h_align: text_shape.h_align,
+                        v_align: text_shape.v_align,
+                        family: None,
+                    });
+                    self.shape_cache.insert(cache_key, result.clone());
+                    result
+                };
+
+                shape_time += shape_start.elapsed();
 
                 // Pre-calculate rotation trig functions outside the glyph loop
                 let rotation = clipped.transform.rotation;
@@ -894,6 +941,7 @@ impl Renderer {
                 };
                 let has_rotation = rotation.abs() > 0.0001;
 
+                let atlas_start = std::time::Instant::now();
                 for g in &shaped.glyphs {
                     let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
                         continue;
@@ -1040,7 +1088,9 @@ impl Renderer {
                         base + 3,
                     ]);
                 }
+                atlas_time += atlas_start.elapsed();
 
+                let vertex_start = std::time::Instant::now();
                 let index_end = self.text_indices.len() as u32;
                 if index_end > index_start {
                     draws.push(ClippedDraw {
@@ -1049,6 +1099,18 @@ impl Renderer {
                         index_end,
                     });
                 }
+                vertex_time += vertex_start.elapsed();
+            }
+
+            if self.frame_counter % 60 == 0 {
+                println!(
+                    "    Text detail: Shape: {:.2}ms, Atlas: {:.2}ms, Vertex: {:.2}ms (Cache: {} hits, {} misses)",
+                    shape_time.as_secs_f64() * 1000.0,
+                    atlas_time.as_secs_f64() * 1000.0,
+                    vertex_time.as_secs_f64() * 1000.0,
+                    cache_hits,
+                    cache_misses,
+                );
             }
 
             if !draws.is_empty() {
@@ -1131,5 +1193,19 @@ impl Renderer {
         self.last_frame_vertex_count = self.wgpu_vertices.len();
         self.last_frame_index_count = self.frame_indices.len();
         self.last_frame_sdf_instance_count = self.sdf_instances.len();
+
+        let text_time = text_start.elapsed();
+        let total_render_time = render_start.elapsed();
+
+        // Log every 60 frames
+        self.frame_counter += 1;
+        if self.frame_counter % 60 == 0 {
+            println!(
+                "  Render breakdown: Total: {:.2}ms, Text: {:.2}ms, Other: {:.2}ms",
+                total_render_time.as_secs_f64() * 1000.0,
+                text_time.as_secs_f64() * 1000.0,
+                (total_render_time.as_secs_f64() - text_time.as_secs_f64()) * 1000.0,
+            );
+        }
     }
 }

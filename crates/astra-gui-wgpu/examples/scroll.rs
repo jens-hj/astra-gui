@@ -122,6 +122,7 @@ struct App {
     last_frame_time: Option<std::time::Instant>,
     item_heights: Vec<f32>, // Random heights for vertical scroll items
     item_widths: Vec<f32>,  // Random widths for horizontal scroll items
+    frame_count: u64,       // For performance logging
 }
 
 struct GpuState {
@@ -516,13 +517,17 @@ impl ApplicationHandler for App {
 
             WindowEvent::RedrawRequested => {
                 if let Some(gpu_state) = &mut self.gpu_state {
+                    let frame_start = std::time::Instant::now();
+
                     // Build UI to dispatch events
+                    let ui_build_start = std::time::Instant::now();
                     let mut ui = create_demo_ui(
                         gpu_state.config.width as f32,
                         gpu_state.config.height as f32,
                         &self.item_heights,
                         &self.item_widths,
                     );
+                    let ui_build_time = ui_build_start.elapsed();
 
                     // IMPORTANT: Compute layout before dispatching events so hit testing works
                     let window_rect = astra_gui::Rect::new(
@@ -532,7 +537,9 @@ impl ApplicationHandler for App {
                             gpu_state.config.height as f32,
                         ],
                     );
+                    let layout_start = std::time::Instant::now();
                     ui.compute_layout(window_rect);
+                    let layout_time = layout_start.elapsed();
 
                     // Restore scroll state from persistent storage (before animations)
                     // This needs to happen before dispatch so the initial state is correct
@@ -563,6 +570,7 @@ impl ApplicationHandler for App {
                         .apply_styles(&mut ui, &interaction_states);
 
                     // Generate output
+                    let output_start = std::time::Instant::now();
                     let ui_output = FullOutput::from_node_with_debug(
                         ui,
                         (
@@ -575,10 +583,12 @@ impl ApplicationHandler for App {
                             None
                         },
                     );
+                    let output_time = output_start.elapsed();
 
                     // Clear input for next frame
                     gpu_state.input.begin_frame();
 
+                    let render_start = std::time::Instant::now();
                     match gpu_state.render(&ui_output) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
@@ -589,6 +599,21 @@ impl ApplicationHandler for App {
                         Err(wgpu::SurfaceError::OutOfMemory) => event_loop.exit(),
                         Err(e) => eprintln!("Render error: {:?}", e),
                     }
+                    let render_time = render_start.elapsed();
+
+                    let frame_time = frame_start.elapsed();
+
+                    // Print timing every 60 frames
+                    if self.frame_count % 60 == 0 {
+                        println!("Frame time: {:.2}ms (UI build: {:.2}ms, Layout: {:.2}ms, Output: {:.2}ms, Render: {:.2}ms)",
+                            frame_time.as_secs_f64() * 1000.0,
+                            ui_build_time.as_secs_f64() * 1000.0,
+                            layout_time.as_secs_f64() * 1000.0,
+                            output_time.as_secs_f64() * 1000.0,
+                            render_time.as_secs_f64() * 1000.0,
+                        );
+                    }
+                    self.frame_count += 1;
                 }
             }
 
@@ -632,6 +657,7 @@ fn main() {
         gpu_state: None,
         debug_options: DebugOptions::none(),
         last_frame_time: None,
+        frame_count: 0,
         item_heights,
         item_widths,
     };
