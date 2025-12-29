@@ -422,6 +422,7 @@ impl App {
                                         ),
                                         Node::new()
                                             .with_width(Size::px(60.0))
+                                            .with_height(Size::px(24.0))
                                             .with_content(Content::Text(TextContent {
                                                 text: format!("{:.0}", self.outer_translation_x),
                                                 font_size: 18.0,
@@ -454,6 +455,7 @@ impl App {
                                         ),
                                         Node::new()
                                             .with_width(Size::px(60.0))
+                                            .with_height(Size::px(24.0))
                                             .with_content(Content::Text(TextContent {
                                                 text: format!("{:.0}", self.outer_translation_y),
                                                 font_size: 18.0,
@@ -486,6 +488,7 @@ impl App {
                                         ),
                                         Node::new()
                                             .with_width(Size::px(60.0))
+                                            .with_height(Size::px(24.0))
                                             .with_content(Content::Text(TextContent {
                                                 text: format!("{:.0}", self.inner_translation_x),
                                                 font_size: 18.0,
@@ -518,6 +521,7 @@ impl App {
                                         ),
                                         Node::new()
                                             .with_width(Size::px(60.0))
+                                            .with_height(Size::px(24.0))
                                             .with_content(Content::Text(TextContent {
                                                 text: format!("{:.0}", self.inner_translation_y),
                                                 font_size: 18.0,
