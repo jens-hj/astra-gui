@@ -885,6 +885,15 @@ impl Renderer {
                     family: None,
                 });
 
+                // Pre-calculate rotation trig functions outside the glyph loop
+                let rotation = clipped.transform.rotation;
+                let (cos_r, sin_r) = if rotation.abs() > 0.0001 {
+                    (rotation.cos(), rotation.sin())
+                } else {
+                    (1.0, 0.0) // Identity rotation
+                };
+                let has_rotation = rotation.abs() > 0.0001;
+
                 for g in &shaped.glyphs {
                     let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
                         continue;
@@ -942,7 +951,6 @@ impl Renderer {
                     let y1 = y0 + bitmap.size_px[1] as f32;
 
                     // Apply full transform (translation + rotation) to the glyph quad vertices
-                    let rotation = clipped.transform.rotation;
                     let translation = clipped.transform.translation;
                     let transform_origin =
                         if let Some(abs_origin) = clipped.transform.absolute_origin {
@@ -960,20 +968,19 @@ impl Renderer {
                         };
 
                     // Helper to apply translation first, then rotation around the transform origin
+                    // Uses pre-calculated cos_r and sin_r from outside the loop
                     let apply_transform = |pos: [f32; 2]| -> [f32; 2] {
                         // 1. Apply translation first
                         let mut x = pos[0] + translation.x;
                         let mut y = pos[1] + translation.y;
 
-                        // 2. Apply rotation if present
-                        if rotation.abs() > 0.0001 {
+                        // 2. Apply rotation if present (use pre-calculated trig values)
+                        if has_rotation {
                             // Translate to origin
                             x -= transform_origin[0];
                             y -= transform_origin[1];
 
-                            // Rotate (clockwise positive)
-                            let cos_r = rotation.cos();
-                            let sin_r = rotation.sin();
+                            // Rotate (clockwise positive) - uses pre-calculated cos_r and sin_r
                             let rx = x * cos_r + y * sin_r;
                             let ry = -x * sin_r + y * cos_r;
 
