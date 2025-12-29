@@ -209,12 +209,7 @@ impl GpuState {
         }
     }
 
-    fn render(
-        &mut self,
-        debug_options: &DebugOptions,
-        item_heights: &[f32],
-        item_widths: &[f32],
-    ) -> Result<(), wgpu::SurfaceError> {
+    fn render(&mut self, ui_output: &FullOutput) -> Result<(), wgpu::SurfaceError> {
         let surface_texture = self.surface.get_current_texture()?;
         let view = surface_texture
             .texture
@@ -251,33 +246,6 @@ impl GpuState {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
-
-        // Build UI
-        let mut ui = create_demo_ui(
-            self.config.width as f32,
-            self.config.height as f32,
-            item_heights,
-            item_widths,
-        );
-
-        // Dispatch events
-        let (_events, interaction_states) = self.event_dispatcher.dispatch(&self.input, &mut ui);
-
-        // Apply interactive styles
-        self.interactive_state_manager.begin_frame();
-        self.interactive_state_manager
-            .apply_styles(&mut ui, &interaction_states);
-
-        // Render UI
-        let ui_output = FullOutput::from_node_with_debug(
-            ui,
-            (self.config.width as f32, self.config.height as f32),
-            if debug_options.is_enabled() {
-                Some(*debug_options)
-            } else {
-                None
-            },
-        );
 
         let mut encoder = self
             .device
@@ -378,7 +346,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
     let horizontal_scroll_container = Node::new()
         .with_id(NodeId::new("horizontal_scroll_container"))
         .with_width(Size::px(800.0))
-        .with_height(Size::px(200.0))
+        .with_height(Size::px(400.0))
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Horizontal)
@@ -433,7 +401,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
     let grid_scroll_container = Node::new()
         .with_id(NodeId::new("grid_scroll_container"))
         .with_width(Size::px(600.0))
-        .with_height(Size::px(400.0))
+        .with_height(Size::px(600.0))
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Vertical)
@@ -567,7 +535,7 @@ impl ApplicationHandler for App {
                     ui.compute_layout(window_rect);
 
                     // Dispatch events (scroll events are automatically processed internally)
-                    let (_events, _) = gpu_state
+                    let (_events, interaction_states) = gpu_state
                         .event_dispatcher
                         .dispatch(&gpu_state.input, &mut ui);
 
@@ -581,14 +549,30 @@ impl ApplicationHandler for App {
 
                     ui.update_all_scroll_animations(dt);
 
+                    // Apply interactive styles
+                    gpu_state.interactive_state_manager.begin_frame();
+                    gpu_state
+                        .interactive_state_manager
+                        .apply_styles(&mut ui, &interaction_states);
+
+                    // Generate output
+                    let ui_output = FullOutput::from_node_with_debug(
+                        ui,
+                        (
+                            gpu_state.config.width as f32,
+                            gpu_state.config.height as f32,
+                        ),
+                        if self.debug_options.is_enabled() {
+                            Some(self.debug_options)
+                        } else {
+                            None
+                        },
+                    );
+
                     // Clear input for next frame
                     gpu_state.input.begin_frame();
 
-                    match gpu_state.render(
-                        &self.debug_options,
-                        &self.item_heights,
-                        &self.item_widths,
-                    ) {
+                    match gpu_state.render(&ui_output) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
                             if let Some(window) = &self.window {
