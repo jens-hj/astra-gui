@@ -443,7 +443,7 @@ impl Node {
     }
 
     /// Get the layout mode
-    pub(crate) fn layout_direction(&self) -> Layout {
+    pub fn layout_direction(&self) -> Layout {
         self.layout_direction
     }
 

@@ -126,7 +126,8 @@ struct App {
     scroll_targets: HashMap<String, (f32, f32)>, // Target scroll positions for smooth scrolling
     debug_options: DebugOptions,
     last_frame_time: Option<std::time::Instant>,
-    item_heights: Vec<f32>, // Random heights for each item, generated once
+    item_heights: Vec<f32>, // Random heights for vertical scroll items
+    item_widths: Vec<f32>,  // Random widths for horizontal scroll items
 }
 
 struct GpuState {
@@ -219,6 +220,7 @@ impl GpuState {
         scroll_offsets: &HashMap<String, (f32, f32)>,
         debug_options: &DebugOptions,
         item_heights: &[f32],
+        item_widths: &[f32],
     ) -> Result<(), wgpu::SurfaceError> {
         let surface_texture = self.surface.get_current_texture()?;
         let view = surface_texture
@@ -263,6 +265,7 @@ impl GpuState {
             self.config.height as f32,
             scroll_offsets,
             item_heights,
+            item_widths,
         );
 
         // Dispatch events
@@ -334,9 +337,10 @@ fn calculate_max_scroll(container: &Node) -> (f32, f32) {
     let container_width = layout.rect.max[0] - layout.rect.min[0] - padding.left - padding.right;
     let container_height = layout.rect.max[1] - layout.rect.min[1] - padding.top - padding.bottom;
 
-    // Calculate total content size
+    // Calculate total content size based on layout direction
     let gap = container.gap();
     let children = container.children();
+    let layout_direction = container.layout_direction();
 
     if children.is_empty() {
         return (0.0, 0.0);
@@ -345,17 +349,51 @@ fn calculate_max_scroll(container: &Node) -> (f32, f32) {
     let mut content_width = 0.0f32;
     let mut content_height = 0.0f32;
 
-    for (i, child) in children.iter().enumerate() {
-        if let Some(child_layout) = child.computed_layout() {
-            let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
-            let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+    match layout_direction {
+        Layout::Vertical => {
+            // For vertical layout: accumulate heights, track max width
+            for (i, child) in children.iter().enumerate() {
+                if let Some(child_layout) = child.computed_layout() {
+                    let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                    let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
 
-            content_width = content_width.max(child_width);
-            content_height += child_height;
+                    content_width = content_width.max(child_width);
+                    content_height += child_height;
 
-            // Add gap between items (but not after the last one)
-            if i < children.len() - 1 {
-                content_height += gap;
+                    // Add gap between items (but not after the last one)
+                    if i < children.len() - 1 {
+                        content_height += gap;
+                    }
+                }
+            }
+        }
+        Layout::Horizontal => {
+            // For horizontal layout: accumulate widths, track max height
+            for (i, child) in children.iter().enumerate() {
+                if let Some(child_layout) = child.computed_layout() {
+                    let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                    let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+                    content_width += child_width;
+                    content_height = content_height.max(child_height);
+
+                    // Add gap between items (but not after the last one)
+                    if i < children.len() - 1 {
+                        content_width += gap;
+                    }
+                }
+            }
+        }
+        Layout::Stack => {
+            // For stack layout: track max width and max height
+            for child in children.iter() {
+                if let Some(child_layout) = child.computed_layout() {
+                    let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                    let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+                    content_width = content_width.max(child_width);
+                    content_height = content_height.max(child_height);
+                }
             }
         }
     }
@@ -372,6 +410,7 @@ fn create_demo_ui(
     _height: f32,
     scroll_offsets: &HashMap<String, (f32, f32)>,
     item_heights: &[f32],
+    item_widths: &[f32],
 ) -> Node {
     // Create a scrollable container with many items
     let mut items = Vec::new();
@@ -424,6 +463,56 @@ fn create_demo_ui(
 
     scroll_container.set_scroll_offset(scroll_offset);
 
+    // Create horizontal scrollable container
+    let mut horizontal_items = Vec::new();
+    for (i, &width) in item_widths.iter().enumerate() {
+        horizontal_items.push(
+            Node::new()
+                .with_width(Size::px(width))
+                .with_height(Size::Fill)
+                .with_shape(Shape::rect())
+                .with_style(Style {
+                    fill_color: Some(if i % 2 == 0 {
+                        mocha::SURFACE0
+                    } else {
+                        mocha::SURFACE1
+                    }),
+                    corner_shape: Some(CornerShape::Round(8.0)),
+                    ..Default::default()
+                })
+                .with_content(Content::Text(TextContent {
+                    text: format!("Item {}\nwidth {:.0}", i + 1, width),
+                    font_size: 20.0,
+                    color: mocha::TEXT,
+                    h_align: HorizontalAlign::Center,
+                    v_align: VerticalAlign::Center,
+                })),
+        );
+    }
+
+    let horizontal_scroll_offset = scroll_offsets
+        .get("horizontal_scroll_container")
+        .copied()
+        .unwrap_or((0.0, 0.0));
+
+    let mut horizontal_scroll_container = Node::new()
+        .with_id(NodeId::new("horizontal_scroll_container"))
+        .with_width(Size::px(800.0))
+        .with_height(Size::px(200.0))
+        .with_padding(Spacing::all(10.0))
+        .with_gap(10.0)
+        .with_layout_direction(Layout::Horizontal)
+        .with_overflow(Overflow::Scroll)
+        .with_shape(Shape::rect())
+        .with_style(Style {
+            fill_color: Some(mocha::MANTLE),
+            corner_shape: Some(CornerShape::Round(12.0)),
+            ..Default::default()
+        })
+        .with_children(horizontal_items);
+
+    horizontal_scroll_container.set_scroll_offset(horizontal_scroll_offset);
+
     // Root with centered layout
     Node::new()
         .with_width(Size::Fill)
@@ -447,13 +536,21 @@ fn create_demo_ui(
                             h_align: HorizontalAlign::Center,
                             v_align: VerticalAlign::Center,
                         })),
-                    // Centered scroll container
+                    // Centered vertical scroll container
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::Fill)
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(scroll_container)
+                        .with_child(Node::new().with_width(Size::Fill)), // Right spacer
+                    // Horizontal scroll container
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::px(220.0))
+                        .with_layout_direction(Layout::Horizontal)
+                        .with_child(Node::new().with_width(Size::Fill)) // Left spacer
+                        .with_child(horizontal_scroll_container)
                         .with_child(Node::new().with_width(Size::Fill)), // Right spacer
                 ]),
         )
@@ -510,6 +607,7 @@ impl ApplicationHandler for App {
                         gpu_state.config.height as f32,
                         &self.scroll_offsets,
                         &self.item_heights,
+                        &self.item_widths,
                     );
 
                     // IMPORTANT: Compute layout before dispatching events so hit testing works
@@ -592,6 +690,7 @@ impl ApplicationHandler for App {
                         &self.scroll_offsets,
                         &self.debug_options,
                         &self.item_heights,
+                        &self.item_widths,
                     ) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
@@ -630,9 +729,14 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    // Generate random heights for items once at startup
+    // Generate random heights for vertical scroll items once at startup
     let item_heights: Vec<f32> = (0..30)
         .map(|_| rand::random::<f32>() * 100.0 + 50.0)
+        .collect();
+
+    // Generate random widths for horizontal scroll items once at startup
+    let item_widths: Vec<f32> = (0..30)
+        .map(|_| rand::random::<f32>() * 150.0 + 100.0)
         .collect();
 
     let mut app = App {
@@ -643,11 +747,12 @@ fn main() {
         debug_options: DebugOptions::none(),
         last_frame_time: None,
         item_heights,
+        item_widths,
     };
 
     println!("{}", DEBUG_HELP_TEXT);
     println!();
-    println!("Use mouse wheel to scroll the container");
+    println!("Use mouse wheel to scroll the containers (vertical and horizontal)");
 
     event_loop.run_app(&mut app).unwrap();
 }
