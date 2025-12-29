@@ -20,7 +20,7 @@ pub use interactive_state::*;
 pub use winit::event::MouseButton;
 pub use winit::keyboard::{Key, NamedKey};
 
-use astra_gui::{FullOutput, Shape, Tessellator};
+use astra_gui::{FullOutput, HorizontalAlign, Shape, Tessellator, VerticalAlign};
 use instance::RectInstance;
 use vertex::WgpuVertex;
 
@@ -139,11 +139,9 @@ pub struct Renderer {
 
     // Text shaping cache - stores pre-shaped text to avoid expensive reshaping every frame
     // Key: (text, font_size, width, height)
+    // NOTE: Only caches ShapedLine, NOT LinePlacement (which contains absolute positions)
     #[cfg(feature = "text-cosmic")]
-    shape_cache: std::collections::HashMap<
-        (String, u32, u32, u32),
-        (gui_text::ShapedLine, gui_text::LinePlacement),
-    >,
+    shape_cache: std::collections::HashMap<(String, u32, u32, u32), gui_text::ShapedLine>,
 
     // Glyph metrics cache - stores bearing, size, AND atlas placement to avoid lookups
     // Key: GlyphKey (font_id, glyph_id, px_size, subpixel)
@@ -907,22 +905,46 @@ impl Renderer {
                     (rect.max[1] - rect.min[1]) as u32,
                 );
 
-                let (shaped, placement) = if let Some(cached) = self.shape_cache.get(&cache_key) {
+                let shaped = if let Some(cached) = self.shape_cache.get(&cache_key) {
                     // Cache hit - reuse shaped text
                     cached.clone()
                 } else {
                     // Cache miss - shape the text
-                    let result = self.text_engine.shape_line(gui_text::ShapeLineRequest {
-                        text,
-                        rect,
-                        font_px: text_shape.font_size,
-                        h_align: text_shape.h_align,
-                        v_align: text_shape.v_align,
-                        family: None,
-                    });
-                    self.shape_cache.insert(cache_key, result.clone());
-                    result
+                    let (shaped_line, _placement) =
+                        self.text_engine.shape_line(gui_text::ShapeLineRequest {
+                            text,
+                            rect,
+                            font_px: text_shape.font_size,
+                            h_align: text_shape.h_align,
+                            v_align: text_shape.v_align,
+                            family: None,
+                        });
+                    self.shape_cache.insert(cache_key, shaped_line.clone());
+                    shaped_line
                 };
+
+                // Always recalculate placement for this specific rect position
+                // (placement contains absolute screen positions, so it can't be cached)
+                let line_w = shaped.metrics.width_px;
+                let line_h = shaped.metrics.height_px;
+                let origin_px = {
+                    let x = match text_shape.h_align {
+                        HorizontalAlign::Left => rect.min[0],
+                        HorizontalAlign::Center => {
+                            rect.min[0] + ((rect.max[0] - rect.min[0]) - line_w) * 0.5
+                        }
+                        HorizontalAlign::Right => rect.max[0] - line_w,
+                    };
+                    let y = match text_shape.v_align {
+                        VerticalAlign::Top => rect.min[1],
+                        VerticalAlign::Center => {
+                            rect.min[1] + ((rect.max[1] - rect.min[1]) - line_h) * 0.5
+                        }
+                        VerticalAlign::Bottom => rect.max[1] - line_h,
+                    };
+                    [x, y]
+                };
+                let placement = gui_text::LinePlacement { origin_px };
 
                 // Pre-calculate rotation trig functions outside the glyph loop
                 let rotation = clipped.transform.rotation;
