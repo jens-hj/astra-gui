@@ -8,7 +8,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign,
-    Layout, Node, Rect, Shape, Size, Spacing, Style, TextContent, VerticalAlign,
+    Layout, Node, Rect, Shape, Size, Spacing, Stroke, Style, TextContent, VerticalAlign,
 };
 use astra_gui_text::Engine as TextEngine;
 use astra_gui_wgpu::{EventDispatcher, InputState, InteractiveStateManager, RenderMode, Renderer};
@@ -237,19 +237,20 @@ impl App {
                 .with_height(Size::px(80.0))
                 .with_shape(Shape::rect())
                 .with_style(Style {
-                    fill_color: Some(color),
+                    fill_color: Some(mocha::CRUST),
+                    stroke: Some(Stroke::new(2.0, color)),
                     corner_shape: Some(CornerShape::Round(8.0)),
                     ..Default::default()
                 })
-                .with_children(vec![Node::new().with_content(Content::Text(TextContent {
-                    text: text.to_string(),
-                    font_size: 20.0,
-                    color: mocha::BASE,
-                    h_align: HorizontalAlign::Center,
-                    v_align: VerticalAlign::Center,
-                }))])
                 .with_h_align(HorizontalAlign::Center)
                 .with_v_align(VerticalAlign::Center)
+                .with_child(Node::new().with_content(Content::Text(TextContent {
+                    text: text.to_string(),
+                    font_size: 20.0,
+                    color: mocha::TEXT,
+                    h_align: HorizontalAlign::Center,
+                    v_align: VerticalAlign::Center,
+                })))
         };
 
         // Helper to create a container with alignment settings
@@ -294,17 +295,16 @@ impl App {
                             .with_height(Size::Fill)
                             .with_shape(Shape::rect())
                             .with_style(Style {
-                                fill_color: Some(mocha::SURFACE0),
-                                corner_shape: Some(CornerShape::Round(4.0)),
-                                stroke_color: Some(mocha::SURFACE2),
-                                stroke_width: Some(1.0),
+                                fill_color: Some(mocha::CRUST),
+                                stroke: Some(Stroke::new(2.0, mocha::SURFACE0)),
+                                corner_shape: Some(CornerShape::Round(18.0)),
                                 ..Default::default()
                             })
                             .with_padding(Spacing::all(12.0))
                             .with_gap(8.0)
                             .with_h_align(h_align)
                             .with_v_align(v_align)
-                            .with_children(vec![create_box(mocha::BLUE, "Box")]),
+                            .with_child(create_box(mocha::BLUE, "Box")),
                     ])
             };
 
@@ -370,12 +370,12 @@ impl App {
                                         ),
                                         create_container(
                                             HorizontalAlign::Center,
-                                            VerticalAlign::Center,
+                                            VerticalAlign::Top,
                                             Layout::Horizontal,
                                         ),
                                         create_container(
                                             HorizontalAlign::Right,
-                                            VerticalAlign::Bottom,
+                                            VerticalAlign::Top,
                                             Layout::Horizontal,
                                         ),
                                     ]),
@@ -386,7 +386,7 @@ impl App {
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
-                                            VerticalAlign::Top,
+                                            VerticalAlign::Center,
                                             Layout::Vertical,
                                         ),
                                         create_container(
@@ -396,7 +396,7 @@ impl App {
                                         ),
                                         create_container(
                                             HorizontalAlign::Right,
-                                            VerticalAlign::Bottom,
+                                            VerticalAlign::Center,
                                             Layout::Vertical,
                                         ),
                                     ]),
@@ -407,12 +407,12 @@ impl App {
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
-                                            VerticalAlign::Top,
+                                            VerticalAlign::Bottom,
                                             Layout::Stack,
                                         ),
                                         create_container(
                                             HorizontalAlign::Center,
-                                            VerticalAlign::Center,
+                                            VerticalAlign::Bottom,
                                             Layout::Stack,
                                         ),
                                         create_container(
@@ -425,6 +425,8 @@ impl App {
                         // Spacer
                         Node::new().with_width(Size::Fill),
                     ]),
+                // Spacer
+                Node::new().with_height(Size::Fill),
                 // Help text at bottom
                 Node::new()
                     .with_width(Size::Fill)
