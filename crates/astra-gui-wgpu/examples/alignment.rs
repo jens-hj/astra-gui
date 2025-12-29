@@ -3,6 +3,7 @@
 //! Demonstrates h_align and v_align working together for different layout directions.
 //!
 //! Controls:
+//! - Debug controls (M/P/B/C/R/G/D/S)
 //! - ESC: quit
 
 use astra_gui::{
@@ -10,14 +11,110 @@ use astra_gui::{
     Layout, Node, Rect, Shape, Size, Spacing, Style, TextContent, VerticalAlign,
 };
 use astra_gui_text::Engine as TextEngine;
-use astra_gui_wgpu::{EventDispatcher, InputState, InteractiveStateManager, Renderer};
+use astra_gui_wgpu::{EventDispatcher, InputState, InteractiveStateManager, RenderMode, Renderer};
 use std::sync::Arc;
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{ElementState, KeyEvent, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     window::{Window, WindowId},
 };
+
+const DEBUG_HELP_TEXT: &str = "Debug controls:
+  M - Toggle margins (red overlay)
+  P - Toggle padding (blue overlay)
+  B - Toggle borders (green outline)
+  C - Toggle content area (yellow outline)
+  R - Toggle clip rects (red outline)
+  G - Toggle gaps (purple overlay)
+  O - Toggle transform origins (orange crosshair)
+  D - Toggle all debug visualizations
+  S - Toggle render mode (SDF/Mesh)
+  ESC - Exit";
+
+fn handle_debug_keybinds(
+    event: &WindowEvent,
+    debug_options: &mut DebugOptions,
+    renderer: Option<&mut Renderer>,
+) -> bool {
+    let WindowEvent::KeyboardInput {
+        event:
+            KeyEvent {
+                physical_key: winit::keyboard::PhysicalKey::Code(key_code),
+                state: ElementState::Pressed,
+                ..
+            },
+        ..
+    } = event
+    else {
+        return false;
+    };
+
+    match *key_code {
+        winit::keyboard::KeyCode::KeyM => {
+            debug_options.show_margins = !debug_options.show_margins;
+            println!("Margins: {}", debug_options.show_margins);
+            true
+        }
+        winit::keyboard::KeyCode::KeyP => {
+            debug_options.show_padding = !debug_options.show_padding;
+            println!("Padding: {}", debug_options.show_padding);
+            true
+        }
+        winit::keyboard::KeyCode::KeyB => {
+            debug_options.show_borders = !debug_options.show_borders;
+            println!("Borders: {}", debug_options.show_borders);
+            true
+        }
+        winit::keyboard::KeyCode::KeyC => {
+            debug_options.show_content_area = !debug_options.show_content_area;
+            println!("Content area: {}", debug_options.show_content_area);
+            true
+        }
+        winit::keyboard::KeyCode::KeyR => {
+            debug_options.show_clip_rects = !debug_options.show_clip_rects;
+            println!("Clip rects: {}", debug_options.show_clip_rects);
+            true
+        }
+        winit::keyboard::KeyCode::KeyG => {
+            debug_options.show_gaps = !debug_options.show_gaps;
+            println!("Gaps: {}", debug_options.show_gaps);
+            true
+        }
+        winit::keyboard::KeyCode::KeyO => {
+            debug_options.show_transform_origins = !debug_options.show_transform_origins;
+            println!(
+                "Transform origins: {}",
+                debug_options.show_transform_origins
+            );
+            true
+        }
+        winit::keyboard::KeyCode::KeyD => {
+            if debug_options.is_enabled() {
+                *debug_options = DebugOptions::none();
+                println!("Debug: OFF");
+            } else {
+                *debug_options = DebugOptions::all();
+                println!("Debug: ALL ON");
+            }
+            true
+        }
+        winit::keyboard::KeyCode::KeyS => {
+            if let Some(renderer) = renderer {
+                let new_mode = match renderer.render_mode() {
+                    RenderMode::Sdf | RenderMode::Auto => RenderMode::Mesh,
+                    RenderMode::Mesh => RenderMode::Sdf,
+                };
+                renderer.set_render_mode(new_mode);
+                println!("Render mode: {:?}", new_mode);
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
 
 struct GpuState {
     surface: wgpu::Surface<'static>,
@@ -136,8 +233,8 @@ impl App {
         // Helper function to create a colored box
         let create_box = |color: Color, text: &str| {
             Node::new()
-                .with_width(Size::px(60.0))
-                .with_height(Size::px(40.0))
+                .with_width(Size::px(100.0))
+                .with_height(Size::px(80.0))
                 .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(color),
@@ -146,7 +243,7 @@ impl App {
                 })
                 .with_children(vec![Node::new().with_content(Content::Text(TextContent {
                     text: text.to_string(),
-                    font_size: 14.0,
+                    font_size: 20.0,
                     color: mocha::BASE,
                     h_align: HorizontalAlign::Center,
                     v_align: VerticalAlign::Center,
@@ -175,17 +272,17 @@ impl App {
                 };
 
                 Node::new()
-                    .with_width(Size::px(200.0))
-                    .with_height(Size::px(200.0))
+                    .with_width(Size::px(300.0))
+                    .with_height(Size::px(300.0))
                     .with_layout_direction(Layout::Vertical)
-                    .with_gap(4.0)
+                    .with_gap(8.0)
                     .with_children(vec![
                         // Label
                         Node::new()
-                            .with_height(Size::px(40.0))
+                            .with_height(Size::px(50.0))
                             .with_content(Content::Text(TextContent {
                                 text: format!("{} {}\n{}", h_label, v_label, layout_label),
-                                font_size: 12.0,
+                                font_size: 16.0,
                                 color: mocha::SUBTEXT0,
                                 h_align: HorizontalAlign::Center,
                                 v_align: VerticalAlign::Center,
@@ -203,15 +300,11 @@ impl App {
                                 stroke_width: Some(1.0),
                                 ..Default::default()
                             })
-                            .with_padding(Spacing::all(8.0))
+                            .with_padding(Spacing::all(12.0))
                             .with_gap(8.0)
                             .with_h_align(h_align)
                             .with_v_align(v_align)
-                            .with_children(vec![
-                                create_box(mocha::RED, "1"),
-                                create_box(mocha::GREEN, "2"),
-                                create_box(mocha::BLUE, "3"),
-                            ]),
+                            .with_children(vec![create_box(mocha::BLUE, "Box")]),
                     ])
             };
 
@@ -223,79 +316,134 @@ impl App {
                 fill_color: Some(mocha::BASE),
                 ..Default::default()
             })
-            .with_padding(Spacing::all(20.0))
             .with_layout_direction(Layout::Vertical)
-            .with_gap(20.0)
+            .with_gap(24.0)
             .with_children(vec![
+                // Spacer
+                Node::new().with_height(Size::Fill),
                 // Title
                 Node::new()
-                    .with_height(Size::px(40.0))
+                    .with_width(Size::Fill)
+                    .with_height(Size::px(60.0))
+                    .with_padding(Spacing::vertical(10.0))
                     .with_content(Content::Text(TextContent {
                         text: "Alignment Examples".to_string(),
-                        font_size: 24.0,
+                        font_size: 32.0,
                         color: mocha::TEXT,
                         h_align: HorizontalAlign::Center,
                         v_align: VerticalAlign::Center,
                     })),
-                // Horizontal Layout Examples
+                // Instructions
                 Node::new()
-                    .with_layout_direction(Layout::Horizontal)
-                    .with_gap(20.0)
-                    .with_children(vec![
-                        create_container(
-                            HorizontalAlign::Left,
-                            VerticalAlign::Top,
-                            Layout::Horizontal,
-                        ),
-                        create_container(
-                            HorizontalAlign::Center,
-                            VerticalAlign::Center,
-                            Layout::Horizontal,
-                        ),
-                        create_container(
-                            HorizontalAlign::Right,
-                            VerticalAlign::Bottom,
-                            Layout::Horizontal,
-                        ),
-                    ]),
-                // Vertical Layout Examples
+                    .with_width(Size::Fill)
+                    .with_content(Content::Text(TextContent {
+                        text: "h_align and v_align control child positioning within containers"
+                            .to_string(),
+                        font_size: 16.0,
+                        color: mocha::SUBTEXT0,
+                        h_align: HorizontalAlign::Center,
+                        v_align: VerticalAlign::Center,
+                    })),
+                // Main content area
                 Node::new()
+                    .with_width(Size::Fill)
+                    .with_height(Size::Fill)
                     .with_layout_direction(Layout::Horizontal)
-                    .with_gap(20.0)
+                    .with_gap(40.0)
                     .with_children(vec![
-                        create_container(
-                            HorizontalAlign::Left,
-                            VerticalAlign::Top,
-                            Layout::Vertical,
-                        ),
-                        create_container(
-                            HorizontalAlign::Center,
-                            VerticalAlign::Center,
-                            Layout::Vertical,
-                        ),
-                        create_container(
-                            HorizontalAlign::Right,
-                            VerticalAlign::Bottom,
-                            Layout::Vertical,
-                        ),
+                        // Spacer
+                        Node::new().with_width(Size::Fill),
+                        // Content container
+                        Node::new()
+                            .with_layout_direction(Layout::Vertical)
+                            .with_gap(24.0)
+                            .with_children(vec![
+                                // Horizontal Layout Examples
+                                Node::new()
+                                    .with_layout_direction(Layout::Horizontal)
+                                    .with_gap(20.0)
+                                    .with_children(vec![
+                                        create_container(
+                                            HorizontalAlign::Left,
+                                            VerticalAlign::Top,
+                                            Layout::Horizontal,
+                                        ),
+                                        create_container(
+                                            HorizontalAlign::Center,
+                                            VerticalAlign::Center,
+                                            Layout::Horizontal,
+                                        ),
+                                        create_container(
+                                            HorizontalAlign::Right,
+                                            VerticalAlign::Bottom,
+                                            Layout::Horizontal,
+                                        ),
+                                    ]),
+                                // Vertical Layout Examples
+                                Node::new()
+                                    .with_layout_direction(Layout::Horizontal)
+                                    .with_gap(20.0)
+                                    .with_children(vec![
+                                        create_container(
+                                            HorizontalAlign::Left,
+                                            VerticalAlign::Top,
+                                            Layout::Vertical,
+                                        ),
+                                        create_container(
+                                            HorizontalAlign::Center,
+                                            VerticalAlign::Center,
+                                            Layout::Vertical,
+                                        ),
+                                        create_container(
+                                            HorizontalAlign::Right,
+                                            VerticalAlign::Bottom,
+                                            Layout::Vertical,
+                                        ),
+                                    ]),
+                                // Stack Layout Examples
+                                Node::new()
+                                    .with_layout_direction(Layout::Horizontal)
+                                    .with_gap(20.0)
+                                    .with_children(vec![
+                                        create_container(
+                                            HorizontalAlign::Left,
+                                            VerticalAlign::Top,
+                                            Layout::Stack,
+                                        ),
+                                        create_container(
+                                            HorizontalAlign::Center,
+                                            VerticalAlign::Center,
+                                            Layout::Stack,
+                                        ),
+                                        create_container(
+                                            HorizontalAlign::Right,
+                                            VerticalAlign::Bottom,
+                                            Layout::Stack,
+                                        ),
+                                    ]),
+                            ]),
+                        // Spacer
+                        Node::new().with_width(Size::Fill),
                     ]),
-                // Stack Layout Examples
+                // Help text at bottom
                 Node::new()
-                    .with_layout_direction(Layout::Horizontal)
-                    .with_gap(20.0)
-                    .with_children(vec![
-                        create_container(HorizontalAlign::Left, VerticalAlign::Top, Layout::Stack),
-                        create_container(
-                            HorizontalAlign::Center,
-                            VerticalAlign::Center,
-                            Layout::Stack,
-                        ),
-                        create_container(
-                            HorizontalAlign::Right,
-                            VerticalAlign::Bottom,
-                            Layout::Stack,
-                        ),
-                    ]),
+                    .with_width(Size::Fill)
+                    .with_height(Size::px(30.0))
+                    .with_padding(Spacing::horizontal(10.0))
+                    .with_shape(Shape::rect())
+                    .with_style(Style {
+                        fill_color: Some(mocha::SURFACE0),
+                        ..Default::default()
+                    })
+                    .with_content(Content::Text(
+                        TextContent::new(
+                            "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | D:All | S:RenderMode | ESC:Exit",
+                        )
+                        .with_font_size(16.0)
+                        .with_color(mocha::TEXT)
+                        .with_h_align(HorizontalAlign::Left)
+                        .with_v_align(VerticalAlign::Center),
+                    )),
             ])
     }
 }
@@ -305,7 +453,7 @@ impl ApplicationHandler for App {
         if self.window.is_none() {
             let window_attributes = Window::default_attributes()
                 .with_title("Alignment Example")
-                .with_inner_size(winit::dpi::LogicalSize::new(700, 900));
+                .with_inner_size(winit::dpi::LogicalSize::new(1200, 1200));
 
             let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
@@ -377,6 +525,18 @@ impl ApplicationHandler for App {
         event: WindowEvent,
     ) {
         self.input_state.handle_event(&event);
+
+        // Handle debug keybinds
+        if handle_debug_keybinds(
+            &event,
+            &mut self.debug_options,
+            self.gpu_state.as_mut().map(|s| &mut s.renderer),
+        ) {
+            // Debug option changed, request redraw
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+        }
 
         match event {
             WindowEvent::CloseRequested => {
