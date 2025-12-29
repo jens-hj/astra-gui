@@ -3,8 +3,8 @@
 //! Provides a draggable slider for selecting values within a range.
 
 use astra_gui::{
-    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Rect, Shape, Size, Style,
-    StyledRect, Transition, Translation,
+    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Shape, Size, Style, Transition,
+    Translation,
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 use std::ops::RangeInclusive;
@@ -99,17 +99,10 @@ pub fn slider(
             Node::new()
                 .with_width(Size::px(style.track_width))
                 .with_height(Size::px(style.track_height))
-                .with_translation(Translation::y(
-                    (style.thumb_size - style.track_height) / 2.0,
-                ))
-                .with_shape(Shape::Rect(StyledRect {
-                    rect: Rect::default(),
-                    corner_shape: CornerShape::Round(style.track_height / 2.0),
-                    fill: style.track_color,
-                    stroke: None,
-                }))
+                .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.track_color),
+                    corner_shape: Some(CornerShape::Round(style.track_height / 2.0)),
                     ..Default::default()
                 })
                 .with_disabled(disabled)
@@ -118,13 +111,10 @@ pub fn slider(
             Node::new()
                 .with_width(Size::px(filled_width))
                 .with_height(Size::px(style.track_height))
-                .with_translation(Translation::y(-thumb_inset))
-                .with_shape(astra_gui::Shape::Rect(
-                    StyledRect::new(Default::default(), style.filled_color)
-                        .with_corner_shape(CornerShape::Round(style.track_height / 2.0)),
-                ))
+                .with_shape(astra_gui::Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.filled_color),
+                    corner_shape: Some(CornerShape::Round(style.track_height / 2.0)),
                     ..Default::default()
                 })
                 .with_disabled_style(Style {
@@ -136,16 +126,12 @@ pub fn slider(
             Node::new()
                 .with_width(Size::px(style.thumb_size))
                 .with_height(Size::px(style.thumb_size))
-                .with_translation(Translation::x(thumb_offset_x))
-                .with_shape(Shape::Rect(StyledRect {
-                    rect: Rect::default(),
-                    corner_shape: CornerShape::Round(style.thumb_size / 2.0),
-                    fill: style.thumb_color,
-                    stroke: None,
-                }))
+                .with_translation(Translation::new(thumb_offset_x, thumb_inset))
+                .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.thumb_color),
                     opacity: Some(1.0),
+                    corner_shape: Some(CornerShape::Round(style.thumb_size / 2.0)),
                     ..Default::default()
                 })
                 .with_hover_style(Style {

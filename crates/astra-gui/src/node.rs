@@ -1,4 +1,4 @@
-use crate::content::Content;
+use crate::content::{Content, HorizontalAlign, VerticalAlign};
 use crate::layout::{
     ComputedLayout, Layout, Overflow, ScrollDirection, Size, Spacing, TransformOrigin, Translation,
 };
@@ -64,6 +64,22 @@ pub struct Node {
     gap: f32,
     /// Layout mode for children
     layout_direction: Layout,
+    /// Horizontal alignment of children within this container
+    ///
+    /// For Horizontal layout: aligns children along the main axis (justify)
+    /// For Vertical layout: aligns children along the cross axis
+    /// For Stack layout: horizontal position of stacked children
+    ///
+    /// Default: `HorizontalAlign::Left`
+    h_align: HorizontalAlign,
+    /// Vertical alignment of children within this container
+    ///
+    /// For Horizontal layout: aligns children along the cross axis
+    /// For Vertical layout: aligns children along the main axis (justify)
+    /// For Stack layout: vertical position of stacked children
+    ///
+    /// Default: `VerticalAlign::Top`
+    v_align: VerticalAlign,
     /// How overflow of content/children is handled.
     ///
     /// Default: `Overflow::Hidden`.
@@ -124,6 +140,8 @@ impl Node {
             margin: Spacing::ZERO,
             gap: 0.0,
             layout_direction: Layout::default(),
+            h_align: HorizontalAlign::Left,
+            v_align: VerticalAlign::Top,
             overflow: Overflow::default(),
             scroll_offset: (0.0, 0.0),
             scroll_target: (0.0, 0.0),
@@ -231,6 +249,18 @@ impl Node {
     /// Set the layout mode
     pub fn with_layout_direction(mut self, direction: Layout) -> Self {
         self.layout_direction = direction;
+        self
+    }
+
+    /// Set horizontal alignment of children within this container
+    pub fn with_h_align(mut self, align: HorizontalAlign) -> Self {
+        self.h_align = align;
+        self
+    }
+
+    /// Set vertical alignment of children within this container
+    pub fn with_v_align(mut self, align: VerticalAlign) -> Self {
+        self.v_align = align;
         self
     }
 
@@ -504,6 +534,14 @@ impl Node {
     /// Get the layout mode
     pub fn layout_direction(&self) -> Layout {
         self.layout_direction
+    }
+
+    pub fn h_align(&self) -> HorizontalAlign {
+        self.h_align
+    }
+
+    pub fn v_align(&self) -> VerticalAlign {
+        self.v_align
     }
 
     /// Get the children
