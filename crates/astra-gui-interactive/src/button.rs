@@ -4,7 +4,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Node, NodeId, Size, Spacing,
-    Style, StyledRect, TextContent, Transition, VerticalAlign,
+    Style, TextContent, Transition, VerticalAlign,
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
@@ -111,16 +111,11 @@ pub fn button(
         .with_width(Size::FitContent)
         .with_height(Size::FitContent)
         .with_padding(style.padding)
-        .with_shape(astra_gui::Shape::Rect(StyledRect {
-            rect: astra_gui::Rect::default(), // Will be filled during layout
-            corner_shape: CornerShape::Round(style.border_radius),
-            fill: style.idle_color, // Will be overridden by style system
-            stroke: None,
-        }))
+        .with_shape(astra_gui::Shape::rect())
         .with_content(Content::Text(TextContent {
             text: label.into(),
             font_size: style.font_size,
-            color: style.text_color, // Will be overridden by style system
+            color: style.text_color,
             h_align: HorizontalAlign::Center,
             v_align: VerticalAlign::Center,
         }))

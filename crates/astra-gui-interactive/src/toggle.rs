@@ -3,8 +3,7 @@
 //! Provides an iOS-style toggle switch with smooth animations.
 
 use astra_gui::{
-    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Size, Spacing, Style, StyledRect,
-    Transition,
+    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Size, Spacing, Style, Transition,
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
@@ -69,16 +68,7 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
         .with_height(Size::px(style.track_height))
         .with_layout_direction(Layout::Horizontal)
         .with_padding(Spacing::all(style.knob_margin))
-        .with_shape(astra_gui::Shape::Rect(StyledRect {
-            rect: astra_gui::Rect::default(),
-            corner_shape: CornerShape::Round(style.track_height / 2.0),
-            fill: if value {
-                style.on_color
-            } else {
-                style.off_color
-            },
-            stroke: None,
-        }))
+        .with_shape(astra_gui::Shape::rect())
         .with_style(Style {
             fill_color: Some(if value {
                 style.on_color
@@ -113,12 +103,7 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
                 .with_id(NodeId::new(format!("{}_knob", id_str)))
                 .with_width(Size::px(style.knob_width))
                 .with_height(Size::Fill)
-                .with_shape(astra_gui::Shape::Rect(StyledRect {
-                    rect: astra_gui::Rect::default(),
-                    corner_shape: CornerShape::Round(style.knob_width / 2.0),
-                    fill: style.knob_color,
-                    stroke: None,
-                }))
+                .with_shape(astra_gui::Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.knob_color),
                     corner_shape: Some(CornerShape::Round(style.knob_width / 2.0)),

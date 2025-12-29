@@ -224,6 +224,19 @@ pub enum Shape {
 }
 
 impl Shape {
+    /// Create a simple rectangle shape with default styling
+    ///
+    /// The rect parameter will be filled during layout. All visual properties
+    /// (fill color, stroke, corner shape) should be set via Style, not here.
+    pub fn rect() -> Self {
+        Shape::Rect(StyledRect {
+            rect: Rect::default(),
+            corner_shape: CornerShape::None,
+            fill: Color::transparent(),
+            stroke: None,
+        })
+    }
+
     /// Apply opacity to this shape by multiplying all color alpha values
     pub fn apply_opacity(&mut self, opacity: f32) {
         match self {
