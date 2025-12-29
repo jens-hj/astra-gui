@@ -60,8 +60,10 @@ pub struct DragValueStyle {
 
 impl Default for DragValueStyle {
     fn default() -> Self {
+        let min_width = 80.0;
         let mut text_input_style = TextInputStyle::default();
         text_input_style.text_align = HorizontalAlign::Center;
+        text_input_style.width = min_width;
 
         Self {
             idle_color: mocha::SURFACE0,
@@ -82,7 +84,7 @@ impl Default for DragValueStyle {
             padding: Spacing::symmetric(10.0, 8.0),
             border_radius: 8.0,
             font_size: 20.0,
-            min_width: 80.0,
+            min_width,
             precision: 2,
 
             text_input_style,
@@ -100,6 +102,7 @@ impl DragValueStyle {
     /// Set the minimum width
     pub fn with_min_width(mut self, min_width: f32) -> Self {
         self.min_width = min_width;
+        self.text_input_style.width = min_width;
         self
     }
 

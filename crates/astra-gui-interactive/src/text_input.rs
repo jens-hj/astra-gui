@@ -85,6 +85,8 @@ pub struct TextInputStyle {
     pub cursor_style: CursorStyle,
     /// Text horizontal alignment
     pub text_align: HorizontalAlign,
+    /// Width of the text input widget
+    pub width: f32,
 }
 
 impl Default for TextInputStyle {
@@ -113,6 +115,7 @@ impl Default for TextInputStyle {
             font_size: 20.0,
             cursor_style: CursorStyle::default(),
             text_align: HorizontalAlign::Left,
+            width: 300.0,
         }
     }
 }
@@ -190,8 +193,7 @@ pub fn text_input(
     };
 
     // Calculate the x offset where text starts based on alignment
-    // Note: assuming a fixed width of 300.0 (should match the node width below)
-    let text_container_width = 300.0 - style.padding.get_horizontal();
+    let text_container_width = style.width - style.padding.get_horizontal();
     let text_start_x = match style.text_align {
         HorizontalAlign::Left => 0.0,
         HorizontalAlign::Center => (text_container_width - total_text_width) / 2.0,
@@ -392,7 +394,7 @@ pub fn text_input(
 
     Node::new()
         .with_id(node_id)
-        .with_width(Size::px(300.0))
+        .with_width(Size::px(style.width))
         .with_height(Size::px(style.font_size + style.padding.get_vertical()))
         .with_padding(style.padding)
         .with_layout_direction(Layout::Stack)
