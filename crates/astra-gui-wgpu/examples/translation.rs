@@ -217,6 +217,10 @@ impl App {
 
         if button_clicked("reset_btn", &events) {
             self.counter = 0;
+            self.outer_translation_x = 0.0;
+            self.outer_translation_y = 0.0;
+            self.inner_translation_x = 0.0;
+            self.inner_translation_y = 0.0;
             println!("Reset clicked! Counter: {}", self.counter);
         }
 
@@ -233,7 +237,7 @@ impl App {
             &(-200.0..=200.0),
             &events,
             &SliderStyle::default(),
-            None,
+            Some(1.0),
         ) {
             println!("Outer X: {:.1}", self.outer_translation_x);
         }
@@ -244,7 +248,7 @@ impl App {
             &(-200.0..=200.0),
             &events,
             &SliderStyle::default(),
-            None,
+            Some(1.0),
         ) {
             println!("Outer Y: {:.1}", self.outer_translation_y);
         }
@@ -255,7 +259,7 @@ impl App {
             &(-100.0..=100.0),
             &events,
             &SliderStyle::default(),
-            None,
+            Some(1.0),
         ) {
             println!("Inner X: {:.1}", self.inner_translation_x);
         }
@@ -266,7 +270,7 @@ impl App {
             &(-100.0..=100.0),
             &events,
             &SliderStyle::default(),
-            None,
+            Some(1.0),
         ) {
             println!("Inner Y: {:.1}", self.inner_translation_y);
         }

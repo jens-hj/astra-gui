@@ -6,11 +6,13 @@
 //! and sliders that work with the astra-gui framework's hybrid architecture.
 
 mod button;
+mod drag_value;
 mod slider;
 mod text_input;
 mod toggle;
 
 pub use button::*;
+pub use drag_value::*;
 pub use slider::*;
 pub use text_input::*;
 pub use toggle::*;
