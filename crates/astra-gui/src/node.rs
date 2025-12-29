@@ -1257,6 +1257,14 @@ impl Node {
                 }
             }
         }
+
+        // After children layout, calculate and cache max_scroll if this is a scrollable container
+        if self.overflow == Overflow::Scroll {
+            let max_scroll = self.calculate_max_scroll_for_node();
+            if let Some(computed) = &mut self.computed {
+                computed.max_scroll = max_scroll;
+            }
+        }
     }
 
     /// Collect all shapes from this node tree for rendering
@@ -1497,6 +1505,99 @@ impl Node {
         for child in &self.children {
             child.collect_debug_shapes(shapes, options);
         }
+    }
+
+    /// Calculate maximum scroll offset for this container based on children layout
+    /// This is called during layout computation to cache the result
+    fn calculate_max_scroll_for_node(&self) -> (f32, f32) {
+        let Some(layout) = self.computed_layout() else {
+            return (0.0, 0.0);
+        };
+
+        // Get container dimensions (after padding)
+        let container_width =
+            layout.rect.max[0] - layout.rect.min[0] - self.padding.left - self.padding.right;
+        let container_height =
+            layout.rect.max[1] - layout.rect.min[1] - self.padding.top - self.padding.bottom;
+
+        // Calculate total content size based on layout direction
+        if self.children.is_empty() {
+            return (0.0, 0.0);
+        }
+
+        let mut content_width = 0.0f32;
+        let mut content_height = 0.0f32;
+
+        match self.layout_direction {
+            Layout::Vertical => {
+                // For vertical layout: accumulate heights, track max width
+                // For nested layouts (like grid), we need to look at the intrinsic width
+                for (i, child) in self.children.iter().enumerate() {
+                    if let Some(child_layout) = child.computed_layout() {
+                        let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                        let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+                        // For horizontal child layouts, calculate their full content width
+                        let actual_child_width = if child.layout_direction == Layout::Horizontal {
+                            let mut row_width = 0.0f32;
+
+                            for (j, grandchild) in child.children.iter().enumerate() {
+                                if let Some(gc_layout) = grandchild.computed_layout() {
+                                    row_width += gc_layout.rect.max[0] - gc_layout.rect.min[0];
+                                    if j < child.children.len() - 1 {
+                                        row_width += child.gap;
+                                    }
+                                }
+                            }
+                            row_width + child.padding.left + child.padding.right
+                        } else {
+                            child_width
+                        };
+
+                        content_width = content_width.max(actual_child_width);
+                        content_height += child_height;
+
+                        if i < self.children.len() - 1 {
+                            content_height += self.gap;
+                        }
+                    }
+                }
+            }
+            Layout::Horizontal => {
+                // For horizontal layout: accumulate widths, track max height
+                for (i, child) in self.children.iter().enumerate() {
+                    if let Some(child_layout) = child.computed_layout() {
+                        let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                        let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+                        content_width += child_width;
+                        content_height = content_height.max(child_height);
+
+                        if i < self.children.len() - 1 {
+                            content_width += self.gap;
+                        }
+                    }
+                }
+            }
+            Layout::Stack => {
+                // For stack layout: track max width and max height
+                for child in self.children.iter() {
+                    if let Some(child_layout) = child.computed_layout() {
+                        let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                        let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+                        content_width = content_width.max(child_width);
+                        content_height = content_height.max(child_height);
+                    }
+                }
+            }
+        }
+
+        // Max scroll is the amount content exceeds container size
+        let max_scroll_x = (content_width - container_width).max(0.0);
+        let max_scroll_y = (content_height - container_height).max(0.0);
+
+        (max_scroll_x, max_scroll_y)
     }
 }
 

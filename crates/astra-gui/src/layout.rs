@@ -349,11 +349,20 @@ impl Default for Transform2D {
 pub struct ComputedLayout {
     /// Absolute position in screen coordinates
     pub rect: Rect,
+    /// Maximum scroll offset for scrollable containers (cached during layout)
+    pub max_scroll: (f32, f32),
 }
 
 impl ComputedLayout {
     pub fn new(rect: Rect) -> Self {
-        Self { rect }
+        Self {
+            rect,
+            max_scroll: (0.0, 0.0),
+        }
+    }
+
+    pub fn with_max_scroll(rect: Rect, max_scroll: (f32, f32)) -> Self {
+        Self { rect, max_scroll }
     }
 }
 
