@@ -386,14 +386,16 @@ impl EventDispatcher {
         (events, interaction_states)
     }
 
-    /// Bidirectional sync of scroll state - restores and saves in a single tree traversal
+    /// Restore and sync scroll state in a single tree traversal
     ///
-    /// This combines restore_scroll_state and sync_scroll_state into one pass,
-    /// reducing tree traversals from 2 to 1 per frame.
+    /// This combines restore_scroll_state and sync_scroll_state into one pass.
+    /// Must be called twice per frame:
+    /// 1. After layout but before animations - to restore state
+    /// 2. After animations - to save state
     ///
-    /// Call this after layout computation and scroll animations to both:
-    /// 1. Restore persistent scroll state to newly rebuilt nodes
-    /// 2. Save current scroll state back to persistent storage
+    /// The single traversal works because:
+    /// - First call: restores old state, then immediately saves it (no-op since unchanged)
+    /// - Second call: restores current state, then saves updated state after animations
     pub fn sync_scroll_state_bidirectional(&mut self, root: &mut Node) {
         Self::sync_bidirectional_recursive(root, &mut self.scroll_state);
     }
@@ -410,7 +412,7 @@ impl EventDispatcher {
                 node.set_scroll_target(target);
             }
 
-            // Then sync back after potential changes (e.g., from scroll animations)
+            // Then sync back current state (saves any changes from animations/events)
             if node.overflow() == astra_gui::Overflow::Scroll {
                 let current_offset = node.scroll_offset();
                 let current_target = node.scroll_target();
