@@ -518,7 +518,7 @@ fn create_demo_ui(
     let mut horizontal_scroll_container = Node::new()
         .with_id(NodeId::new("horizontal_scroll_container"))
         .with_width(Size::px(800.0))
-        .with_height(Size::px(200.0))
+        .with_height(Size::px(400.0))
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Horizontal)
@@ -579,8 +579,8 @@ fn create_demo_ui(
 
     let mut grid_scroll_container = Node::new()
         .with_id(NodeId::new("grid_scroll_container"))
-        .with_width(Size::px(600.0))
-        .with_height(Size::px(400.0))
+        .with_width(Size::px(650.0))
+        .with_height(Size::px(650.0))
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Vertical)
@@ -630,6 +630,7 @@ fn create_demo_ui(
                     // 2D grid scroll container
                     Node::new()
                         .with_width(Size::Fill)
+                        .with_height(Size::px(670.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(grid_scroll_container)
@@ -637,6 +638,7 @@ fn create_demo_ui(
                     // Horizontal scroll container
                     Node::new()
                         .with_width(Size::Fill)
+                        .with_height(Size::px(420.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(horizontal_scroll_container)
@@ -680,6 +682,11 @@ impl ApplicationHandler for App {
                 // Debug controls
                 let renderer = self.gpu_state.as_mut().map(|s| &mut s.renderer);
                 let _handled = handle_debug_keybinds(&event, &mut self.debug_options, renderer);
+
+                // Update input state (for shift tracking, etc.)
+                if let Some(gpu_state) = &mut self.gpu_state {
+                    gpu_state.input.handle_event(&event);
+                }
             }
 
             WindowEvent::Resized(physical_size) => {
@@ -749,23 +756,39 @@ impl ApplicationHandler for App {
                                     // Calculate max scroll based on content size
                                     let max_scroll = calculate_max_scroll(node);
 
+                                    // Debug logging for grid container
+                                    if target_id == "grid_scroll_container" {
+                                        println!("Grid scroll - shift_held: {}, max_scroll: {:?}, current: {:?}, delta: {:?}",
+                                            gpu_state.input.shift_held, max_scroll, current, adjusted_delta);
+                                    }
+
                                     // For grid container: shift = horizontal, normal = vertical
                                     // For horizontal layouts: apply vertical scroll to horizontal axis
                                     // For vertical layouts: normal vertical scrolling
                                     let new_target = if target_id == "grid_scroll_container" {
                                         // 2D scrolling: shift for horizontal, normal for vertical
                                         if gpu_state.input.shift_held {
-                                            (
+                                            let new = (
                                                 (current.0 + adjusted_delta.1)
                                                     .clamp(0.0, max_scroll.0),
                                                 current.1,
-                                            )
+                                            );
+                                            println!(
+                                                "  -> Horizontal scroll: new_target = {:?}",
+                                                new
+                                            );
+                                            new
                                         } else {
-                                            (
+                                            let new = (
                                                 current.0,
                                                 (current.1 + adjusted_delta.1)
                                                     .clamp(0.0, max_scroll.1),
-                                            )
+                                            );
+                                            println!(
+                                                "  -> Vertical scroll: new_target = {:?}",
+                                                new
+                                            );
+                                            new
                                         }
                                     } else {
                                         match layout_direction {
