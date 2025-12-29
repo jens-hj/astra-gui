@@ -7,8 +7,9 @@
 //! - ESC: quit
 
 use astra_gui::{
-    catppuccin::mocha, Color, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign,
-    Layout, Node, NodeId, Overflow, Shape, Size, Spacing, Style, TextContent, VerticalAlign,
+    catppuccin::mocha, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout,
+    Node, NodeId, Overflow, Rect, ScrollDirection, Shape, Size, Spacing, Style, TextContent,
+    VerticalAlign,
 };
 use astra_gui_wgpu::{
     EventDispatcher, InputState, InteractionEvent, InteractiveStateManager, RenderMode, Renderer,
@@ -33,9 +34,6 @@ const DEBUG_HELP_TEXT: &str = "Debug controls:
   D - Toggle all debug visualizations
   S - Toggle render mode (SDF/Mesh)
   ESC - Exit";
-
-const DEBUG_HELP_TEXT_ONELINE: &str =
-    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | D:All | S:RenderMode | ESC:Exit";
 
 fn handle_debug_keybinds(
     event: &WindowEvent,
@@ -124,8 +122,10 @@ fn handle_debug_keybinds(
 struct App {
     window: Option<Arc<Window>>,
     gpu_state: Option<GpuState>,
-    scroll_offsets: HashMap<String, (f32, f32)>,
+    scroll_offsets: HashMap<String, (f32, f32)>, // Current scroll positions
+    scroll_targets: HashMap<String, (f32, f32)>, // Target scroll positions for smooth scrolling
     debug_options: DebugOptions,
+    last_frame_time: Option<std::time::Instant>,
 }
 
 struct GpuState {
@@ -263,7 +263,7 @@ impl GpuState {
         );
 
         // Dispatch events
-        let (events, interaction_states) = self.event_dispatcher.dispatch(&self.input, &mut ui);
+        let (_events, interaction_states) = self.event_dispatcher.dispatch(&self.input, &mut ui);
 
         // Apply interactive styles
         self.interactive_state_manager.begin_frame();
@@ -305,6 +305,21 @@ impl GpuState {
     }
 }
 
+/// Helper function to find a node by its ID
+fn find_node_by_id<'a>(node: &'a Node, id: &str) -> Option<&'a Node> {
+    if node.id().map(|node_id| node_id.as_str()) == Some(id) {
+        return Some(node);
+    }
+
+    for child in node.children() {
+        if let Some(found) = find_node_by_id(child, id) {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
 fn create_demo_ui(_width: f32, _height: f32, scroll_offsets: &HashMap<String, (f32, f32)>) -> Node {
     // Create a scrollable container with many items
     let mut items = Vec::new();
@@ -338,6 +353,7 @@ fn create_demo_ui(_width: f32, _height: f32, scroll_offsets: &HashMap<String, (f
         .get("scroll_container")
         .copied()
         .unwrap_or((0.0, 0.0));
+
     let mut scroll_container = Node::new()
         .with_id(NodeId::new("scroll_container"))
         .with_width(Size::px(400.0))
@@ -346,6 +362,8 @@ fn create_demo_ui(_width: f32, _height: f32, scroll_offsets: &HashMap<String, (f
         .with_gap(10.0)
         .with_layout_direction(Layout::Vertical)
         .with_overflow(Overflow::Scroll)
+        .with_scroll_speed(1.0) // Adjust this to change scroll speed
+        .with_scroll_direction(ScrollDirection::Inverted) // Natural scrolling
         .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(mocha::MANTLE),
@@ -436,15 +454,22 @@ impl ApplicationHandler for App {
 
             WindowEvent::RedrawRequested => {
                 if let Some(gpu_state) = &mut self.gpu_state {
-                    // Process input and scroll events first
-                    gpu_state.input.begin_frame();
-
                     // Build UI to dispatch events
                     let mut ui = create_demo_ui(
                         gpu_state.config.width as f32,
                         gpu_state.config.height as f32,
                         &self.scroll_offsets,
                     );
+
+                    // IMPORTANT: Compute layout before dispatching events so hit testing works
+                    let window_rect = astra_gui::Rect::new(
+                        [0.0, 0.0],
+                        [
+                            gpu_state.config.width as f32,
+                            gpu_state.config.height as f32,
+                        ],
+                    );
+                    ui.compute_layout(window_rect);
 
                     let (events, _) = gpu_state
                         .event_dispatcher
@@ -454,21 +479,56 @@ impl ApplicationHandler for App {
                     for event in &events {
                         if let InteractionEvent::Scroll { delta, .. } = event.event {
                             if event.target.as_str() == "scroll_container" {
-                                let current = self
-                                    .scroll_offsets
-                                    .get("scroll_container")
-                                    .copied()
-                                    .unwrap_or((0.0, 0.0));
-                                // Positive scroll delta means scroll up, so content moves down (positive offset increase)
-                                let new_offset = (
-                                    current.0 + delta.0,
-                                    (current.1 + delta.1).max(0.0), // Clamp to not scroll past top
-                                );
-                                self.scroll_offsets
-                                    .insert("scroll_container".to_string(), new_offset);
-                                println!("Scroll delta: {:?}, new offset: {:?}", delta, new_offset);
+                                // Find the node to get its scroll properties
+                                if let Some(node) = find_node_by_id(&ui, "scroll_container") {
+                                    let scroll_speed = node.scroll_speed();
+                                    let scroll_direction = node.scroll_direction();
+
+                                    let current = self
+                                        .scroll_offsets
+                                        .get("scroll_container")
+                                        .copied()
+                                        .unwrap_or((0.0, 0.0));
+
+                                    // Apply scroll speed and direction
+                                    let direction_multiplier = match scroll_direction {
+                                        ScrollDirection::Normal => 1.0,
+                                        ScrollDirection::Inverted => -1.0,
+                                    };
+
+                                    let adjusted_delta = (
+                                        delta.0 * scroll_speed * direction_multiplier,
+                                        delta.1 * scroll_speed * direction_multiplier,
+                                    );
+
+                                    let new_target = (
+                                        current.0 + adjusted_delta.0,
+                                        (current.1 + adjusted_delta.1).max(0.0), // Clamp to not scroll past top
+                                    );
+                                    self.scroll_targets
+                                        .insert("scroll_container".to_string(), new_target);
+                                }
                             }
                         }
+                    }
+
+                    // Smooth scroll interpolation
+                    let now = std::time::Instant::now();
+                    let dt = self
+                        .last_frame_time
+                        .map(|t| (now - t).as_secs_f32())
+                        .unwrap_or(0.016); // Default to ~60fps
+                    self.last_frame_time = Some(now);
+
+                    const SCROLL_SMOOTHNESS: f32 = 10.0; // Higher = faster, lower = smoother
+                    for (id, target) in &self.scroll_targets {
+                        let current = self.scroll_offsets.get(id).copied().unwrap_or((0.0, 0.0));
+                        let t = 1.0 - (-SCROLL_SMOOTHNESS * dt).exp(); // Exponential ease-out
+                        let new_offset = (
+                            current.0 + (target.0 - current.0) * t,
+                            current.1 + (target.1 - current.1) * t,
+                        );
+                        self.scroll_offsets.insert(id.clone(), new_offset);
                     }
 
                     // Clear input for next frame
@@ -484,6 +544,12 @@ impl ApplicationHandler for App {
                         Err(wgpu::SurfaceError::OutOfMemory) => event_loop.exit(),
                         Err(e) => eprintln!("Render error: {:?}", e),
                     }
+                }
+            }
+
+            WindowEvent::MouseWheel { .. } => {
+                if let Some(gpu_state) = &mut self.gpu_state {
+                    gpu_state.input.handle_event(&event);
                 }
             }
 
@@ -510,7 +576,9 @@ fn main() {
         window: None,
         gpu_state: None,
         scroll_offsets: HashMap::new(),
+        scroll_targets: HashMap::new(),
         debug_options: DebugOptions::none(),
+        last_frame_time: None,
     };
 
     println!("{}", DEBUG_HELP_TEXT);

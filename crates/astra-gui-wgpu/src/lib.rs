@@ -50,6 +50,14 @@ struct ClippedDraw {
     index_end: u32,
 }
 
+/// A draw call for SDF instances with scissor rect.
+#[derive(Clone, Copy, Debug)]
+struct SdfDraw {
+    scissor: (u32, u32, u32, u32),
+    instance_start: u32,
+    instance_count: u32,
+}
+
 const INITIAL_VERTEX_CAPACITY: usize = 1024;
 const INITIAL_INDEX_CAPACITY: usize = 2048;
 
@@ -87,6 +95,7 @@ pub struct Renderer {
     sdf_instance_buffer: wgpu::Buffer,
     sdf_instance_capacity: usize,
     sdf_instances: Vec<RectInstance>,
+    sdf_draws: Vec<SdfDraw>, // Track clip rects for SDF instances
     sdf_quad_vertex_buffer: wgpu::Buffer,
     sdf_quad_index_buffer: wgpu::Buffer,
     last_frame_sdf_instance_count: usize,
@@ -499,6 +508,7 @@ impl Renderer {
             sdf_instance_buffer,
             sdf_instance_capacity: INITIAL_SDF_INSTANCE_CAPACITY,
             sdf_instances: Vec::new(),
+            sdf_draws: Vec::new(),
             sdf_quad_vertex_buffer,
             sdf_quad_index_buffer,
             last_frame_sdf_instance_count: 0,
@@ -558,6 +568,7 @@ impl Renderer {
         self.sdf_instances.clear();
         self.sdf_instances
             .reserve(self.last_frame_sdf_instance_count);
+        self.sdf_draws.clear();
 
         self.wgpu_vertices.clear();
         self.wgpu_vertices.reserve(self.last_frame_vertex_count);
@@ -581,7 +592,46 @@ impl Renderer {
 
             if use_sdf {
                 // Use SDF rendering (analytical anti-aliasing)
-                self.sdf_instances.push(RectInstance::from(clipped));
+                // Compute scissor rect for this shape
+                let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
+                let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
+                let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
+                let sc_max_y = clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
+
+                let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
+                let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
+
+                // Skip if fully clipped
+                if sc_w > 0 && sc_h > 0 {
+                    let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
+                    let instance_index = self.sdf_instances.len() as u32;
+
+                    self.sdf_instances.push(RectInstance::from(clipped));
+
+                    // Try to batch with previous draw if same scissor
+                    if let Some(last_draw) = self.sdf_draws.last_mut() {
+                        if last_draw.scissor == scissor
+                            && last_draw.instance_start + last_draw.instance_count == instance_index
+                        {
+                            // Extend existing batch
+                            last_draw.instance_count += 1;
+                        } else {
+                            // Start new batch
+                            self.sdf_draws.push(SdfDraw {
+                                scissor,
+                                instance_start: instance_index,
+                                instance_count: 1,
+                            });
+                        }
+                    } else {
+                        // First draw
+                        self.sdf_draws.push(SdfDraw {
+                            scissor,
+                            instance_start: instance_index,
+                            instance_count: 1,
+                        });
+                    }
+                }
             } else {
                 // Use mesh tessellation - collect for batch processing
                 // (Tessellator processes all shapes at once)
@@ -705,8 +755,8 @@ impl Renderer {
             occlusion_query_set: None,
         });
 
-        // Draw SDF instances (analytic anti-aliasing)
-        if !self.sdf_instances.is_empty() {
+        // Draw SDF instances with batched scissor clipping (analytic anti-aliasing)
+        if !self.sdf_draws.is_empty() {
             render_pass.set_pipeline(&self.sdf_pipeline);
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.sdf_quad_vertex_buffer.slice(..));
@@ -715,7 +765,17 @@ impl Renderer {
                 self.sdf_quad_index_buffer.slice(..),
                 wgpu::IndexFormat::Uint32,
             );
-            render_pass.draw_indexed(0..6, 0, 0..self.sdf_instances.len() as u32);
+
+            // Draw each batch with its scissor rect
+            for draw in &self.sdf_draws {
+                let (x, y, w, h) = draw.scissor;
+                render_pass.set_scissor_rect(x, y, w, h);
+                render_pass.draw_indexed(
+                    0..6,
+                    0,
+                    draw.instance_start..(draw.instance_start + draw.instance_count),
+                );
+            }
         }
 
         // Draw geometry with batched scissor clipping

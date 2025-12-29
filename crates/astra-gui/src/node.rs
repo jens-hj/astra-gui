@@ -1,6 +1,7 @@
 use crate::content::Content;
 use crate::layout::{
-    ComputedLayout, Layout, Offset, Overflow, Size, Spacing, TransformOrigin, Translation,
+    ComputedLayout, Layout, Offset, Overflow, ScrollDirection, Size, Spacing, TransformOrigin,
+    Translation,
 };
 use crate::measure::{ContentMeasurer, IntrinsicSize, MeasureTextRequest};
 use crate::primitives::{Rect, Shape};
@@ -72,6 +73,14 @@ pub struct Node {
     ///
     /// Default: (0.0, 0.0)
     scroll_offset: (f32, f32),
+    /// Scroll speed multiplier for Overflow::Scroll containers
+    ///
+    /// Default: 1.0
+    scroll_speed: f32,
+    /// Scroll direction behavior
+    ///
+    /// Default: ScrollDirection::Inverted (natural scrolling)
+    scroll_direction: ScrollDirection,
     /// Opacity of this node and all its children (0.0 = transparent, 1.0 = opaque).
     ///
     /// Default: 1.0 (fully opaque).
@@ -114,6 +123,8 @@ impl Node {
             layout_direction: Layout::default(),
             overflow: Overflow::default(),
             scroll_offset: (0.0, 0.0),
+            scroll_speed: 1.0,
+            scroll_direction: ScrollDirection::default(),
             opacity: 1.0,
             shape: None,
             content: None,
@@ -222,6 +233,18 @@ impl Node {
     /// Set how overflow of content/children is handled (default: `Overflow::Hidden`).
     pub fn with_overflow(mut self, overflow: Overflow) -> Self {
         self.overflow = overflow;
+        self
+    }
+
+    /// Set the scroll speed multiplier (default: 1.0)
+    pub fn with_scroll_speed(mut self, speed: f32) -> Self {
+        self.scroll_speed = speed;
+        self
+    }
+
+    /// Set the scroll direction behavior (default: `ScrollDirection::Inverted`)
+    pub fn with_scroll_direction(mut self, direction: ScrollDirection) -> Self {
+        self.scroll_direction = direction;
         self
     }
 
@@ -375,6 +398,16 @@ impl Node {
         // TODO: Clamp to content bounds
     }
 
+    /// Get the scroll speed multiplier
+    pub fn scroll_speed(&self) -> f32 {
+        self.scroll_speed
+    }
+
+    /// Get the scroll direction behavior
+    pub fn scroll_direction(&self) -> ScrollDirection {
+        self.scroll_direction
+    }
+
     /// Get the shape, if any
     pub(crate) fn shape(&self) -> Option<&Shape> {
         self.shape.as_ref()
@@ -416,7 +449,7 @@ impl Node {
     }
 
     /// Get the children
-    pub(crate) fn children(&self) -> &[Node] {
+    pub fn children(&self) -> &[Node] {
         &self.children
     }
 

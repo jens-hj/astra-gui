@@ -22,8 +22,23 @@ pub enum Overflow {
     Visible,
     /// Content is clipped to the node's bounds.
     Hidden,
-    /// Content is clipped but can be scrolled (not implemented yet).
+    /// Content is clipped but can be scrolled.
     Scroll,
+}
+
+/// Scroll direction behavior
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScrollDirection {
+    /// Normal scrolling: wheel up scrolls content down
+    Normal,
+    /// Inverted/natural scrolling: wheel up scrolls content up (like touchpad)
+    Inverted,
+}
+
+impl Default for ScrollDirection {
+    fn default() -> Self {
+        Self::Inverted
+    }
 }
 
 impl Size {
