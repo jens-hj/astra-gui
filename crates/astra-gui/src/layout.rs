@@ -376,6 +376,14 @@ pub struct Spacing {
 }
 
 impl Spacing {
+    /// Zero spacing constant
+    pub const ZERO: Self = Self {
+        top: 0.0,
+        right: 0.0,
+        bottom: 0.0,
+        left: 0.0,
+    };
+
     /// Create spacing with all sides equal
     pub const fn all(value: f32) -> Self {
         Self {
@@ -388,7 +396,7 @@ impl Spacing {
 
     /// Create zero spacing
     pub const fn zero() -> Self {
-        Self::all(0.0)
+        Self::ZERO
     }
 
     /// Create spacing with symmetric horizontal and vertical values (CSS-style)

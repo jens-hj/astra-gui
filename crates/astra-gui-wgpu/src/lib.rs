@@ -122,6 +122,8 @@ pub struct Renderer {
     last_frame_text_vertex_count: usize,
     #[cfg(feature = "text-cosmic")]
     last_frame_text_index_count: usize,
+    #[cfg(feature = "text-cosmic")]
+    last_frame_text_draw_count: usize,
 
     // Glyph atlas (R8 alpha mask)
     #[cfg(feature = "text-cosmic")]
@@ -558,6 +560,8 @@ impl Renderer {
             #[cfg(feature = "text-cosmic")]
             last_frame_text_index_count: 0,
             #[cfg(feature = "text-cosmic")]
+            last_frame_text_draw_count: 0,
+            #[cfg(feature = "text-cosmic")]
             atlas_texture,
             #[cfg(feature = "text-cosmic")]
             atlas_bind_group,
@@ -885,7 +889,7 @@ impl Renderer {
             self.text_indices.clear();
             self.text_indices.reserve(self.last_frame_text_index_count);
 
-            let mut draws: Vec<ClippedDraw> = Vec::new();
+            let mut draws: Vec<ClippedDraw> = Vec::with_capacity(self.last_frame_text_draw_count);
 
             let mut shape_time = std::time::Duration::ZERO;
             let mut atlas_time = std::time::Duration::ZERO;
@@ -1246,6 +1250,7 @@ impl Renderer {
             // Update frame tracking for next frame's pre-allocation
             self.last_frame_text_vertex_count = self.text_vertices.len();
             self.last_frame_text_index_count = self.text_indices.len();
+            self.last_frame_text_draw_count = draws.len();
         }
 
         // Update frame tracking for geometry buffers
