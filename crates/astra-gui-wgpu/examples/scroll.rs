@@ -627,15 +627,21 @@ impl ApplicationHandler for App {
                     // Process scroll events and update offsets
                     for event in &events {
                         if let InteractionEvent::Scroll { delta, .. } = event.event {
-                            if event.target.as_str() == "scroll_container" {
+                            let target_id = event.target.as_str();
+
+                            // Handle both vertical and horizontal scroll containers
+                            if target_id == "scroll_container"
+                                || target_id == "horizontal_scroll_container"
+                            {
                                 // Find the node to get its scroll properties
-                                if let Some(node) = find_node_by_id(&ui, "scroll_container") {
+                                if let Some(node) = find_node_by_id(&ui, target_id) {
                                     let scroll_speed = node.scroll_speed();
                                     let scroll_direction = node.scroll_direction();
+                                    let layout_direction = node.layout_direction();
 
                                     let current = self
                                         .scroll_offsets
-                                        .get("scroll_container")
+                                        .get(target_id)
                                         .copied()
                                         .unwrap_or((0.0, 0.0));
 
@@ -653,12 +659,24 @@ impl ApplicationHandler for App {
                                     // Calculate max scroll based on content size
                                     let max_scroll = calculate_max_scroll(node);
 
-                                    let new_target = (
-                                        current.0 + adjusted_delta.0,
-                                        (current.1 + adjusted_delta.1).clamp(0.0, max_scroll.1),
-                                    );
+                                    // For horizontal layouts, apply vertical scroll to horizontal axis
+                                    let new_target = match layout_direction {
+                                        Layout::Horizontal => (
+                                            (current.0 + adjusted_delta.1).clamp(0.0, max_scroll.0),
+                                            current.1,
+                                        ),
+                                        Layout::Vertical => (
+                                            current.0,
+                                            (current.1 + adjusted_delta.1).clamp(0.0, max_scroll.1),
+                                        ),
+                                        Layout::Stack => (
+                                            (current.0 + adjusted_delta.0).clamp(0.0, max_scroll.0),
+                                            (current.1 + adjusted_delta.1).clamp(0.0, max_scroll.1),
+                                        ),
+                                    };
+
                                     self.scroll_targets
-                                        .insert("scroll_container".to_string(), new_target);
+                                        .insert(target_id.to_string(), new_target);
                                 }
                             }
                         }
