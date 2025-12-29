@@ -386,43 +386,55 @@ impl EventDispatcher {
         (events, interaction_states)
     }
 
-    /// Restore and sync scroll state in a single tree traversal
+    /// Restore scroll state from persistent storage
     ///
-    /// This combines restore_scroll_state and sync_scroll_state into one pass.
-    /// Must be called twice per frame:
-    /// 1. After layout but before animations - to restore state
-    /// 2. After animations - to save state
-    ///
-    /// The single traversal works because:
-    /// - First call: restores old state, then immediately saves it (no-op since unchanged)
-    /// - Second call: restores current state, then saves updated state after animations
-    pub fn sync_scroll_state_bidirectional(&mut self, root: &mut Node) {
-        Self::sync_bidirectional_recursive(root, &mut self.scroll_state);
+    /// Call this after layout but before animations to restore previous scroll positions.
+    pub fn restore_scroll_state(&mut self, root: &mut Node) {
+        Self::restore_scroll_state_recursive(root, &self.scroll_state);
     }
 
-    /// Recursively restore and sync scroll state in a single pass
-    fn sync_bidirectional_recursive(
+    /// Recursively restore scroll state from persistent storage
+    fn restore_scroll_state_recursive(
         node: &mut Node,
-        scroll_state: &mut HashMap<String, ((f32, f32), (f32, f32))>,
+        scroll_state: &HashMap<String, ((f32, f32), (f32, f32))>,
     ) {
-        // First restore from persistent state (need to clone id to avoid borrow conflict)
-        if let Some(node_id) = node.id().map(|id| id.as_str().to_string()) {
-            if let Some(&(offset, target)) = scroll_state.get(&node_id) {
+        if let Some(node_id) = node.id() {
+            if let Some(&(offset, target)) = scroll_state.get(node_id.as_str()) {
                 node.set_scroll_offset(offset);
                 node.set_scroll_target(target);
             }
+        }
 
-            // Then sync back current state (saves any changes from animations/events)
+        for child in node.children_mut() {
+            Self::restore_scroll_state_recursive(child, scroll_state);
+        }
+    }
+
+    /// Sync scroll state to persistent storage
+    ///
+    /// Call this after animations to save updated scroll positions.
+    pub fn sync_scroll_state(&mut self, root: &Node) {
+        Self::sync_scroll_state_recursive(root, &mut self.scroll_state);
+    }
+
+    /// Recursively sync scroll state to persistent storage
+    fn sync_scroll_state_recursive(
+        node: &Node,
+        scroll_state: &mut HashMap<String, ((f32, f32), (f32, f32))>,
+    ) {
+        if let Some(node_id) = node.id() {
             if node.overflow() == astra_gui::Overflow::Scroll {
                 let current_offset = node.scroll_offset();
                 let current_target = node.scroll_target();
-                scroll_state.insert(node_id, (current_offset, current_target));
+                scroll_state.insert(
+                    node_id.as_str().to_string(),
+                    (current_offset, current_target),
+                );
             }
         }
 
-        // Recurse to children
-        for child in node.children_mut() {
-            Self::sync_bidirectional_recursive(child, scroll_state);
+        for child in node.children() {
+            Self::sync_scroll_state_recursive(child, scroll_state);
         }
     }
 

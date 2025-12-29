@@ -154,22 +154,26 @@ impl From<&ClippedShape> for RectInstance {
             ]
         };
 
-        // Convert fill color
+        // Apply opacity from ClippedShape to fill color
         let fill_color = [
             (rect.fill.r * 255.0).round().clamp(0.0, 255.0) as u8,
             (rect.fill.g * 255.0).round().clamp(0.0, 255.0) as u8,
             (rect.fill.b * 255.0).round().clamp(0.0, 255.0) as u8,
-            (rect.fill.a * 255.0).round().clamp(0.0, 255.0) as u8,
+            ((rect.fill.a * clipped.opacity) * 255.0)
+                .round()
+                .clamp(0.0, 255.0) as u8,
         ];
 
-        // Convert stroke (if present)
+        // Convert stroke (if present) and apply opacity
         let (stroke_color, stroke_width) = if let Some(stroke) = &rect.stroke {
             (
                 [
                     (stroke.color.r * 255.0).round().clamp(0.0, 255.0) as u8,
                     (stroke.color.g * 255.0).round().clamp(0.0, 255.0) as u8,
                     (stroke.color.b * 255.0).round().clamp(0.0, 255.0) as u8,
-                    (stroke.color.a * 255.0).round().clamp(0.0, 255.0) as u8,
+                    ((stroke.color.a * clipped.opacity) * 255.0)
+                        .round()
+                        .clamp(0.0, 255.0) as u8,
                 ],
                 stroke.width,
             )

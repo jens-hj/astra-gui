@@ -75,7 +75,7 @@ impl FullOutput {
 
         let shapes = raw_shapes
             .into_iter()
-            .map(|(rect, clip_rect, shape, transform)| {
+            .map(|(rect, clip_rect, shape, transform, opacity)| {
                 // Apply the rect to the shape if it's a StyledRect.
                 // Text already carries its own bounding rect internally (TextShape::rect).
                 let shape_with_rect = match shape {
@@ -87,6 +87,7 @@ impl FullOutput {
                 };
 
                 ClippedShape::with_transform(clip_rect, rect, shape_with_rect, transform)
+                    .with_opacity(opacity)
             })
             .collect();
 
@@ -101,7 +102,7 @@ fn collect_clipped_shapes(
     inherited_clip_rect: Rect,
     parent_transform: Transform2D,
     debug_options: Option<crate::debug::DebugOptions>,
-    out: &mut Vec<(Rect, Rect, Shape, Transform2D)>,
+    out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
 ) {
     collect_clipped_shapes_with_opacity(
         node,
@@ -121,7 +122,7 @@ fn collect_clipped_shapes_with_opacity(
     inherited_clip_rect: Rect,
     parent_transform: Transform2D,
     debug_options: Option<crate::debug::DebugOptions>,
-    out: &mut Vec<(Rect, Rect, Shape, Transform2D)>,
+    out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
     parent_opacity: f32,
 ) {
     let combined_opacity = parent_opacity * node.opacity();
@@ -195,16 +196,14 @@ fn collect_clipped_shapes_with_opacity(
     // The node's own shape uses the inherited clip rect (from parent), not effective_clip_rect.
     // This ensures the container's border/background is not clipped by its own overflow policy.
     if let Some(shape) = node.shape() {
-        let mut shape_with_opacity = shape.clone();
-        // OPTIMIZATION: Only apply opacity if it's less than 1.0 (most nodes have opacity = 1.0)
-        if combined_opacity < 1.0 {
-            shape_with_opacity.apply_opacity(combined_opacity);
-        }
+        // OPTIMIZATION: Store opacity in ClippedShape instead of applying it to the shape
+        // This eliminates 325 shape clones per frame - opacity will be applied during rendering
         out.push((
             node_rect,
             inherited_clip_rect,
-            shape_with_opacity,
+            shape.clone(),
             world_transform,
+            combined_opacity,
         ));
     }
 
@@ -225,16 +224,14 @@ fn collect_clipped_shapes_with_opacity(
                         node_rect.max[1] - padding.bottom,
                     ],
                 );
-                let mut text_shape = crate::primitives::TextShape::new(content_rect, text_content);
-                // OPTIMIZATION: Only apply opacity if it's less than 1.0
-                if combined_opacity < 1.0 {
-                    text_shape.apply_opacity(combined_opacity);
-                }
+                let text_shape = crate::primitives::TextShape::new(content_rect, text_content);
+                // OPTIMIZATION: Store opacity instead of applying it to shape
                 out.push((
                     node_rect,
                     effective_clip_rect,
                     Shape::Text(text_shape),
                     world_transform,
+                    combined_opacity,
                 ));
             }
         }
@@ -331,7 +328,7 @@ fn collect_debug_shapes_clipped(
     clip_rect: Rect,
     options: &crate::debug::DebugOptions,
     transform: &Transform2D,
-    out: &mut Vec<(Rect, Rect, Shape, Transform2D)>,
+    out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
 ) {
     use crate::color::Color;
     use crate::primitives::{Stroke, StyledRect};
@@ -359,6 +356,7 @@ fn collect_debug_shapes_clipped(
                     Color::new(1.0, 0.0, 0.0, 0.2),
                 )),
                 *transform,
+                1.0,
             ));
         }
         // Draw right margin (excluding top and bottom corners)
@@ -374,6 +372,7 @@ fn collect_debug_shapes_clipped(
                     Color::new(1.0, 0.0, 0.0, 0.2),
                 )),
                 *transform,
+                1.0,
             ));
         }
         // Draw bottom margin (full width including corners)
@@ -392,6 +391,7 @@ fn collect_debug_shapes_clipped(
                     Color::new(1.0, 0.0, 0.0, 0.2),
                 )),
                 *transform,
+                1.0,
             ));
         }
         // Draw left margin (excluding top and bottom corners)
@@ -407,6 +407,7 @@ fn collect_debug_shapes_clipped(
                     Color::new(1.0, 0.0, 0.0, 0.2),
                 )),
                 *transform,
+                1.0,
             ));
         }
     }
@@ -433,6 +434,7 @@ fn collect_debug_shapes_clipped(
                     .with_stroke(Stroke::new(1.0, Color::new(1.0, 1.0, 0.0, 0.5))),
             ),
             *transform,
+            1.0,
         ));
     }
 
@@ -453,6 +455,7 @@ fn collect_debug_shapes_clipped(
                     Color::new(0.0, 0.0, 1.0, 0.2),
                 )),
                 *transform,
+                1.0,
             ));
         }
         // Draw right padding (excluding top and bottom corners)
@@ -471,6 +474,7 @@ fn collect_debug_shapes_clipped(
                     Color::new(0.0, 0.0, 1.0, 0.2),
                 )),
                 *transform,
+                1.0,
             ));
         }
         // Draw bottom padding (full width)
@@ -486,6 +490,7 @@ fn collect_debug_shapes_clipped(
                     Color::new(0.0, 0.0, 1.0, 0.2),
                 )),
                 *transform,
+                1.0,
             ));
         }
         // Draw left padding (excluding top and bottom corners)
@@ -504,6 +509,7 @@ fn collect_debug_shapes_clipped(
                     Color::new(0.0, 0.0, 1.0, 0.2),
                 )),
                 *transform,
+                1.0,
             ));
         }
     }
@@ -518,6 +524,7 @@ fn collect_debug_shapes_clipped(
                     .with_stroke(Stroke::new(1.0, Color::new(0.0, 1.0, 0.0, 0.5))),
             ),
             *transform,
+            1.0,
         ));
     }
 
@@ -532,6 +539,7 @@ fn collect_debug_shapes_clipped(
                     .with_stroke(Stroke::new(2.0, Color::new(1.0, 0.0, 0.0, 0.8))),
             ),
             Transform2D::IDENTITY, // Clip rects are already in world space
+            1.0,
         ));
     }
 
@@ -564,6 +572,7 @@ fn collect_debug_shapes_clipped(
                 Color::new(1.0, 0.5, 0.0, 0.9), // Orange
             )),
             *transform,
+            1.0,
         ));
 
         // Vertical line
@@ -584,6 +593,7 @@ fn collect_debug_shapes_clipped(
                 Color::new(1.0, 0.5, 0.0, 0.9), // Orange
             )),
             *transform,
+            1.0,
         ));
 
         // Circle at center (hollow with stroke)
@@ -608,6 +618,7 @@ fn collect_debug_shapes_clipped(
                     .with_stroke(Stroke::new(2.0, Color::new(1.0, 0.5, 0.0, 0.9))), // Orange stroke
             ),
             *transform,
+            1.0,
         ));
     }
 }
@@ -617,7 +628,7 @@ fn collect_gap_debug_shapes(
     clip_rect: Rect,
     _options: &crate::debug::DebugOptions,
     transform: &Transform2D,
-    out: &mut Vec<(Rect, Rect, Shape, Transform2D)>,
+    out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
 ) {
     use crate::color::Color;
     use crate::layout::Layout;
@@ -677,6 +688,7 @@ fn collect_gap_debug_shapes(
                 Color::new(0.5, 0.0, 0.5, 0.3), // Purple with 30% opacity
             )),
             *transform,
+            1.0,
         ));
     }
 }

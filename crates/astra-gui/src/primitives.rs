@@ -253,6 +253,7 @@ pub struct ClippedShape {
     pub clip_rect: Rect, // Clip rect in world space
     pub shape: Shape,
     pub transform: Transform2D, // Accumulated transform from hierarchy
+    pub opacity: f32,           // Combined opacity from node hierarchy
 }
 
 impl ClippedShape {
@@ -268,6 +269,7 @@ impl ClippedShape {
             clip_rect,
             shape,
             transform: Transform2D::IDENTITY,
+            opacity: 1.0,
         }
     }
 
@@ -282,6 +284,12 @@ impl ClippedShape {
             clip_rect,
             shape,
             transform,
+            opacity: 1.0,
         }
+    }
+
+    pub fn with_opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self
     }
 }

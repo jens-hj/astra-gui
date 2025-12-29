@@ -536,9 +536,7 @@ impl ApplicationHandler for App {
 
                     // Restore scroll state from persistent storage (before animations)
                     // This needs to happen before dispatch so the initial state is correct
-                    gpu_state
-                        .event_dispatcher
-                        .sync_scroll_state_bidirectional(&mut ui);
+                    gpu_state.event_dispatcher.restore_scroll_state(&mut ui);
 
                     // Dispatch events (scroll events are automatically processed internally)
                     let (_events, interaction_states) = gpu_state
@@ -556,9 +554,7 @@ impl ApplicationHandler for App {
                     ui.update_all_scroll_animations(dt);
 
                     // Save updated scroll state back to persistent storage
-                    gpu_state
-                        .event_dispatcher
-                        .sync_scroll_state_bidirectional(&mut ui);
+                    gpu_state.event_dispatcher.sync_scroll_state(&ui);
 
                     // Apply interactive styles
                     gpu_state.interactive_state_manager.begin_frame();

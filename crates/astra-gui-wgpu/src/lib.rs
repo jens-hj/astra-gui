@@ -1000,11 +1000,12 @@ impl Renderer {
                     let p2 = apply_transform([x1, y1]);
                     let p3 = apply_transform([x0, y1]);
 
+                    // Apply opacity from ClippedShape to text color
                     let color = [
                         text_shape.color.r,
                         text_shape.color.g,
                         text_shape.color.b,
-                        text_shape.color.a,
+                        text_shape.color.a * clipped.opacity,
                     ];
                     let uv = placed.uv;
 
