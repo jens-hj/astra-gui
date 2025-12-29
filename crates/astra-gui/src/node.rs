@@ -75,7 +75,7 @@ pub struct Node {
     scroll_offset: (f32, f32),
     /// Scroll speed multiplier for Overflow::Scroll containers
     ///
-    /// Default: 1.0
+    /// Default: 2.0
     scroll_speed: f32,
     /// Scroll direction behavior
     ///
@@ -123,7 +123,7 @@ impl Node {
             layout_direction: Layout::default(),
             overflow: Overflow::default(),
             scroll_offset: (0.0, 0.0),
-            scroll_speed: 1.0,
+            scroll_speed: 8.0,
             scroll_direction: ScrollDirection::default(),
             opacity: 1.0,
             shape: None,

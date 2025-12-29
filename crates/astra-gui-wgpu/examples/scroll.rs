@@ -362,8 +362,6 @@ fn create_demo_ui(_width: f32, _height: f32, scroll_offsets: &HashMap<String, (f
         .with_gap(10.0)
         .with_layout_direction(Layout::Vertical)
         .with_overflow(Overflow::Scroll)
-        .with_scroll_speed(1.0) // Adjust this to change scroll speed
-        .with_scroll_direction(ScrollDirection::Inverted) // Natural scrolling
         .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(mocha::MANTLE),
