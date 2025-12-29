@@ -93,7 +93,7 @@ impl Default for ButtonStyle {
             idle_stroke_color: mocha::LAVENDER,
             hover_stroke_color: mocha::LAVENDER,
             pressed_stroke_color: mocha::LAVENDER,
-            disabled_stroke_color: mocha::OVERLAY2,
+            disabled_stroke_color: mocha::SURFACE2,
             // Text Colors
             text_color: mocha::TEXT,
             disabled_text_color: mocha::SUBTEXT1,
@@ -148,7 +148,7 @@ pub fn button(
         })
         .with_hover_style(Style {
             fill_color: Some(style.hover_color),
-            stroke: Some(Stroke::new(2.0, style.hover_stroke_color)),
+            stroke: Some(Stroke::new(3.0, style.hover_stroke_color)),
             ..Default::default()
         })
         .with_active_style(Style {

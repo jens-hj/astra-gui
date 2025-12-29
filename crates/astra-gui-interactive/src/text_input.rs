@@ -4,7 +4,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, Rect, Shape,
-    Size, Spacing, Style, StyledRect, TextContent, Transition, Translation, VerticalAlign,
+    Size, Spacing, Stroke, Style, StyledRect, TextContent, Transition, Translation, VerticalAlign,
 };
 use astra_gui_wgpu::{InteractionEvent, Key, NamedKey, TargetedEvent};
 use std::time::Duration;
@@ -53,12 +53,26 @@ pub struct TextInputStyle {
     pub focused_color: Color,
     /// Background color when disabled
     pub disabled_color: Color,
+
+    /// Stroke color when idle
+    pub idle_stroke_color: Color,
+    /// Stroke color when focused
+    pub focused_stroke_color: Color,
+    /// Stroke color when disabled
+    pub disabled_stroke_color: Color,
+
+    // Stroke width
+    pub idle_stroke_width: f32,
+    pub focused_stroke_width: f32,
+    pub disabled_stroke_width: f32,
+
     /// Text color
     pub text_color: Color,
     /// Placeholder text color
-    pub placeholder_color: Color,
+    pub placeholder_text_color: Color,
     /// Disabled text color
     pub disabled_text_color: Color,
+
     /// Selection highlight color
     pub selection_color: Color,
     /// Internal padding
@@ -74,16 +88,27 @@ pub struct TextInputStyle {
 impl Default for TextInputStyle {
     fn default() -> Self {
         Self {
+            // Fill Colors
             idle_color: mocha::SURFACE0,
             focused_color: mocha::SURFACE1,
-            disabled_color: mocha::SURFACE0.with_alpha(0.5),
+            disabled_color: mocha::SURFACE0.with_alpha(0.8),
+            // Stroke Colors
+            idle_stroke_color: mocha::LAVENDER,
+            focused_stroke_color: mocha::LAVENDER,
+            disabled_stroke_color: mocha::SURFACE2,
+            // Stroke Width
+            idle_stroke_width: 2.0,
+            focused_stroke_width: 3.0,
+            disabled_stroke_width: 2.0,
+            // Text Colors
             text_color: mocha::TEXT,
-            placeholder_color: mocha::SUBTEXT0,
+            placeholder_text_color: mocha::SUBTEXT0,
             disabled_text_color: mocha::SUBTEXT0,
+            // Other
             selection_color: mocha::LAVENDER.with_alpha(0.3),
-            padding: Spacing::symmetric(16.0, 12.0),
+            padding: Spacing::symmetric(10.0, 8.0),
             border_radius: 8.0,
-            font_size: 24.0,
+            font_size: 20.0,
             cursor_style: CursorStyle::default(),
         }
     }
@@ -131,7 +156,7 @@ pub fn text_input(
 
     // Determine text color (placeholder vs actual text)
     let text_color = if value_str.is_empty() {
-        style.placeholder_color
+        style.placeholder_text_color
     } else {
         style.text_color
     };
@@ -206,12 +231,12 @@ pub fn text_input(
                     .with_width(Size::px(selection_width))
                     .with_height(Size::px(style.font_size))
                     .with_translation(Translation::x(selection_x_offset))
-                    .with_shape(Shape::Rect(StyledRect {
-                        rect: Rect::default(),
-                        corner_shape: CornerShape::Round(2.0), // Slightly rounded
-                        fill: style.selection_color,
-                        stroke: None,
-                    })),
+                    .with_shape(Shape::rect())
+                    .with_style(Style {
+                        fill_color: Some(style.selection_color),
+                        // corner_shape: Some(CornerShape::Round(5.0)),
+                        ..Default::default()
+                    }),
             );
         }
     }
@@ -315,32 +340,40 @@ pub fn text_input(
             .with_disabled(disabled),
     );
 
+    let fill_color = if focused {
+        style.focused_color
+    } else {
+        style.idle_color
+    };
+
+    let stroke_color = if focused {
+        style.focused_stroke_color
+    } else {
+        style.idle_stroke_color
+    };
+
+    let stroke_width = if focused {
+        style.focused_stroke_width
+    } else {
+        style.idle_stroke_width
+    };
+
     Node::new()
         .with_id(node_id)
         .with_width(Size::px(300.0))
         .with_height(Size::px(style.font_size + style.padding.get_vertical()))
         .with_padding(style.padding)
         .with_layout_direction(Layout::Stack)
-        .with_shape(astra_gui::Shape::Rect(StyledRect {
-            rect: astra_gui::Rect::default(),
-            corner_shape: CornerShape::Round(style.border_radius),
-            fill: if focused {
-                style.focused_color
-            } else {
-                style.idle_color
-            },
-            stroke: None,
-        }))
+        .with_shape(astra_gui::Shape::rect())
         .with_style(Style {
-            fill_color: Some(if focused {
-                style.focused_color
-            } else {
-                style.idle_color
-            }),
+            fill_color: Some(fill_color),
+            stroke: Some(Stroke::new(stroke_width, stroke_color)),
+            corner_shape: Some(CornerShape::Round(style.border_radius)),
             ..Default::default()
         })
         .with_disabled_style(Style {
             fill_color: Some(style.disabled_color),
+            stroke: Some(Stroke::new(stroke_width, style.disabled_stroke_color)),
             ..Default::default()
         })
         .with_disabled(disabled)

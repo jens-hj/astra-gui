@@ -244,6 +244,9 @@ impl Node {
 
     /// Set the base style (always applied)
     pub fn with_style(mut self, style: Style) -> Self {
+        // Apply the style immediately for nodes without interactive states
+        // (nodes with IDs will have styles applied via InteractiveStateManager)
+        style.apply_to_node(&mut self);
         self.base_style = Some(style);
         self
     }
