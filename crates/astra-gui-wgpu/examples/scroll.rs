@@ -7,11 +7,11 @@
 //! - ESC: quit
 
 use astra_gui::{
-    catppuccin::mocha, Color, Content, CornerShape, FullOutput, HorizontalAlign, Layout, Node,
-    NodeId, Overflow, Shape, Size, Spacing, Style, TextContent, VerticalAlign,
+    catppuccin::mocha, Color, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign,
+    Layout, Node, NodeId, Overflow, Shape, Size, Spacing, Style, TextContent, VerticalAlign,
 };
 use astra_gui_wgpu::{
-    EventDispatcher, InputState, InteractionEvent, InteractiveStateManager, Renderer,
+    EventDispatcher, InputState, InteractionEvent, InteractiveStateManager, RenderMode, Renderer,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -22,10 +22,110 @@ use winit::{
     window::{Window, WindowId},
 };
 
+const DEBUG_HELP_TEXT: &str = "Debug controls:
+  M - Toggle margins (red overlay)
+  P - Toggle padding (blue overlay)
+  B - Toggle borders (green outline)
+  C - Toggle content area (yellow outline)
+  R - Toggle clip rects (red outline)
+  G - Toggle gaps (purple overlay)
+  O - Toggle transform origins (orange crosshair)
+  D - Toggle all debug visualizations
+  S - Toggle render mode (SDF/Mesh)
+  ESC - Exit";
+
+const DEBUG_HELP_TEXT_ONELINE: &str =
+    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | D:All | S:RenderMode | ESC:Exit";
+
+fn handle_debug_keybinds(
+    event: &WindowEvent,
+    debug_options: &mut DebugOptions,
+    renderer: Option<&mut Renderer>,
+) -> bool {
+    let WindowEvent::KeyboardInput {
+        event:
+            KeyEvent {
+                physical_key: winit::keyboard::PhysicalKey::Code(key_code),
+                state: ElementState::Pressed,
+                ..
+            },
+        ..
+    } = event
+    else {
+        return false;
+    };
+
+    match *key_code {
+        winit::keyboard::KeyCode::KeyM => {
+            debug_options.show_margins = !debug_options.show_margins;
+            println!("Margins: {}", debug_options.show_margins);
+            true
+        }
+        winit::keyboard::KeyCode::KeyP => {
+            debug_options.show_padding = !debug_options.show_padding;
+            println!("Padding: {}", debug_options.show_padding);
+            true
+        }
+        winit::keyboard::KeyCode::KeyB => {
+            debug_options.show_borders = !debug_options.show_borders;
+            println!("Borders: {}", debug_options.show_borders);
+            true
+        }
+        winit::keyboard::KeyCode::KeyC => {
+            debug_options.show_content_area = !debug_options.show_content_area;
+            println!("Content area: {}", debug_options.show_content_area);
+            true
+        }
+        winit::keyboard::KeyCode::KeyR => {
+            debug_options.show_clip_rects = !debug_options.show_clip_rects;
+            println!("Clip rects: {}", debug_options.show_clip_rects);
+            true
+        }
+        winit::keyboard::KeyCode::KeyG => {
+            debug_options.show_gaps = !debug_options.show_gaps;
+            println!("Gaps: {}", debug_options.show_gaps);
+            true
+        }
+        winit::keyboard::KeyCode::KeyO => {
+            debug_options.show_transform_origins = !debug_options.show_transform_origins;
+            println!(
+                "Transform origins: {}",
+                debug_options.show_transform_origins
+            );
+            true
+        }
+        winit::keyboard::KeyCode::KeyD => {
+            if debug_options.is_enabled() {
+                *debug_options = DebugOptions::none();
+                println!("Debug: OFF");
+            } else {
+                *debug_options = DebugOptions::all();
+                println!("Debug: ALL ON");
+            }
+            true
+        }
+        winit::keyboard::KeyCode::KeyS => {
+            if let Some(renderer) = renderer {
+                let new_mode = match renderer.render_mode() {
+                    RenderMode::Sdf | RenderMode::Auto => RenderMode::Mesh,
+                    RenderMode::Mesh => RenderMode::Sdf,
+                };
+                renderer.set_render_mode(new_mode);
+                println!("Render mode: {:?}", new_mode);
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
 struct App {
     window: Option<Arc<Window>>,
     gpu_state: Option<GpuState>,
     scroll_offsets: HashMap<String, (f32, f32)>,
+    debug_options: DebugOptions,
 }
 
 struct GpuState {
@@ -116,6 +216,7 @@ impl GpuState {
     fn render(
         &mut self,
         scroll_offsets: &HashMap<String, (f32, f32)>,
+        debug_options: &DebugOptions,
     ) -> Result<(), wgpu::SurfaceError> {
         let surface_texture = self.surface.get_current_texture()?;
         let view = surface_texture
@@ -170,8 +271,15 @@ impl GpuState {
             .apply_styles(&mut ui, &interaction_states);
 
         // Render UI
-        let ui_output =
-            FullOutput::from_node(ui, (self.config.width as f32, self.config.height as f32));
+        let ui_output = FullOutput::from_node_with_debug(
+            ui,
+            (self.config.width as f32, self.config.height as f32),
+            if debug_options.is_enabled() {
+                Some(*debug_options)
+            } else {
+                None
+            },
+        );
 
         let mut encoder = self
             .device
@@ -314,6 +422,12 @@ impl ApplicationHandler for App {
                 ..
             } => event_loop.exit(),
 
+            WindowEvent::KeyboardInput { .. } => {
+                // Debug controls
+                let renderer = self.gpu_state.as_mut().map(|s| &mut s.renderer);
+                let _handled = handle_debug_keybinds(&event, &mut self.debug_options, renderer);
+            }
+
             WindowEvent::Resized(physical_size) => {
                 if let Some(gpu_state) = &mut self.gpu_state {
                     gpu_state.resize(physical_size);
@@ -357,7 +471,7 @@ impl ApplicationHandler for App {
                         }
                     }
 
-                    match gpu_state.render(&self.scroll_offsets) {
+                    match gpu_state.render(&self.scroll_offsets, &self.debug_options) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
                             if let Some(window) = &self.window {
@@ -393,10 +507,12 @@ fn main() {
         window: None,
         gpu_state: None,
         scroll_offsets: HashMap::new(),
+        debug_options: DebugOptions::none(),
     };
 
+    println!("{}", DEBUG_HELP_TEXT);
+    println!();
     println!("Use mouse wheel to scroll the container");
-    println!("ESC to exit");
 
     event_loop.run_app(&mut app).unwrap();
 }
