@@ -1,7 +1,6 @@
 use crate::content::Content;
 use crate::layout::{
-    ComputedLayout, Layout, Offset, Overflow, ScrollDirection, Size, Spacing, TransformOrigin,
-    Translation,
+    ComputedLayout, Layout, Overflow, ScrollDirection, Size, Spacing, TransformOrigin, Translation,
 };
 use crate::measure::{ContentMeasurer, IntrinsicSize, MeasureTextRequest};
 use crate::primitives::{Rect, Shape};
@@ -189,7 +188,7 @@ impl Node {
 
     /// Set the offset (deprecated, use with_translation)
     #[deprecated(since = "0.2.0", note = "Use with_translation instead")]
-    pub fn with_offset(mut self, offset: Offset) -> Self {
+    pub fn with_offset(mut self, offset: Translation) -> Self {
         self.translation = offset;
         self
     }
