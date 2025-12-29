@@ -436,10 +436,10 @@ impl ApplicationHandler for App {
 
             WindowEvent::RedrawRequested => {
                 if let Some(gpu_state) = &mut self.gpu_state {
-                    // Handle scroll events before rendering
+                    // Process input and scroll events first
                     gpu_state.input.begin_frame();
 
-                    // Build UI to get events
+                    // Build UI to dispatch events
                     let mut ui = create_demo_ui(
                         gpu_state.config.width as f32,
                         gpu_state.config.height as f32,
@@ -450,7 +450,7 @@ impl ApplicationHandler for App {
                         .event_dispatcher
                         .dispatch(&gpu_state.input, &mut ui);
 
-                    // Process scroll events
+                    // Process scroll events and update offsets
                     for event in &events {
                         if let InteractionEvent::Scroll { delta, .. } = event.event {
                             if event.target.as_str() == "scroll_container" {
@@ -459,17 +459,20 @@ impl ApplicationHandler for App {
                                     .get("scroll_container")
                                     .copied()
                                     .unwrap_or((0.0, 0.0));
-                                // Invert delta: positive scroll should move content down (negative offset)
+                                // Positive scroll delta means scroll up, so content moves down (positive offset increase)
                                 let new_offset = (
-                                    current.0 - delta.0,
-                                    (current.1 - delta.1).max(0.0), // Clamp to not scroll past top
+                                    current.0 + delta.0,
+                                    (current.1 + delta.1).max(0.0), // Clamp to not scroll past top
                                 );
                                 self.scroll_offsets
                                     .insert("scroll_container".to_string(), new_offset);
-                                println!("Scroll offset: {:?}", new_offset);
+                                println!("Scroll delta: {:?}, new offset: {:?}", delta, new_offset);
                             }
                         }
                     }
+
+                    // Clear input for next frame
+                    gpu_state.input.begin_frame();
 
                     match gpu_state.render(&self.scroll_offsets, &self.debug_options) {
                         Ok(_) => {}
