@@ -299,8 +299,95 @@ pub fn drag_value_update(
     // Sync local focused state with event dispatcher
     *focused = is_focused;
 
+    // First, check for drag events (works whether focused or not)
+    let mut value_changed = false;
+    let mut was_dragged = false;
+
+    for event in events {
+        let target_str = event.target.as_str();
+
+        if target_str != hitbox_id && target_str != container_id {
+            continue;
+        }
+
+        match &event.event {
+            InteractionEvent::DragStart { .. } => {
+                // Initialize accumulator with current value when drag starts
+                *drag_accumulator = *value;
+                // Unfocus if currently focused (user is starting to drag)
+                if is_focused {
+                    *focused = false;
+                    event_dispatcher.set_focus(None);
+                }
+            }
+            InteractionEvent::DragMove { delta, .. } => {
+                was_dragged = true;
+                // Calculate value change from horizontal drag
+                let mut drag_speed = speed;
+
+                // Apply speed modifiers
+                if input_state.shift_held {
+                    drag_speed *= 0.1; // Slower, more precise
+                }
+                if input_state.ctrl_held {
+                    drag_speed *= 10.0; // Faster
+                }
+
+                let delta_value = delta.x * drag_speed;
+
+                // Update the continuous accumulator
+                *drag_accumulator += delta_value;
+
+                // Apply range clamping to accumulator
+                if let Some(ref value_range) = range {
+                    *drag_accumulator =
+                        drag_accumulator.clamp(*value_range.start(), *value_range.end());
+                }
+
+                // Calculate the stepped value from the accumulator
+                let mut new_value = *drag_accumulator;
+
+                if let Some(step_size) = step {
+                    if step_size > 0.0 {
+                        if let Some(ref value_range) = range {
+                            let steps_from_start =
+                                ((new_value - value_range.start()) / step_size).round();
+                            new_value = value_range.start() + steps_from_start * step_size;
+                            new_value = new_value.clamp(*value_range.start(), *value_range.end());
+                        } else {
+                            // Snap to nearest step from 0
+                            new_value = (new_value / step_size).round() * step_size;
+                        }
+                    }
+                }
+
+                // Only update the exposed value if it changed
+                if (*value - new_value).abs() > f32::EPSILON {
+                    *value = new_value;
+                    value_changed = true;
+                }
+            }
+            InteractionEvent::DragEnd { .. } => {
+                // Only enter text input mode if we didn't actually drag
+                if !was_dragged {
+                    *focused = true;
+                    *text_buffer = format_value(*value, 6); // Use high precision for editing
+                    *cursor_pos = text_buffer.len(); // Place cursor at end
+                    *selection = None;
+                    event_dispatcher.set_focus(Some(node_id.clone()));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // If we dragged, we're done (don't process text input)
+    if was_dragged {
+        return value_changed;
+    }
+
     // When focused, delegate to text_input_update
-    if is_focused {
+    if *focused {
         // Let text_input_update handle all the text editing
         let text_changed = text_input_update(
             id,
@@ -368,80 +455,6 @@ pub fn drag_value_update(
         return text_changed;
     }
 
-    // When not focused, handle drag and click events
-    let mut value_changed = false;
-    let mut was_dragged = false;
-
-    for event in events {
-        let target_str = event.target.as_str();
-
-        if target_str != hitbox_id && target_str != container_id {
-            continue;
-        }
-
-        match &event.event {
-            InteractionEvent::DragStart { .. } => {
-                // Initialize accumulator with current value when drag starts
-                *drag_accumulator = *value;
-            }
-            InteractionEvent::DragMove { delta, .. } => {
-                was_dragged = true;
-                // Calculate value change from horizontal drag
-                let mut drag_speed = speed;
-
-                // Apply speed modifiers
-                if input_state.shift_held {
-                    drag_speed *= 0.1; // Slower, more precise
-                }
-                if input_state.ctrl_held {
-                    drag_speed *= 10.0; // Faster
-                }
-
-                let delta_value = delta.x * drag_speed;
-
-                // Update the continuous accumulator
-                *drag_accumulator += delta_value;
-
-                // Apply range clamping to accumulator
-                if let Some(ref value_range) = range {
-                    *drag_accumulator =
-                        drag_accumulator.clamp(*value_range.start(), *value_range.end());
-                }
-
-                // Calculate the stepped value from the accumulator
-                let mut new_value = *drag_accumulator;
-
-                if let Some(step_size) = step {
-                    if step_size > 0.0 {
-                        if let Some(ref value_range) = range {
-                            let steps_from_start =
-                                ((new_value - value_range.start()) / step_size).round();
-                            new_value = value_range.start() + steps_from_start * step_size;
-                            new_value = new_value.clamp(*value_range.start(), *value_range.end());
-                        } else {
-                            // Snap to nearest step from 0
-                            new_value = (new_value / step_size).round() * step_size;
-                        }
-                    }
-                }
-
-                // Only update the exposed value if it changed
-                if (*value - new_value).abs() > f32::EPSILON {
-                    *value = new_value;
-                    value_changed = true;
-                }
-            }
-            InteractionEvent::DragEnd { .. } => {
-                // Only enter text input mode if we didn't actually drag
-                if !was_dragged {
-                    *focused = true;
-                    *text_buffer = format_value(*value, 6); // Use high precision for editing
-                    event_dispatcher.set_focus(Some(node_id.clone()));
-                }
-            }
-            _ => {}
-        }
-    }
-
-    value_changed
+    // Not focused and no text changes
+    false
 }

@@ -533,7 +533,7 @@ impl App {
                 // Label
                 Node::new()
                     .with_width(Size::px(200.0))
-                    .with_height(Size::FitContent)
+                    .with_height(Size::Fill)
                     .with_content(Content::Text(TextContent {
                         text: label.to_string(),
                         font_size: 20.0,
