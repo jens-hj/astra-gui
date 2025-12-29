@@ -8,7 +8,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout,
-    Node, NodeId, Overflow, Rect, ScrollDirection, Shape, Size, Spacing, Style, TextContent,
+    Node, NodeId, Overflow, ScrollDirection, Shape, Size, Spacing, Style, TextContent,
     VerticalAlign,
 };
 use astra_gui_wgpu::{
@@ -320,6 +320,50 @@ fn find_node_by_id<'a>(node: &'a Node, id: &str) -> Option<&'a Node> {
     None
 }
 
+/// Calculate maximum scroll offset for a container
+fn calculate_max_scroll(container: &Node) -> (f32, f32) {
+    let Some(layout) = container.computed_layout() else {
+        return (0.0, 0.0);
+    };
+
+    // Get container dimensions (after padding)
+    let padding = container.padding();
+    let container_width = layout.rect.max[0] - layout.rect.min[0] - padding.left - padding.right;
+    let container_height = layout.rect.max[1] - layout.rect.min[1] - padding.top - padding.bottom;
+
+    // Calculate total content size
+    let gap = container.gap();
+    let children = container.children();
+
+    if children.is_empty() {
+        return (0.0, 0.0);
+    }
+
+    let mut content_width = 0.0f32;
+    let mut content_height = 0.0f32;
+
+    for (i, child) in children.iter().enumerate() {
+        if let Some(child_layout) = child.computed_layout() {
+            let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+            let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+            content_width = content_width.max(child_width);
+            content_height += child_height;
+
+            // Add gap between items (but not after the last one)
+            if i < children.len() - 1 {
+                content_height += gap;
+            }
+        }
+    }
+
+    // Max scroll is the amount content exceeds container size
+    let max_scroll_x = (content_width - container_width).max(0.0);
+    let max_scroll_y = (content_height - container_height).max(0.0);
+
+    (max_scroll_x, max_scroll_y)
+}
+
 fn create_demo_ui(_width: f32, _height: f32, scroll_offsets: &HashMap<String, (f32, f32)>) -> Node {
     // Create a scrollable container with many items
     let mut items = Vec::new();
@@ -499,9 +543,12 @@ impl ApplicationHandler for App {
                                         delta.1 * scroll_speed * direction_multiplier,
                                     );
 
+                                    // Calculate max scroll based on content size
+                                    let max_scroll = calculate_max_scroll(node);
+
                                     let new_target = (
                                         current.0 + adjusted_delta.0,
-                                        (current.1 + adjusted_delta.1).max(0.0), // Clamp to not scroll past top
+                                        (current.1 + adjusted_delta.1).clamp(0.0, max_scroll.1),
                                     );
                                     self.scroll_targets
                                         .insert("scroll_container".to_string(), new_target);

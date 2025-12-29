@@ -429,7 +429,7 @@ impl Node {
     }
 
     /// Get the padding
-    pub(crate) fn padding(&self) -> Spacing {
+    pub fn padding(&self) -> Spacing {
         self.padding
     }
 
@@ -439,7 +439,7 @@ impl Node {
     }
 
     /// Get the gap between children
-    pub(crate) fn gap(&self) -> f32 {
+    pub fn gap(&self) -> f32 {
         self.gap
     }
 
