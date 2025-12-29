@@ -31,6 +31,11 @@ pub struct Style {
     /// Cursor/caret color (for text input cursors, falls back to text_color if not set)
     pub cursor_color: Option<Color>,
 
+    // Note: Translation is stored as separate x/y fields (not `Option<Translation>`)
+    // to allow partial style overrides. This enables hover/active styles to change
+    // just one axis (e.g., "shift 5px right") without affecting the other axis.
+    // This is consistent with CSS where you can set `transform: translateX(5px)`
+    // without overriding any existing translateY.
     /// Horizontal translation from default position
     pub translation_x: Option<f32>,
 
