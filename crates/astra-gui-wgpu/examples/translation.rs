@@ -348,7 +348,7 @@ impl App {
                 Node::new()
                     .with_width(Size::Fill)
                     .with_content(Content::Text(TextContent {
-                        text: "Translation Example".to_string(),
+                        text: "Transform Translation Example".to_string(),
                         font_size: 32.0,
                         color: mocha::TEXT,
                         h_align: HorizontalAlign::Center,

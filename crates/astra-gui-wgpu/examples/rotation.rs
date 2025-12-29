@@ -10,8 +10,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Content, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Rect,
-    Shape, Size, Spacing, Stroke, StyledRect, TextContent, TransformOrigin, Translation,
-    VerticalAlign,
+    Shape, Size, Spacing, Stroke, StyledRect, TextContent, TransformOrigin, VerticalAlign,
 };
 use astra_gui_interactive::{
     button, button_clicked, slider, slider_drag, toggle, toggle_clicked, ButtonStyle, SliderStyle,
@@ -341,7 +340,7 @@ impl App {
                     .with_height(Size::px(60.0))
                     .with_padding(Spacing::vertical(10.0))
                     .with_content(Content::Text(TextContent {
-                        text: "Rotation & Transform Example".to_string(),
+                        text: "Transform Rotation Example".to_string(),
                         font_size: 32.0,
                         color: mocha::TEXT,
                         h_align: HorizontalAlign::Center,
