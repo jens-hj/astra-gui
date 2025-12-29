@@ -286,7 +286,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
     let mut items = Vec::new();
     for (i, &height) in item_heights.iter().enumerate() {
         // Create nested children for each item
-        let mut nested_children = vec![
+        let nested_children = vec![
             Node::new()
                 .with_width(Size::Fill)
                 .with_height(Size::px(30.0))
@@ -573,8 +573,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     // Centered vertical scroll container
                     Node::new()
                         .with_width(Size::Fill)
-                        // .with_height(Size::fraction(0.37))
-                        .with_height(Size::px(800.0))
+                        .with_height(Size::fraction(0.37))
+                        // .with_height(Size::px(800.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(scroll_container)
@@ -582,8 +582,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     // 2D grid scroll container
                     Node::new()
                         .with_width(Size::Fill)
-                        // .with_height(Size::fraction(0.33))
-                        .with_height(Size::px(600.0))
+                        .with_height(Size::fraction(0.33))
+                        // .with_height(Size::px(600.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(grid_scroll_container)
@@ -591,8 +591,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     // Horizontal scroll container
                     Node::new()
                         .with_width(Size::Fill)
-                        // .with_height(Size::fraction(0.2))
-                        .with_height(Size::px(400.0))
+                        .with_height(Size::fraction(0.2))
+                        // .with_height(Size::px(400.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(horizontal_scroll_container)
@@ -722,7 +722,6 @@ impl ApplicationHandler for App {
                     // Clear input for next frame
                     gpu_state.input.begin_frame();
 
-                    let render_start = std::time::Instant::now();
                     let (gpu_work_time, present_time) = match gpu_state.render(&ui_output) {
                         Ok(times) => times,
                         Err(wgpu::SurfaceError::Lost) => {
@@ -740,7 +739,6 @@ impl ApplicationHandler for App {
                             (std::time::Duration::ZERO, std::time::Duration::ZERO)
                         }
                     };
-                    let render_time = render_start.elapsed();
 
                     let frame_time = frame_start.elapsed();
 

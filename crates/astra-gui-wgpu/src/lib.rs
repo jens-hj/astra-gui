@@ -152,9 +152,6 @@ pub struct Renderer {
         text::atlas::GlyphKey,
         ([i32; 2], [u32; 2], text::atlas::PlacedGlyph), // (bearing_px, size_px, placement)
     >,
-
-    // Performance profiling
-    frame_counter: u64,
 }
 
 impl Renderer {
@@ -573,8 +570,6 @@ impl Renderer {
             shape_cache: std::collections::HashMap::new(),
             #[cfg(feature = "text-cosmic")]
             glyph_metrics_cache: std::collections::HashMap::new(),
-
-            frame_counter: 0,
         }
     }
 
@@ -598,17 +593,9 @@ impl Renderer {
         screen_height: f32,
         output: &FullOutput,
     ) {
-        let render_start = std::time::Instant::now();
-
-        let mut sdf_time = std::time::Duration::ZERO;
-        let mut text_prep_time = std::time::Duration::ZERO;
-        let mut buffer_upload_time = std::time::Duration::ZERO;
-        let mut draw_time = std::time::Duration::ZERO;
-
         // Separate shapes into SDF-renderable and tessellated.
         // SDF rendering is used for simple shapes (currently: all fills, simple strokes).
         // OPTIMIZATION: Pre-allocate based on previous frame to reduce allocations
-        let sdf_start = std::time::Instant::now();
         self.sdf_instances.clear();
         self.sdf_instances
             .reserve(self.last_frame_sdf_instance_count);
@@ -682,10 +669,7 @@ impl Renderer {
             }
         }
 
-        sdf_time = sdf_start.elapsed();
-
         // Process mesh shapes if using Mesh render mode
-        let mesh_start = std::time::Instant::now();
         if self.render_mode == RenderMode::Mesh {
             // Tessellate all shapes using mesh rendering
             let mesh = self.tessellator.tessellate(&output.shapes);
@@ -751,10 +735,7 @@ impl Renderer {
             });
         }
 
-        let mesh_time = mesh_start.elapsed();
-
         // Upload geometry
-        let gpu_upload_start = std::time::Instant::now();
         if !self.frame_indices.is_empty() {
             queue.write_buffer(
                 &self.vertex_buffer,
@@ -791,10 +772,7 @@ impl Renderer {
                 bytemuck::cast_slice(&self.sdf_instances),
             );
         }
-        let gpu_upload_time = gpu_upload_start.elapsed();
-
         // Render pass
-        let render_pass_start = std::time::Instant::now();
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Astra UI Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -873,8 +851,6 @@ impl Renderer {
             render_pass.set_scissor_rect(0, 0, screen_width as u32, screen_height as u32);
         }
 
-        let text_start = std::time::Instant::now();
-
         // Draw text: shape (backend-agnostic) + rasterize (backend-agnostic) + atlas upload + quads.
         //
         // IMPORTANT: scissor/clipping is render-pass state. To respect `ClippedShape::clip_rect`,
@@ -890,12 +866,6 @@ impl Renderer {
             self.text_indices.reserve(self.last_frame_text_index_count);
 
             let mut draws: Vec<ClippedDraw> = Vec::with_capacity(self.last_frame_text_draw_count);
-
-            let mut shape_time = std::time::Duration::ZERO;
-            let mut atlas_time = std::time::Duration::ZERO;
-            let mut vertex_time = std::time::Duration::ZERO;
-            let mut cache_hits = 0;
-            let mut cache_misses = 0;
 
             for clipped in &output.shapes {
                 let Shape::Text(text_shape) = &clipped.shape else {
@@ -929,8 +899,6 @@ impl Renderer {
                 let index_start = self.text_indices.len() as u32;
 
                 // Shape + placement (backend-agnostic) with caching
-                let shape_start = std::time::Instant::now();
-
                 // Create cache key from text + font size + rect dimensions
                 let cache_key = (
                     text.to_string(),
@@ -941,11 +909,9 @@ impl Renderer {
 
                 let (shaped, placement) = if let Some(cached) = self.shape_cache.get(&cache_key) {
                     // Cache hit - reuse shaped text
-                    cache_hits += 1;
                     cached.clone()
                 } else {
                     // Cache miss - shape the text
-                    cache_misses += 1;
                     let result = self.text_engine.shape_line(gui_text::ShapeLineRequest {
                         text,
                         rect,
@@ -958,8 +924,6 @@ impl Renderer {
                     result
                 };
 
-                shape_time += shape_start.elapsed();
-
                 // Pre-calculate rotation trig functions outside the glyph loop
                 let rotation = clipped.transform.rotation;
                 let (cos_r, sin_r) = if rotation.abs() > 0.0001 {
@@ -969,7 +933,6 @@ impl Renderer {
                 };
                 let has_rotation = rotation.abs() > 0.0001;
 
-                let atlas_start = std::time::Instant::now();
                 for g in &shaped.glyphs {
                     // Map glyph key to atlas key
                     let atlas_key = text::atlas::GlyphKey::new(
@@ -1136,9 +1099,6 @@ impl Renderer {
                         base + 3,
                     ]);
                 }
-                atlas_time += atlas_start.elapsed();
-
-                let vertex_start = std::time::Instant::now();
                 let index_end = self.text_indices.len() as u32;
                 if index_end > index_start {
                     draws.push(ClippedDraw {
@@ -1147,23 +1107,9 @@ impl Renderer {
                         index_end,
                     });
                 }
-                vertex_time += vertex_start.elapsed();
-            }
-
-            if self.frame_counter % 60 == 0 {
-                println!(
-                    "    Text detail: Shape: {:.2}ms, Atlas: {:.2}ms, Vertex: {:.2}ms (Cache: {} hits, {} misses)",
-                    shape_time.as_secs_f64() * 1000.0,
-                    atlas_time.as_secs_f64() * 1000.0,
-                    vertex_time.as_secs_f64() * 1000.0,
-                    cache_hits,
-                    cache_misses,
-                );
             }
 
             if !draws.is_empty() {
-                let buffer_upload_start = std::time::Instant::now();
-
                 if self.text_vertices.len() > self.text_vertex_capacity {
                     self.text_vertex_capacity = (self.text_vertices.len() * 2).next_power_of_two();
                     self.text_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -1196,9 +1142,6 @@ impl Renderer {
                     0,
                     bytemuck::cast_slice(&self.text_indices),
                 );
-
-                let buffer_upload_time = buffer_upload_start.elapsed();
-                let draw_start = std::time::Instant::now();
 
                 render_pass.set_pipeline(&self.text_pipeline);
                 render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
@@ -1235,16 +1178,6 @@ impl Renderer {
                 render_pass.draw_indexed(batch_start..batch_end, 0, 0..1);
 
                 render_pass.set_scissor_rect(0, 0, screen_width as u32, screen_height as u32);
-
-                let draw_time = draw_start.elapsed();
-
-                if self.frame_counter % 60 == 0 {
-                    println!(
-                        "    Text buffers: Upload: {:.2}ms, Draw: {:.2}ms",
-                        buffer_upload_time.as_secs_f64() * 1000.0,
-                        draw_time.as_secs_f64() * 1000.0,
-                    );
-                }
             }
 
             // Update frame tracking for next frame's pre-allocation
@@ -1257,32 +1190,5 @@ impl Renderer {
         self.last_frame_vertex_count = self.wgpu_vertices.len();
         self.last_frame_index_count = self.frame_indices.len();
         self.last_frame_sdf_instance_count = self.sdf_instances.len();
-
-        let text_time = text_start.elapsed();
-        let render_pass_time = render_pass_start.elapsed();
-        let total_render_time = render_start.elapsed();
-
-        // Log every 60 frames
-        self.frame_counter += 1;
-        if self.frame_counter % 60 == 0 {
-            let other_time = total_render_time.as_secs_f64()
-                - sdf_time.as_secs_f64()
-                - mesh_time.as_secs_f64()
-                - gpu_upload_time.as_secs_f64()
-                - text_time.as_secs_f64();
-
-            println!(
-                "  Render breakdown: Total: {:.2}ms",
-                total_render_time.as_secs_f64() * 1000.0,
-            );
-            println!(
-                "    SDF prep: {:.2}ms, Mesh: {:.2}ms, GPU upload: {:.2}ms, Text: {:.2}ms, Other: {:.2}ms",
-                sdf_time.as_secs_f64() * 1000.0,
-                mesh_time.as_secs_f64() * 1000.0,
-                gpu_upload_time.as_secs_f64() * 1000.0,
-                text_time.as_secs_f64() * 1000.0,
-                other_time * 1000.0,
-            );
-        }
     }
 }
