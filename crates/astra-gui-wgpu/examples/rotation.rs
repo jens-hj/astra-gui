@@ -215,6 +215,8 @@ impl App {
 
         if button_clicked("reset_btn", &events) {
             self.counter = 0;
+            self.outer_rotation = 0.0;
+            self.inner_rotation = 0.0;
             println!("Reset clicked! Counter: {}", self.counter);
         }
 
@@ -230,7 +232,7 @@ impl App {
             &(-180.0..=180.0),
             &events,
             &SliderStyle::default(),
-            None,
+            Some(1.0),
         ) {
             println!("Outer rotation: {:.1}°", self.outer_rotation);
         }
@@ -241,7 +243,7 @@ impl App {
             &(-180.0..=180.0),
             &events,
             &SliderStyle::default(),
-            None,
+            Some(1.0),
         ) {
             println!("Inner rotation: {:.1}°", self.inner_rotation);
         }
@@ -379,7 +381,7 @@ impl App {
                                     .with_content(Content::Text(TextContent {
                                         text: "Outer Container Rotation".to_string(),
                                         font_size: 20.0,
-                                        color: mocha::BLUE,
+                                        color: mocha::LAVENDER,
                                         h_align: HorizontalAlign::Center,
                                         v_align: VerticalAlign::Center,
                                     })),
@@ -478,15 +480,16 @@ impl App {
                             .with_width(Size::Fill)
                             .with_height(Size::Fill)
                             .with_children(vec![
-                                // Outer rotated container (blue)
+                                // Outer rotated container (lavender)
                                 Node::new()
                                     .with_width(Size::px(400.0))
                                     .with_height(Size::px(400.0))
                                     .with_rotation(self.outer_rotation.to_radians())
                                     .with_transform_origin(TransformOrigin::center())
                                     .with_shape(Shape::Rect(
-                                        StyledRect::new(Default::default(), mocha::BLUE)
-                                            .with_stroke(Stroke::new(3.0, mocha::LAVENDER)),
+                                        StyledRect::new(Default::default(), mocha::CRUST)
+                                            .with_stroke(Stroke::new(3.0, mocha::LAVENDER))
+                                            .with_corner_shape(astra_gui::CornerShape::Round(50.0)),
                                     ))
                                     .with_padding(Spacing::all(30.0))
                                     .with_layout_direction(Layout::Vertical)
@@ -498,7 +501,7 @@ impl App {
                                             .with_content(Content::Text(TextContent {
                                                 text: "Outer Container".to_string(),
                                                 font_size: 24.0,
-                                                color: mocha::BASE,
+                                                color: mocha::TEXT,
                                                 h_align: HorizontalAlign::Center,
                                                 v_align: VerticalAlign::Center,
                                             })),
@@ -534,8 +537,9 @@ impl App {
                                             .with_rotation(self.inner_rotation.to_radians())
                                             .with_transform_origin(TransformOrigin::center())
                                             .with_shape(Shape::Rect(
-                                                StyledRect::new(Default::default(), mocha::GREEN)
-                                                    .with_stroke(Stroke::new(2.0, mocha::BASE)),
+                                                StyledRect::new(Default::default(), mocha::CRUST)
+                                                    .with_stroke(Stroke::new(2.0, mocha::GREEN))
+                                                    .with_corner_shape(astra_gui::CornerShape::Cut(20.0)),
                                             ))
                                             .with_padding(Spacing::all(20.0))
                                             .with_layout_direction(Layout::Vertical)
@@ -547,7 +551,7 @@ impl App {
                                                     .with_content(Content::Text(TextContent {
                                                         text: "Inner Container".to_string(),
                                                         font_size: 20.0,
-                                                        color: mocha::BASE,
+                                                        color: mocha::TEXT,
                                                         h_align: HorizontalAlign::Center,
                                                         v_align: VerticalAlign::Center,
                                                     })),
@@ -562,7 +566,7 @@ impl App {
                                                             .with_content(Content::Text(TextContent {
                                                                 text: "Toggle:".to_string(),
                                                                 font_size: 18.0,
-                                                                color: mocha::BASE,
+                                                                color: mocha::TEXT,
                                                                 h_align: HorizontalAlign::Right,
                                                                 v_align: VerticalAlign::Center,
                                                             })),
@@ -582,7 +586,7 @@ impl App {
                                                             self.outer_rotation + self.inner_rotation
                                                         ),
                                                         font_size: 16.0,
-                                                        color: mocha::BASE,
+                                                        color: mocha::TEXT,
                                                         h_align: HorizontalAlign::Center,
                                                         v_align: VerticalAlign::Center,
                                                     })),
