@@ -513,6 +513,68 @@ fn create_demo_ui(
 
     horizontal_scroll_container.set_scroll_offset(horizontal_scroll_offset);
 
+    // Create 2D scrollable container (scrolls both X and Y)
+    let mut grid_items = Vec::new();
+    for row in 0..10 {
+        let mut row_items = Vec::new();
+        for col in 0..10 {
+            row_items.push(
+                Node::new()
+                    .with_width(Size::px(150.0))
+                    .with_height(Size::px(100.0))
+                    .with_shape(Shape::rect())
+                    .with_style(Style {
+                        fill_color: Some(if (row + col) % 2 == 0 {
+                            mocha::SURFACE0
+                        } else {
+                            mocha::SURFACE1
+                        }),
+                        corner_shape: Some(CornerShape::Round(8.0)),
+                        ..Default::default()
+                    })
+                    .with_content(Content::Text(TextContent {
+                        text: format!("R{} C{}", row + 1, col + 1),
+                        font_size: 20.0,
+                        color: mocha::TEXT,
+                        h_align: HorizontalAlign::Center,
+                        v_align: VerticalAlign::Center,
+                    })),
+            );
+        }
+
+        grid_items.push(
+            Node::new()
+                .with_width(Size::FitContent)
+                .with_height(Size::px(100.0))
+                .with_layout_direction(Layout::Horizontal)
+                .with_gap(10.0)
+                .with_children(row_items),
+        );
+    }
+
+    let grid_scroll_offset = scroll_offsets
+        .get("grid_scroll_container")
+        .copied()
+        .unwrap_or((0.0, 0.0));
+
+    let mut grid_scroll_container = Node::new()
+        .with_id(NodeId::new("grid_scroll_container"))
+        .with_width(Size::px(600.0))
+        .with_height(Size::px(400.0))
+        .with_padding(Spacing::all(10.0))
+        .with_gap(10.0)
+        .with_layout_direction(Layout::Vertical)
+        .with_overflow(Overflow::Scroll)
+        .with_shape(Shape::rect())
+        .with_style(Style {
+            fill_color: Some(mocha::MANTLE),
+            corner_shape: Some(CornerShape::Round(12.0)),
+            ..Default::default()
+        })
+        .with_children(grid_items);
+
+    grid_scroll_container.set_scroll_offset(grid_scroll_offset);
+
     // Root with centered layout
     Node::new()
         .with_width(Size::Fill)
@@ -530,7 +592,8 @@ fn create_demo_ui(
                         .with_width(Size::Fill)
                         .with_height(Size::px(60.0))
                         .with_content(Content::Text(TextContent {
-                            text: "Scroll Example - Use Mouse Wheel".to_string(),
+                            text: "Scroll Example - Use Mouse Wheel (Shift for horizontal)"
+                                .to_string(),
                             font_size: 32.0,
                             color: mocha::TEXT,
                             h_align: HorizontalAlign::Center,
@@ -543,6 +606,14 @@ fn create_demo_ui(
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(scroll_container)
+                        .with_child(Node::new().with_width(Size::Fill)), // Right spacer
+                    // 2D grid scroll container
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::px(420.0))
+                        .with_layout_direction(Layout::Horizontal)
+                        .with_child(Node::new().with_width(Size::Fill)) // Left spacer
+                        .with_child(grid_scroll_container)
                         .with_child(Node::new().with_width(Size::Fill)), // Right spacer
                     // Horizontal scroll container
                     Node::new()
@@ -629,9 +700,10 @@ impl ApplicationHandler for App {
                         if let InteractionEvent::Scroll { delta, .. } = event.event {
                             let target_id = event.target.as_str();
 
-                            // Handle both vertical and horizontal scroll containers
+                            // Handle all scroll containers
                             if target_id == "scroll_container"
                                 || target_id == "horizontal_scroll_container"
+                                || target_id == "grid_scroll_container"
                             {
                                 // Find the node to get its scroll properties
                                 if let Some(node) = find_node_by_id(&ui, target_id) {
@@ -659,20 +731,43 @@ impl ApplicationHandler for App {
                                     // Calculate max scroll based on content size
                                     let max_scroll = calculate_max_scroll(node);
 
-                                    // For horizontal layouts, apply vertical scroll to horizontal axis
-                                    let new_target = match layout_direction {
-                                        Layout::Horizontal => (
-                                            (current.0 + adjusted_delta.1).clamp(0.0, max_scroll.0),
-                                            current.1,
-                                        ),
-                                        Layout::Vertical => (
-                                            current.0,
-                                            (current.1 + adjusted_delta.1).clamp(0.0, max_scroll.1),
-                                        ),
-                                        Layout::Stack => (
-                                            (current.0 + adjusted_delta.0).clamp(0.0, max_scroll.0),
-                                            (current.1 + adjusted_delta.1).clamp(0.0, max_scroll.1),
-                                        ),
+                                    // For grid container: shift = horizontal, normal = vertical
+                                    // For horizontal layouts: apply vertical scroll to horizontal axis
+                                    // For vertical layouts: normal vertical scrolling
+                                    let new_target = if target_id == "grid_scroll_container" {
+                                        // 2D scrolling: shift for horizontal, normal for vertical
+                                        if gpu_state.input.shift_held {
+                                            (
+                                                (current.0 + adjusted_delta.1)
+                                                    .clamp(0.0, max_scroll.0),
+                                                current.1,
+                                            )
+                                        } else {
+                                            (
+                                                current.0,
+                                                (current.1 + adjusted_delta.1)
+                                                    .clamp(0.0, max_scroll.1),
+                                            )
+                                        }
+                                    } else {
+                                        match layout_direction {
+                                            Layout::Horizontal => (
+                                                (current.0 + adjusted_delta.1)
+                                                    .clamp(0.0, max_scroll.0),
+                                                current.1,
+                                            ),
+                                            Layout::Vertical => (
+                                                current.0,
+                                                (current.1 + adjusted_delta.1)
+                                                    .clamp(0.0, max_scroll.1),
+                                            ),
+                                            Layout::Stack => (
+                                                (current.0 + adjusted_delta.0)
+                                                    .clamp(0.0, max_scroll.0),
+                                                (current.1 + adjusted_delta.1)
+                                                    .clamp(0.0, max_scroll.1),
+                                            ),
+                                        }
                                     };
 
                                     self.scroll_targets
@@ -770,7 +865,8 @@ fn main() {
 
     println!("{}", DEBUG_HELP_TEXT);
     println!();
-    println!("Use mouse wheel to scroll the containers (vertical and horizontal)");
+    println!("Use mouse wheel to scroll the containers");
+    println!("Hold Shift while scrolling over the grid to scroll horizontally");
 
     event_loop.run_app(&mut app).unwrap();
 }
