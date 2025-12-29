@@ -158,15 +158,14 @@ impl InteractiveStateManager {
                 style
             }
             InteractionState::Disabled => {
-                // Disabled style overrides everything
+                let mut style = base_style.clone();
                 if let Some(disabled) = disabled_style {
-                    disabled.clone()
+                    style = style.merge(disabled);
                 } else {
-                    // Fallback: use base style with reduced opacity
-                    let mut style = base_style.clone();
+                    // Fallback: apply reduced opacity to base style
                     style.opacity = Some(0.5);
-                    style
                 }
+                style
             }
         };
 

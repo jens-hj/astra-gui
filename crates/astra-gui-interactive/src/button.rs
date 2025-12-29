@@ -4,7 +4,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Node, NodeId, Size, Spacing,
-    Style, TextContent, Transition, VerticalAlign,
+    Stroke, Style, TextContent, Transition, VerticalAlign,
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
@@ -58,10 +58,21 @@ pub struct ButtonStyle {
     pub pressed_color: Color,
     /// Background color when disabled
     pub disabled_color: Color,
+
+    /// Stroke color when idle
+    pub idle_stroke_color: Color,
+    /// Stroke color when hovered
+    pub hover_stroke_color: Color,
+    /// Stroke color when pressed
+    pub pressed_stroke_color: Color,
+    /// Stroke color when disabled
+    pub disabled_stroke_color: Color,
+
     /// Text color
     pub text_color: Color,
     /// Disabled text color
     pub disabled_text_color: Color,
+
     /// Internal padding
     pub padding: Spacing,
     /// Corner radius for rounded corners
@@ -73,12 +84,20 @@ pub struct ButtonStyle {
 impl Default for ButtonStyle {
     fn default() -> Self {
         Self {
-            idle_color: mocha::LAVENDER,
-            hover_color: mocha::LAVENDER.with_alpha(0.8),
-            pressed_color: mocha::MAUVE,
-            disabled_color: mocha::SURFACE0,
-            text_color: mocha::BASE,
-            disabled_text_color: mocha::OVERLAY0,
+            // Fill Colors
+            idle_color: mocha::SURFACE0,
+            hover_color: mocha::SURFACE1,
+            pressed_color: mocha::MANTLE,
+            disabled_color: mocha::SURFACE0.with_alpha(0.8),
+            // Stroke Colors
+            idle_stroke_color: mocha::LAVENDER,
+            hover_stroke_color: mocha::LAVENDER,
+            pressed_stroke_color: mocha::LAVENDER,
+            disabled_stroke_color: mocha::OVERLAY2,
+            // Text Colors
+            text_color: mocha::TEXT,
+            disabled_text_color: mocha::SUBTEXT1,
+            // Others
             padding: Spacing::symmetric(32.0, 16.0),
             border_radius: 24.0,
             font_size: 32.0,
@@ -124,20 +143,23 @@ pub fn button(
             fill_color: Some(style.idle_color),
             text_color: Some(style.text_color),
             corner_shape: Some(CornerShape::Round(style.border_radius)),
+            stroke: Some(Stroke::new(2.0, style.idle_stroke_color)),
             ..Default::default()
         })
         .with_hover_style(Style {
             fill_color: Some(style.hover_color),
+            stroke: Some(Stroke::new(2.0, style.hover_stroke_color)),
             ..Default::default()
         })
         .with_active_style(Style {
             fill_color: Some(style.pressed_color),
+            stroke: Some(Stroke::new(2.0, style.pressed_stroke_color)),
             ..Default::default()
         })
         .with_disabled_style(Style {
             fill_color: Some(style.disabled_color),
             text_color: Some(style.disabled_text_color),
-            corner_shape: Some(CornerShape::Round(style.border_radius)),
+            stroke: Some(Stroke::new(2.0, style.disabled_stroke_color)),
             ..Default::default()
         })
         .with_disabled(disabled)
