@@ -20,8 +20,14 @@ The library is split into several crates:
 
 - **Backend Agnostic**: Core logic is independent of any graphics API
 - **WGPU Backend**: High-performance GPU rendering via wgpu
-- **Text Rendering**: Powered by cosmic-text for high-quality text shaping
+- **Text Rendering**: Powered by cosmic-text for high-quality text shaping with aggressive caching
 - **Modular Design**: Use only the crates you need
+- **Transform Support**: Full translation and rotation support with proper transform composition
+- **Performance Optimized**: 
+  - Text shaping cache for reusable shaped text
+  - Glyph metrics and atlas placement caching
+  - Pre-allocated buffers to minimize allocations
+  - Optimized rendering pipeline achieving 60+ FPS even with complex UIs
 
 ## Getting Started
 
@@ -29,8 +35,8 @@ Add astra-gui to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-astra-gui = "0.1.0"
-astra-gui-wgpu = "0.1.0"
+astra-gui = "0.2.0"
+astra-gui-wgpu = "0.2.0"
 ```
 
 ## Examples
@@ -43,12 +49,17 @@ See the `crates/astra-gui-wgpu/examples/` directory for usage examples:
 - `stroke.rs` - Stroke rendering
 - `corner_shapes.rs` - Rounded corners and shapes
 - `overflow.rs` - Overflow handling
+- `scroll.rs` - Scrollable containers with nested scrolling
+- `rotation.rs` - Transform rotation with interactive controls
+- `translation.rs` - Transform translation with nested transforms
 
-Run an example:
+Run an example with optimized performance:
 
 ```bash
-cargo run --example text
+cargo run --release --example scroll
 ```
+
+**Note**: Always use `--release` mode for accurate performance testing. Debug builds can be 3-5x slower.
 
 ## License
 
