@@ -83,6 +83,8 @@ pub struct TextInputStyle {
     pub font_size: f32,
     /// Cursor/caret styling
     pub cursor_style: CursorStyle,
+    /// Text horizontal alignment
+    pub text_align: HorizontalAlign,
 }
 
 impl Default for TextInputStyle {
@@ -110,6 +112,7 @@ impl Default for TextInputStyle {
             border_radius: 8.0,
             font_size: 20.0,
             cursor_style: CursorStyle::default(),
+            text_align: HorizontalAlign::Left,
         }
     }
 }
@@ -171,20 +174,46 @@ pub fn text_input(
         false
     };
 
-    // Calculate cursor x position by measuring text up to cursor position
-    let text_before_cursor = value_str.chars().take(cursor_position).collect::<String>();
-    let cursor_x_offset = if !text_before_cursor.is_empty() {
-        let text_width = measurer.measure_text(astra_gui::MeasureTextRequest {
-            text: &text_before_cursor,
-            font_size: style.font_size,
-            h_align: HorizontalAlign::Left,
-            v_align: VerticalAlign::Center,
-            family: None,
-        });
-        text_width.width
+    // For centered/right-aligned text, we need to know the total width and starting position
+    let total_text_width = if !value_str.is_empty() {
+        measurer
+            .measure_text(astra_gui::MeasureTextRequest {
+                text: &value_str,
+                font_size: style.font_size,
+                h_align: style.text_align,
+                v_align: VerticalAlign::Center,
+                family: None,
+            })
+            .width
     } else {
         0.0
     };
+
+    // Calculate the x offset where text starts based on alignment
+    // Note: assuming a fixed width of 300.0 (should match the node width below)
+    let text_container_width = 300.0 - style.padding.get_horizontal();
+    let text_start_x = match style.text_align {
+        HorizontalAlign::Left => 0.0,
+        HorizontalAlign::Center => (text_container_width - total_text_width) / 2.0,
+        HorizontalAlign::Right => text_container_width - total_text_width,
+    };
+
+    // Calculate cursor x position by measuring text up to cursor position
+    let text_before_cursor = value_str.chars().take(cursor_position).collect::<String>();
+    let cursor_x_offset = text_start_x
+        + if !text_before_cursor.is_empty() {
+            measurer
+                .measure_text(astra_gui::MeasureTextRequest {
+                    text: &text_before_cursor,
+                    font_size: style.font_size,
+                    h_align: HorizontalAlign::Left, // Always measure from left for positioning
+                    v_align: VerticalAlign::Center,
+                    family: None,
+                })
+                .width
+        } else {
+            0.0
+        };
 
     let mut children = vec![];
 
@@ -193,18 +222,20 @@ pub fn text_input(
         if start < end && !value_str.is_empty() {
             // Calculate selection start position
             let text_before_selection = value_str.chars().take(start).collect::<String>();
-            let selection_x_offset = if !text_before_selection.is_empty() {
-                let text_width = measurer.measure_text(astra_gui::MeasureTextRequest {
-                    text: &text_before_selection,
-                    font_size: style.font_size,
-                    h_align: HorizontalAlign::Left,
-                    v_align: VerticalAlign::Center,
-                    family: None,
-                });
-                text_width.width
-            } else {
-                0.0
-            };
+            let selection_x_offset = text_start_x
+                + if !text_before_selection.is_empty() {
+                    measurer
+                        .measure_text(astra_gui::MeasureTextRequest {
+                            text: &text_before_selection,
+                            font_size: style.font_size,
+                            h_align: HorizontalAlign::Left, // Always measure from left for positioning
+                            v_align: VerticalAlign::Center,
+                            family: None,
+                        })
+                        .width
+                } else {
+                    0.0
+                };
 
             // Calculate selection width
             let selected_text = value_str
@@ -213,14 +244,15 @@ pub fn text_input(
                 .take(end - start)
                 .collect::<String>();
             let selection_width = if !selected_text.is_empty() {
-                let text_width = measurer.measure_text(astra_gui::MeasureTextRequest {
-                    text: &selected_text,
-                    font_size: style.font_size,
-                    h_align: HorizontalAlign::Left,
-                    v_align: VerticalAlign::Center,
-                    family: None,
-                });
-                text_width.width
+                measurer
+                    .measure_text(astra_gui::MeasureTextRequest {
+                        text: &selected_text,
+                        font_size: style.font_size,
+                        h_align: HorizontalAlign::Left, // Always measure from left for positioning
+                        v_align: VerticalAlign::Center,
+                        family: None,
+                    })
+                    .width
             } else {
                 0.0
             };
@@ -250,7 +282,7 @@ pub fn text_input(
                 text: display_text,
                 font_size: style.font_size,
                 color: text_color,
-                h_align: HorizontalAlign::Left,
+                h_align: style.text_align,
                 v_align: VerticalAlign::Center,
             }))
             .with_style(Style {

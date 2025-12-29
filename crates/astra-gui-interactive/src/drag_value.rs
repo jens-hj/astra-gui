@@ -10,7 +10,7 @@ use astra_gui::{
 use astra_gui_wgpu::{EventDispatcher, InputState, InteractionEvent, Key, NamedKey, TargetedEvent};
 use std::ops::RangeInclusive;
 
-use crate::TextInputStyle;
+use crate::{text_input, text_input_update, TextInputStyle};
 
 /// Visual styling for a drag value widget
 #[derive(Debug, Clone)]
@@ -60,6 +60,9 @@ pub struct DragValueStyle {
 
 impl Default for DragValueStyle {
     fn default() -> Self {
+        let mut text_input_style = TextInputStyle::default();
+        text_input_style.text_align = HorizontalAlign::Center;
+
         Self {
             idle_color: mocha::SURFACE0,
             hover_color: mocha::SURFACE1,
@@ -82,7 +85,7 @@ impl Default for DragValueStyle {
             min_width: 80.0,
             precision: 2,
 
-            text_input_style: TextInputStyle::default(),
+            text_input_style,
         }
     }
 }
@@ -142,6 +145,10 @@ fn parse_value(text: &str) -> Option<f32> {
 /// * `disabled` - Whether the widget is disabled
 /// * `style` - Visual styling configuration
 /// * `text_buffer` - Text buffer for text input mode
+/// * `cursor_pos` - Cursor position in text buffer
+/// * `selection` - Optional text selection range
+/// * `measurer` - Text measurer for layout calculations
+/// * `event_dispatcher` - Event dispatcher for cursor blink management
 ///
 /// # Returns
 /// A configured `Node` representing the drag value widget
@@ -152,46 +159,27 @@ pub fn drag_value(
     disabled: bool,
     style: &DragValueStyle,
     text_buffer: &str,
+    cursor_pos: usize,
+    selection: Option<(usize, usize)>,
+    measurer: &mut impl astra_gui::ContentMeasurer,
+    event_dispatcher: &mut EventDispatcher,
 ) -> Node {
     let id_string = id.into();
 
-    // If focused, return a centered text input (simplified, no cursor/selection display)
+    // If focused, use text_input with center alignment
     if focused {
-        return Node::new()
-            .with_id(NodeId::new(&id_string))
-            .with_width(Size::px(style.min_width))
-            .with_height(Size::px(style.font_size + style.padding.get_vertical()))
-            .with_padding(style.padding)
-            .with_shape(Shape::rect())
-            .with_style(Style {
-                fill_color: Some(style.text_input_style.focused_color),
-                stroke: Some(Stroke::new(
-                    style.text_input_style.focused_stroke_width,
-                    style.text_input_style.focused_stroke_color,
-                )),
-                corner_shape: Some(CornerShape::Round(style.border_radius)),
-                ..Default::default()
-            })
-            .with_disabled(disabled)
-            .with_transition(Transition::quick())
-            .with_child(
-                Node::new()
-                    .with_width(Size::Fill)
-                    .with_height(Size::Fill)
-                    .with_content(Content::Text(TextContent {
-                        text: text_buffer.to_string(),
-                        font_size: style.font_size,
-                        color: style.text_color,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    }))
-                    .with_style(Style {
-                        text_color: Some(style.text_color),
-                        ..Default::default()
-                    })
-                    .with_disabled(disabled)
-                    .with_transition(Transition::quick()),
-            );
+        return text_input(
+            &id_string,
+            text_buffer,
+            "", // no placeholder
+            focused,
+            disabled,
+            &style.text_input_style,
+            cursor_pos,
+            selection,
+            measurer,
+            event_dispatcher,
+        );
     }
 
     // Otherwise, return drag-enabled display
@@ -267,6 +255,8 @@ pub fn drag_value(
 /// * `id` - The ID of the drag value widget
 /// * `value` - Current value (will be modified)
 /// * `text_buffer` - Text buffer for text input mode (will be modified)
+/// * `cursor_pos` - Cursor position in text buffer (will be modified)
+/// * `selection` - Optional text selection range (will be modified)
 /// * `focused` - Whether widget is in text input mode (will be modified)
 /// * `drag_accumulator` - Continuous accumulator for drag movements (will be modified)
 /// * `events` - Slice of targeted events from this frame
@@ -282,6 +272,8 @@ pub fn drag_value_update(
     id: &str,
     value: &mut f32,
     text_buffer: &mut String,
+    cursor_pos: &mut usize,
+    selection: &mut Option<(usize, usize)>,
     focused: &mut bool,
     drag_accumulator: &mut f32,
     events: &[TargetedEvent],
@@ -304,11 +296,20 @@ pub fn drag_value_update(
     // Sync local focused state with event dispatcher
     *focused = is_focused;
 
-    // When focused, handle text input
+    // When focused, delegate to text_input_update
     if is_focused {
-        let mut changed = false;
+        // Let text_input_update handle all the text editing
+        let text_changed = text_input_update(
+            id,
+            text_buffer,
+            cursor_pos,
+            selection,
+            events,
+            input_state,
+            event_dispatcher,
+        );
 
-        // Check if we should unfocus (Enter or Escape)
+        // Check if we should parse and apply the value
         let enter_pressed = input_state
             .keys_just_pressed
             .iter()
@@ -347,40 +348,15 @@ pub fn drag_value_update(
 
                 *value = clamped_value;
                 *drag_accumulator = clamped_value; // Reset accumulator to new value
-                changed = true;
+                return true;
             }
-            *focused = false;
-            event_dispatcher.set_focus(None);
-            return changed;
+            return false;
         } else if escape_pressed {
-            // Revert to current value
-            *focused = false;
-            event_dispatcher.set_focus(None);
+            // text_input_update already handled unfocusing
             return false;
         }
 
-        // Handle typed characters
-        for ch in &input_state.characters_typed {
-            // Only allow digits, decimal point, minus sign, and 'e' for scientific notation
-            if ch.is_ascii_digit() || *ch == '.' || *ch == '-' || *ch == 'e' || *ch == 'E' {
-                text_buffer.push(*ch);
-                changed = true;
-            }
-        }
-
-        // Handle backspace
-        if input_state
-            .keys_just_pressed
-            .iter()
-            .any(|key| matches!(key, Key::Named(NamedKey::Backspace)))
-        {
-            if !text_buffer.is_empty() {
-                text_buffer.pop();
-                changed = true;
-            }
-        }
-
-        return changed;
+        return text_changed;
     }
 
     // When not focused, handle drag and click events
