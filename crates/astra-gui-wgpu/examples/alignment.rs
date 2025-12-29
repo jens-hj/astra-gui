@@ -242,6 +242,7 @@ impl App {
                     corner_shape: Some(CornerShape::Round(8.0)),
                     ..Default::default()
                 })
+                .with_padding(Spacing::all(4.0))
                 .with_h_align(HorizontalAlign::Center)
                 .with_v_align(VerticalAlign::Center)
                 .with_child(Node::new().with_content(Content::Text(TextContent {
