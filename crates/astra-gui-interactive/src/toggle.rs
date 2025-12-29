@@ -85,7 +85,7 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
             } else {
                 style.off_color
             }),
-            corner_radius: Some(style.track_height / 2.0),
+            corner_shape: Some(CornerShape::Round(style.track_height / 2.0)),
             opacity: Some(1.0),
             ..Default::default()
         })
@@ -121,7 +121,7 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
                 }))
                 .with_style(Style {
                     fill_color: Some(style.knob_color),
-                    corner_radius: Some(style.knob_width / 2.0),
+                    corner_shape: Some(CornerShape::Round(style.knob_width / 2.0)),
                     translation_x: Some(knob_offset_x),
                     ..Default::default()
                 })

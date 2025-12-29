@@ -7,8 +7,9 @@ use std::time::Instant;
 fn styles_differ(a: &Style, b: &Style) -> bool {
     a.fill_color != b.fill_color
         || a.stroke_color != b.stroke_color
+        || a.stroke != b.stroke
         || a.stroke_width != b.stroke_width
-        || a.corner_radius != b.corner_radius
+        || a.corner_shape != b.corner_shape
         || a.opacity != b.opacity
         || a.text_color != b.text_color
         || a.translation_x != b.translation_x

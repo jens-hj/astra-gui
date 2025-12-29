@@ -37,7 +37,7 @@ impl From<Point> for [f32; 2] {
 }
 
 /// Stroke definition with width and color
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stroke {
     pub width: f32,
     pub color: Color,
@@ -113,7 +113,7 @@ impl Rect {
 }
 
 /// Corner shape for rectangles
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CornerShape {
     /// No corner modification (sharp 90-degree corners)
     None,

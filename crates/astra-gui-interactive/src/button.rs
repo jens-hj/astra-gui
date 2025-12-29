@@ -128,7 +128,7 @@ pub fn button(
         .with_style(Style {
             fill_color: Some(style.idle_color),
             text_color: Some(style.text_color),
-            corner_radius: Some(style.border_radius),
+            corner_shape: Some(CornerShape::Round(style.border_radius)),
             ..Default::default()
         })
         .with_hover_style(Style {
@@ -142,7 +142,7 @@ pub fn button(
         .with_disabled_style(Style {
             fill_color: Some(style.disabled_color),
             text_color: Some(style.disabled_text_color),
-            corner_radius: Some(style.border_radius),
+            corner_shape: Some(CornerShape::Round(style.border_radius)),
             ..Default::default()
         })
         .with_disabled(disabled)

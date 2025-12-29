@@ -1,4 +1,5 @@
 use crate::color::Color;
+use crate::primitives::{CornerShape, Stroke};
 use crate::style::Style;
 
 /// Easing function type: takes progress (0.0 to 1.0) and returns eased value (0.0 to 1.0)
@@ -64,6 +65,45 @@ pub fn lerp_color(a: Color, b: Color, t: f32) -> Color {
     }
 }
 
+/// Linearly interpolate between two strokes
+pub fn lerp_stroke(a: Stroke, b: Stroke, t: f32) -> Stroke {
+    Stroke {
+        width: lerp_f32(a.width, b.width, t),
+        color: lerp_color(a.color, b.color, t),
+    }
+}
+
+/// Linearly interpolate between two corner shapes
+///
+/// Only interpolates if both shapes are the same variant with compatible parameters.
+/// Otherwise, snaps to the target shape at t >= 0.5.
+pub fn lerp_corner_shape(a: CornerShape, b: CornerShape, t: f32) -> CornerShape {
+    match (a, b) {
+        (CornerShape::None, CornerShape::None) => CornerShape::None,
+        (CornerShape::Round(r1), CornerShape::Round(r2)) => CornerShape::Round(lerp_f32(r1, r2, t)),
+        (CornerShape::Cut(d1), CornerShape::Cut(d2)) => CornerShape::Cut(lerp_f32(d1, d2, t)),
+        (CornerShape::InverseRound(r1), CornerShape::InverseRound(r2)) => {
+            CornerShape::InverseRound(lerp_f32(r1, r2, t))
+        }
+        (
+            CornerShape::Squircle {
+                radius: r1,
+                smoothness: s1,
+            },
+            CornerShape::Squircle {
+                radius: r2,
+                smoothness: s2,
+            },
+        ) => CornerShape::Squircle {
+            radius: lerp_f32(r1, r2, t),
+            smoothness: lerp_f32(s1, s2, t),
+        },
+        // Different variants: snap at halfway point
+        (_, b) if t >= 0.5 => b,
+        (a, _) => a,
+    }
+}
+
 /// Interpolate between two styles
 ///
 /// For each property, if both styles have a value, interpolate between them.
@@ -82,12 +122,25 @@ pub fn lerp_style(from: &Style, to: &Style, t: f32) -> Style {
             (Some(a), None) => Some(a),
             (None, None) => None,
         },
+        stroke: match (from.stroke, to.stroke) {
+            (Some(a), Some(b)) => Some(lerp_stroke(a, b, t)),
+            (None, Some(b)) => Some(b),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
+        },
         stroke_width: match (from.stroke_width, to.stroke_width) {
             (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
             (None, Some(b)) => Some(b),
             (Some(a), None) => Some(a),
             (None, None) => None,
         },
+        corner_shape: match (from.corner_shape, to.corner_shape) {
+            (Some(a), Some(b)) => Some(lerp_corner_shape(a, b, t)),
+            (None, Some(b)) => Some(b),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
+        },
+        #[allow(deprecated)]
         corner_radius: match (from.corner_radius, to.corner_radius) {
             (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
             (None, Some(b)) => Some(b),

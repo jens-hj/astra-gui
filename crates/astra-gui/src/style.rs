@@ -2,7 +2,7 @@ use crate::color::Color;
 use crate::content::Content;
 use crate::layout::{TransformOrigin, Translation};
 use crate::node::Node;
-use crate::primitives::{CornerShape, Shape};
+use crate::primitives::{CornerShape, Shape, Stroke};
 
 /// Visual style properties that can be transitioned
 ///
@@ -16,10 +16,18 @@ pub struct Style {
     /// Stroke color (for shapes with borders)
     pub stroke_color: Option<Color>,
 
-    /// Stroke width
+    /// Stroke configuration (width and color)
+    pub stroke: Option<Stroke>,
+
+    /// Stroke width (deprecated in favor of stroke, kept for backward compatibility)
     pub stroke_width: Option<f32>,
 
-    /// Corner radius (for Round corner shape)
+    /// Corner shape (supports all variants: None, Round, Cut, InverseRound, Squircle)
+    pub corner_shape: Option<CornerShape>,
+
+    /// Corner radius (deprecated, use corner_shape instead)
+    /// Maps to CornerShape::Round(radius)
+    #[deprecated(since = "0.2.0", note = "Use corner_shape instead")]
     pub corner_radius: Option<f32>,
 
     /// Node opacity (0.0 = transparent, 1.0 = opaque)
@@ -95,7 +103,10 @@ impl Style {
         Style {
             fill_color: other.fill_color.or(self.fill_color),
             stroke_color: other.stroke_color.or(self.stroke_color),
+            stroke: other.stroke.or(self.stroke),
             stroke_width: other.stroke_width.or(self.stroke_width),
+            corner_shape: other.corner_shape.or(self.corner_shape),
+            #[allow(deprecated)]
             corner_radius: other.corner_radius.or(self.corner_radius),
             opacity: other.opacity.or(self.opacity),
             text_color: other.text_color.or(self.text_color),
@@ -126,18 +137,32 @@ impl Style {
                 if let Some(color) = self.fill_color {
                     rect.fill = color;
                 }
-                if let Some(color) = self.stroke_color {
-                    if let Some(ref mut stroke) = rect.stroke {
-                        stroke.color = color;
+
+                // Apply stroke (new unified field takes precedence)
+                if let Some(stroke) = self.stroke {
+                    rect.stroke = Some(stroke);
+                } else {
+                    // Backward compatibility: apply stroke_color and stroke_width separately
+                    if let Some(color) = self.stroke_color {
+                        if let Some(ref mut stroke) = rect.stroke {
+                            stroke.color = color;
+                        }
+                    }
+                    if let Some(width) = self.stroke_width {
+                        if let Some(ref mut stroke) = rect.stroke {
+                            stroke.width = width;
+                        }
                     }
                 }
-                if let Some(width) = self.stroke_width {
-                    if let Some(ref mut stroke) = rect.stroke {
-                        stroke.width = width;
+
+                // Apply corner shape (new field takes precedence over deprecated corner_radius)
+                if let Some(corner_shape) = self.corner_shape {
+                    rect.corner_shape = corner_shape;
+                } else {
+                    #[allow(deprecated)]
+                    if let Some(radius) = self.corner_radius {
+                        rect.corner_shape = CornerShape::Round(radius);
                     }
-                }
-                if let Some(radius) = self.corner_radius {
-                    rect.corner_shape = CornerShape::Round(radius);
                 }
             }
         }
