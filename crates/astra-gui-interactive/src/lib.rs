@@ -8,11 +8,13 @@
 mod button;
 mod drag_value;
 mod slider;
+mod slider_with_value;
 mod text_input;
 mod toggle;
 
 pub use button::*;
 pub use drag_value::*;
 pub use slider::*;
+pub use slider_with_value::*;
 pub use text_input::*;
 pub use toggle::*;
