@@ -534,6 +534,9 @@ impl ApplicationHandler for App {
                     );
                     ui.compute_layout(window_rect);
 
+                    // Restore scroll state from previous frame (survives UI rebuild)
+                    gpu_state.event_dispatcher.restore_scroll_state(&mut ui);
+
                     // Dispatch events (scroll events are automatically processed internally)
                     let (_events, interaction_states) = gpu_state
                         .event_dispatcher
@@ -548,6 +551,9 @@ impl ApplicationHandler for App {
                     self.last_frame_time = Some(now);
 
                     ui.update_all_scroll_animations(dt);
+
+                    // Sync scroll state back to persistent storage (survives UI rebuild)
+                    gpu_state.event_dispatcher.sync_scroll_state(&ui);
 
                     // Apply interactive styles
                     gpu_state.interactive_state_manager.begin_frame();

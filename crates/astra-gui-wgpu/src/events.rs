@@ -76,6 +76,8 @@ pub struct EventDispatcher {
     focused_node: Option<NodeId>,
     /// Cursor blink states for focused text inputs (node_id -> blink_state)
     cursor_blink_states: HashMap<NodeId, CursorBlinkState>,
+    /// Persistent scroll state (node_id -> (scroll_offset, scroll_target))
+    scroll_state: HashMap<String, ((f32, f32), (f32, f32))>,
 }
 
 /// Cursor blink state tracker (internal to EventDispatcher)
@@ -93,6 +95,7 @@ impl EventDispatcher {
             drag_state: None,
             focused_node: None,
             cursor_blink_states: HashMap::new(),
+            scroll_state: HashMap::new(),
         }
     }
 
@@ -376,15 +379,74 @@ impl EventDispatcher {
                 });
 
                 // Automatically process scroll events for nodes with Overflow::Scroll
-                Self::process_scroll_event(root, target_id, input.scroll_delta, input.shift_held);
+                self.process_scroll_event(root, target_id, input.scroll_delta, input.shift_held);
             }
         }
 
         (events, interaction_states)
     }
 
+    /// Restore persistent scroll state to nodes after UI rebuild
+    ///
+    /// Call this after layout computation but before rendering to restore
+    /// scroll offsets and targets from the previous frame.
+    pub fn restore_scroll_state(&self, root: &mut Node) {
+        Self::restore_scroll_state_recursive(root, &self.scroll_state);
+    }
+
+    /// Recursively restore scroll state to all nodes with IDs
+    fn restore_scroll_state_recursive(
+        node: &mut Node,
+        scroll_state: &HashMap<String, ((f32, f32), (f32, f32))>,
+    ) {
+        // If this node has an ID and persistent scroll state, restore it
+        if let Some(node_id) = node.id() {
+            if let Some(&(offset, target)) = scroll_state.get(node_id.as_str()) {
+                node.set_scroll_offset(offset);
+                node.set_scroll_target(target);
+            }
+        }
+
+        // Recurse to children
+        for child in node.children_mut() {
+            Self::restore_scroll_state_recursive(child, scroll_state);
+        }
+    }
+
+    /// Sync scroll state from nodes back to persistent storage after animation updates
+    ///
+    /// Call this after `update_all_scroll_animations()` to persist the interpolated
+    /// scroll offsets so they survive frame rebuilds.
+    pub fn sync_scroll_state(&mut self, root: &Node) {
+        Self::sync_scroll_state_recursive(root, &mut self.scroll_state);
+    }
+
+    /// Recursively sync scroll state from all nodes with IDs
+    fn sync_scroll_state_recursive(
+        node: &Node,
+        scroll_state: &mut HashMap<String, ((f32, f32), (f32, f32))>,
+    ) {
+        // If this node has an ID and scroll state, save it
+        if let Some(node_id) = node.id() {
+            if node.overflow() == astra_gui::Overflow::Scroll {
+                let current_offset = node.scroll_offset();
+                let current_target = node.scroll_target();
+                scroll_state.insert(
+                    node_id.as_str().to_string(),
+                    (current_offset, current_target),
+                );
+            }
+        }
+
+        // Recurse to children
+        for child in node.children() {
+            Self::sync_scroll_state_recursive(child, scroll_state);
+        }
+    }
+
     /// Automatically process scroll events for scrollable containers
     fn process_scroll_event(
+        &mut self,
         root: &mut Node,
         target_id: &NodeId,
         delta: (f32, f32),
@@ -401,7 +463,12 @@ impl EventDispatcher {
             let scroll_direction = node.scroll_direction();
             let layout_direction = node.layout_direction();
 
-            let current_target = node.scroll_target();
+            // Get current state from persistent storage or node's current state
+            let (current_offset, current_target) = self
+                .scroll_state
+                .get(target_id.as_str())
+                .copied()
+                .unwrap_or((node.scroll_offset(), node.scroll_target()));
 
             // Apply scroll speed and direction
             let direction_multiplier = match scroll_direction {
@@ -451,6 +518,12 @@ impl EventDispatcher {
                 }
             };
 
+            // Store updated state to persistent storage
+            self.scroll_state
+                .insert(target_id.as_str().to_string(), (current_offset, new_target));
+
+            // Apply scroll state to the node
+            node.set_scroll_offset(current_offset);
             node.set_scroll_target(new_target);
         }
     }
