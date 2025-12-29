@@ -1,6 +1,6 @@
 [package]
 name = "astra-gui-wgpu"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "WGPU rendering backend for astra-gui"
 
