@@ -1,4 +1,4 @@
-use astra_gui::{ClippedShape, CornerShape, Shape, StyledRect};
+use astra_gui::{ClippedShape, CornerShape, Shape};
 
 /// Instance data for SDF-based rectangle rendering.
 ///

@@ -1,7 +1,6 @@
 use crate::content::Content;
 use crate::layout::{
-    ComputedLayout, Layout, Offset, Overflow, Size, Spacing, Transform2D, TransformOrigin,
-    Translation,
+    ComputedLayout, Layout, Offset, Overflow, Size, Spacing, TransformOrigin, Translation,
 };
 use crate::measure::{ContentMeasurer, IntrinsicSize, MeasureTextRequest};
 use crate::primitives::{Rect, Shape};
@@ -324,18 +323,6 @@ impl Node {
     /// Set the translation (used by style system)
     pub(crate) fn set_translation(&mut self, translation: Translation) {
         self.translation = translation;
-    }
-
-    /// Get the offset (deprecated, use translation)
-    #[deprecated(since = "0.2.0", note = "Use translation instead")]
-    pub(crate) fn offset(&self) -> Offset {
-        self.translation
-    }
-
-    /// Set the offset (deprecated, use set_translation)
-    #[deprecated(since = "0.2.0", note = "Use set_translation instead")]
-    pub(crate) fn set_offset(&mut self, offset: Offset) {
-        self.translation = offset;
     }
 
     /// Get the rotation

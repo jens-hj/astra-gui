@@ -122,7 +122,7 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
                 .with_style(Style {
                     fill_color: Some(style.knob_color),
                     corner_radius: Some(style.knob_width / 2.0),
-                    offset_x: Some(knob_offset_x),
+                    translation_x: Some(knob_offset_x),
                     ..Default::default()
                 })
                 .with_transition(Transition::quick()),

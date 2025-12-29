@@ -11,8 +11,8 @@ fn styles_differ(a: &Style, b: &Style) -> bool {
         || a.corner_radius != b.corner_radius
         || a.opacity != b.opacity
         || a.text_color != b.text_color
-        || a.offset_x != b.offset_x
-        || a.offset_y != b.offset_y
+        || a.translation_x != b.translation_x
+        || a.translation_y != b.translation_y
 }
 
 /// Current interaction state of a node
