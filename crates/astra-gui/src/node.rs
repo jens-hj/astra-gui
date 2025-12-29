@@ -68,10 +68,14 @@ pub struct Node {
     ///
     /// Default: `Overflow::Hidden`.
     overflow: Overflow,
-    /// Scroll offset for Overflow::Scroll containers (horizontal, vertical in pixels)
+    /// Current scroll offset for Overflow::Scroll containers (horizontal, vertical in pixels)
     ///
     /// Default: (0.0, 0.0)
     scroll_offset: (f32, f32),
+    /// Target scroll offset for smooth scrolling animation
+    ///
+    /// Default: (0.0, 0.0)
+    scroll_target: (f32, f32),
     /// Scroll speed multiplier for Overflow::Scroll containers
     ///
     /// Default: 2.0
@@ -122,6 +126,7 @@ impl Node {
             layout_direction: Layout::default(),
             overflow: Overflow::default(),
             scroll_offset: (0.0, 0.0),
+            scroll_target: (0.0, 0.0),
             scroll_speed: 8.0,
             scroll_direction: ScrollDirection::default(),
             opacity: 1.0,
@@ -376,7 +381,7 @@ impl Node {
     }
 
     /// Get the overflow policy
-    pub(crate) fn overflow(&self) -> Overflow {
+    pub fn overflow(&self) -> Overflow {
         self.overflow
     }
 
@@ -390,11 +395,21 @@ impl Node {
         self.scroll_offset = offset;
     }
 
-    /// Scroll by a delta (horizontal, vertical)
+    /// Get the scroll target (for smooth scrolling)
+    pub fn scroll_target(&self) -> (f32, f32) {
+        self.scroll_target
+    }
+
+    /// Set the scroll target (for smooth scrolling)
+    pub fn set_scroll_target(&mut self, target: (f32, f32)) {
+        self.scroll_target = target;
+    }
+
+    /// Scroll by a delta (horizontal, vertical) - updates the target for smooth scrolling
     pub fn scroll_by(&mut self, delta: (f32, f32)) {
-        self.scroll_offset.0 += delta.0;
-        self.scroll_offset.1 += delta.1;
-        // TODO: Clamp to content bounds
+        self.scroll_target.0 += delta.0;
+        self.scroll_target.1 += delta.1;
+        // Clamping will be done by scroll processing
     }
 
     /// Get the scroll speed multiplier
@@ -405,6 +420,50 @@ impl Node {
     /// Get the scroll direction behavior
     pub fn scroll_direction(&self) -> ScrollDirection {
         self.scroll_direction
+    }
+
+    /// Update smooth scrolling animation
+    ///
+    /// This should be called once per frame with the delta time in seconds.
+    /// It interpolates the current scroll offset toward the target scroll offset.
+    ///
+    /// Returns true if scrolling is in progress (not yet at target).
+    pub fn update_scroll_animation(&mut self, dt: f32) -> bool {
+        const SCROLL_SMOOTHNESS: f32 = 10.0; // Higher = faster, lower = smoother
+
+        if self.scroll_offset == self.scroll_target {
+            return false; // Already at target
+        }
+
+        let t = 1.0 - (-SCROLL_SMOOTHNESS * dt).exp(); // Exponential ease-out
+
+        self.scroll_offset.0 += (self.scroll_target.0 - self.scroll_offset.0) * t;
+        self.scroll_offset.1 += (self.scroll_target.1 - self.scroll_offset.1) * t;
+
+        // Snap to target if very close (within 0.1 pixels)
+        if (self.scroll_target.0 - self.scroll_offset.0).abs() < 0.1 {
+            self.scroll_offset.0 = self.scroll_target.0;
+        }
+        if (self.scroll_target.1 - self.scroll_offset.1).abs() < 0.1 {
+            self.scroll_offset.1 = self.scroll_target.1;
+        }
+
+        true // Still animating
+    }
+
+    /// Recursively update scroll animations for this node and all children
+    ///
+    /// Returns true if any node is still animating.
+    pub fn update_all_scroll_animations(&mut self, dt: f32) -> bool {
+        let mut any_animating = self.update_scroll_animation(dt);
+
+        for child in self.children_mut() {
+            if child.update_all_scroll_animations(dt) {
+                any_animating = true;
+            }
+        }
+
+        any_animating
     }
 
     /// Get the shape, if any

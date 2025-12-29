@@ -374,10 +374,200 @@ impl EventDispatcher {
                     target: target_id.clone(),
                     local_position: *local_pos,
                 });
+
+                // Automatically process scroll events for nodes with Overflow::Scroll
+                Self::process_scroll_event(root, target_id, input.scroll_delta, input.shift_held);
             }
         }
 
         (events, interaction_states)
+    }
+
+    /// Automatically process scroll events for scrollable containers
+    fn process_scroll_event(
+        root: &mut Node,
+        target_id: &NodeId,
+        delta: (f32, f32),
+        shift_held: bool,
+    ) {
+        // Find the target node
+        if let Some(node) = Self::find_node_by_id_mut(root, target_id.as_str()) {
+            // Only process if node has Overflow::Scroll
+            if node.overflow() != astra_gui::Overflow::Scroll {
+                return;
+            }
+
+            let scroll_speed = node.scroll_speed();
+            let scroll_direction = node.scroll_direction();
+            let layout_direction = node.layout_direction();
+
+            let current_target = node.scroll_target();
+
+            // Apply scroll speed and direction
+            let direction_multiplier = match scroll_direction {
+                astra_gui::ScrollDirection::Normal => 1.0,
+                astra_gui::ScrollDirection::Inverted => -1.0,
+            };
+
+            let adjusted_delta = (
+                delta.0 * scroll_speed * direction_multiplier,
+                delta.1 * scroll_speed * direction_multiplier,
+            );
+
+            // Calculate max scroll based on content size
+            let max_scroll = Self::calculate_max_scroll(node);
+
+            // Determine scroll behavior based on layout and shift key
+            let new_target = match layout_direction {
+                astra_gui::Layout::Horizontal => {
+                    // Horizontal layout: vertical scroll delta -> horizontal scroll
+                    (
+                        (current_target.0 + adjusted_delta.1).clamp(0.0, max_scroll.0),
+                        current_target.1,
+                    )
+                }
+                astra_gui::Layout::Vertical => {
+                    // Vertical layout: check if shift is held for horizontal scrolling
+                    if shift_held && max_scroll.0 > 0.0 {
+                        // Shift+scroll for horizontal scrolling
+                        (
+                            (current_target.0 + adjusted_delta.1).clamp(0.0, max_scroll.0),
+                            current_target.1,
+                        )
+                    } else {
+                        // Normal vertical scrolling
+                        (
+                            current_target.0,
+                            (current_target.1 + adjusted_delta.1).clamp(0.0, max_scroll.1),
+                        )
+                    }
+                }
+                astra_gui::Layout::Stack => {
+                    // Stack layout: both directions scrollable
+                    (
+                        (current_target.0 + adjusted_delta.0).clamp(0.0, max_scroll.0),
+                        (current_target.1 + adjusted_delta.1).clamp(0.0, max_scroll.1),
+                    )
+                }
+            };
+
+            node.set_scroll_target(new_target);
+        }
+    }
+
+    /// Find a node by ID (mutable)
+    fn find_node_by_id_mut<'a>(node: &'a mut Node, id: &str) -> Option<&'a mut Node> {
+        if node.id().map(|node_id| node_id.as_str()) == Some(id) {
+            return Some(node);
+        }
+
+        for child in node.children_mut() {
+            if let Some(found) = Self::find_node_by_id_mut(child, id) {
+                return Some(found);
+            }
+        }
+
+        None
+    }
+
+    /// Calculate maximum scroll offset for a container
+    fn calculate_max_scroll(container: &Node) -> (f32, f32) {
+        let Some(layout) = container.computed_layout() else {
+            return (0.0, 0.0);
+        };
+
+        // Get container dimensions (after padding)
+        let padding = container.padding();
+        let container_width =
+            layout.rect.max[0] - layout.rect.min[0] - padding.left - padding.right;
+        let container_height =
+            layout.rect.max[1] - layout.rect.min[1] - padding.top - padding.bottom;
+
+        // Calculate total content size based on layout direction
+        let gap = container.gap();
+        let children = container.children();
+        let layout_direction = container.layout_direction();
+
+        if children.is_empty() {
+            return (0.0, 0.0);
+        }
+
+        let mut content_width = 0.0f32;
+        let mut content_height = 0.0f32;
+
+        match layout_direction {
+            astra_gui::Layout::Vertical => {
+                // For vertical layout: accumulate heights, track max width
+                // For nested layouts (like grid), we need to look at the intrinsic width
+                for (i, child) in children.iter().enumerate() {
+                    if let Some(child_layout) = child.computed_layout() {
+                        let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                        let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+                        // For horizontal child layouts, calculate their full content width
+                        let actual_child_width =
+                            if child.layout_direction() == astra_gui::Layout::Horizontal {
+                                let mut row_width = 0.0f32;
+                                let child_gap = child.gap();
+                                let child_padding = child.padding();
+
+                                for (j, grandchild) in child.children().iter().enumerate() {
+                                    if let Some(gc_layout) = grandchild.computed_layout() {
+                                        row_width += gc_layout.rect.max[0] - gc_layout.rect.min[0];
+                                        if j < child.children().len() - 1 {
+                                            row_width += child_gap;
+                                        }
+                                    }
+                                }
+                                row_width + child_padding.left + child_padding.right
+                            } else {
+                                child_width
+                            };
+
+                        content_width = content_width.max(actual_child_width);
+                        content_height += child_height;
+
+                        if i < children.len() - 1 {
+                            content_height += gap;
+                        }
+                    }
+                }
+            }
+            astra_gui::Layout::Horizontal => {
+                // For horizontal layout: accumulate widths, track max height
+                for (i, child) in children.iter().enumerate() {
+                    if let Some(child_layout) = child.computed_layout() {
+                        let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                        let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+                        content_width += child_width;
+                        content_height = content_height.max(child_height);
+
+                        if i < children.len() - 1 {
+                            content_width += gap;
+                        }
+                    }
+                }
+            }
+            astra_gui::Layout::Stack => {
+                // For stack layout: track max width and max height
+                for child in children.iter() {
+                    if let Some(child_layout) = child.computed_layout() {
+                        let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
+                        let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
+
+                        content_width = content_width.max(child_width);
+                        content_height = content_height.max(child_height);
+                    }
+                }
+            }
+        }
+
+        // Max scroll is the amount content exceeds container size
+        let max_scroll_x = (content_width - container_width).max(0.0);
+        let max_scroll_y = (content_height - container_height).max(0.0);
+
+        (max_scroll_x, max_scroll_y)
     }
 }
 

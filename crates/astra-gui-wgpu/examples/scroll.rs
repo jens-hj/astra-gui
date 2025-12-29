@@ -8,13 +8,9 @@
 
 use astra_gui::{
     catppuccin::mocha, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout,
-    Node, NodeId, Overflow, ScrollDirection, Shape, Size, Spacing, Style, TextContent,
-    VerticalAlign,
+    Node, NodeId, Overflow, Shape, Size, Spacing, Style, TextContent, VerticalAlign,
 };
-use astra_gui_wgpu::{
-    EventDispatcher, InputState, InteractionEvent, InteractiveStateManager, RenderMode, Renderer,
-};
-use std::collections::HashMap;
+use astra_gui_wgpu::{EventDispatcher, InputState, InteractiveStateManager, RenderMode, Renderer};
 use std::sync::Arc;
 use winit::{
     application::ApplicationHandler,
@@ -122,8 +118,6 @@ fn handle_debug_keybinds(
 struct App {
     window: Option<Arc<Window>>,
     gpu_state: Option<GpuState>,
-    scroll_offsets: HashMap<String, (f32, f32)>, // Current scroll positions
-    scroll_targets: HashMap<String, (f32, f32)>, // Target scroll positions for smooth scrolling
     debug_options: DebugOptions,
     last_frame_time: Option<std::time::Instant>,
     item_heights: Vec<f32>, // Random heights for vertical scroll items
@@ -217,7 +211,6 @@ impl GpuState {
 
     fn render(
         &mut self,
-        scroll_offsets: &HashMap<String, (f32, f32)>,
         debug_options: &DebugOptions,
         item_heights: &[f32],
         item_widths: &[f32],
@@ -263,7 +256,6 @@ impl GpuState {
         let mut ui = create_demo_ui(
             self.config.width as f32,
             self.config.height as f32,
-            scroll_offsets,
             item_heights,
             item_widths,
         );
@@ -311,127 +303,7 @@ impl GpuState {
     }
 }
 
-/// Helper function to find a node by its ID
-fn find_node_by_id<'a>(node: &'a Node, id: &str) -> Option<&'a Node> {
-    if node.id().map(|node_id| node_id.as_str()) == Some(id) {
-        return Some(node);
-    }
-
-    for child in node.children() {
-        if let Some(found) = find_node_by_id(child, id) {
-            return Some(found);
-        }
-    }
-
-    None
-}
-
-/// Calculate maximum scroll offset for a container
-fn calculate_max_scroll(container: &Node) -> (f32, f32) {
-    let Some(layout) = container.computed_layout() else {
-        return (0.0, 0.0);
-    };
-
-    // Get container dimensions (after padding)
-    let padding = container.padding();
-    let container_width = layout.rect.max[0] - layout.rect.min[0] - padding.left - padding.right;
-    let container_height = layout.rect.max[1] - layout.rect.min[1] - padding.top - padding.bottom;
-
-    // Calculate total content size based on layout direction
-    let gap = container.gap();
-    let children = container.children();
-    let layout_direction = container.layout_direction();
-
-    if children.is_empty() {
-        return (0.0, 0.0);
-    }
-
-    let mut content_width = 0.0f32;
-    let mut content_height = 0.0f32;
-
-    match layout_direction {
-        Layout::Vertical => {
-            // For vertical layout: accumulate heights, track max width
-            // For nested layouts (like grid), we need to look at the intrinsic width
-            for (i, child) in children.iter().enumerate() {
-                if let Some(child_layout) = child.computed_layout() {
-                    let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
-                    let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
-
-                    // For horizontal child layouts, calculate their full content width
-                    let actual_child_width = if child.layout_direction() == Layout::Horizontal {
-                        let mut row_width = 0.0f32;
-                        let child_gap = child.gap();
-                        let child_padding = child.padding();
-
-                        for (j, grandchild) in child.children().iter().enumerate() {
-                            if let Some(gc_layout) = grandchild.computed_layout() {
-                                row_width += gc_layout.rect.max[0] - gc_layout.rect.min[0];
-                                if j < child.children().len() - 1 {
-                                    row_width += child_gap;
-                                }
-                            }
-                        }
-                        row_width + child_padding.left + child_padding.right
-                    } else {
-                        child_width
-                    };
-
-                    content_width = content_width.max(actual_child_width);
-                    content_height += child_height;
-
-                    // Add gap between items (but not after the last one)
-                    if i < children.len() - 1 {
-                        content_height += gap;
-                    }
-                }
-            }
-        }
-        Layout::Horizontal => {
-            // For horizontal layout: accumulate widths, track max height
-            for (i, child) in children.iter().enumerate() {
-                if let Some(child_layout) = child.computed_layout() {
-                    let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
-                    let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
-
-                    content_width += child_width;
-                    content_height = content_height.max(child_height);
-
-                    // Add gap between items (but not after the last one)
-                    if i < children.len() - 1 {
-                        content_width += gap;
-                    }
-                }
-            }
-        }
-        Layout::Stack => {
-            // For stack layout: track max width and max height
-            for child in children.iter() {
-                if let Some(child_layout) = child.computed_layout() {
-                    let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
-                    let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
-
-                    content_width = content_width.max(child_width);
-                    content_height = content_height.max(child_height);
-                }
-            }
-        }
-    }
-
-    // Max scroll is the amount content exceeds container size
-    let max_scroll_x = (content_width - container_width).max(0.0);
-    let max_scroll_y = (content_height - container_height).max(0.0);
-
-    (max_scroll_x, max_scroll_y)
-}
-
-fn create_demo_ui(
-    _width: f32,
-    _height: f32,
-    scroll_offsets: &HashMap<String, (f32, f32)>,
-    item_heights: &[f32],
-    item_widths: &[f32],
-) -> Node {
+fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: &[f32]) -> Node {
     // Create a scrollable container with many items
     let mut items = Vec::new();
     for (i, &height) in item_heights.iter().enumerate() {
@@ -459,13 +331,8 @@ fn create_demo_ui(
         );
     }
 
-    // Scrollable container
-    let scroll_offset = scroll_offsets
-        .get("scroll_container")
-        .copied()
-        .unwrap_or((0.0, 0.0));
-
-    let mut scroll_container = Node::new()
+    // Scrollable container - scroll state is now managed automatically
+    let scroll_container = Node::new()
         .with_id(NodeId::new("scroll_container"))
         .with_width(Size::px(400.0))
         .with_height(Size::px(800.0))
@@ -480,8 +347,6 @@ fn create_demo_ui(
             ..Default::default()
         })
         .with_children(items);
-
-    scroll_container.set_scroll_offset(scroll_offset);
 
     // Create horizontal scrollable container
     let mut horizontal_items = Vec::new();
@@ -510,15 +375,10 @@ fn create_demo_ui(
         );
     }
 
-    let horizontal_scroll_offset = scroll_offsets
-        .get("horizontal_scroll_container")
-        .copied()
-        .unwrap_or((0.0, 0.0));
-
-    let mut horizontal_scroll_container = Node::new()
+    let horizontal_scroll_container = Node::new()
         .with_id(NodeId::new("horizontal_scroll_container"))
         .with_width(Size::px(800.0))
-        .with_height(Size::px(400.0))
+        .with_height(Size::px(200.0))
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Horizontal)
@@ -530,8 +390,6 @@ fn create_demo_ui(
             ..Default::default()
         })
         .with_children(horizontal_items);
-
-    horizontal_scroll_container.set_scroll_offset(horizontal_scroll_offset);
 
     // Create 2D scrollable container (scrolls both X and Y)
     let mut grid_items = Vec::new();
@@ -572,15 +430,10 @@ fn create_demo_ui(
         );
     }
 
-    let grid_scroll_offset = scroll_offsets
-        .get("grid_scroll_container")
-        .copied()
-        .unwrap_or((0.0, 0.0));
-
-    let mut grid_scroll_container = Node::new()
+    let grid_scroll_container = Node::new()
         .with_id(NodeId::new("grid_scroll_container"))
-        .with_width(Size::px(650.0))
-        .with_height(Size::px(650.0))
+        .with_width(Size::px(600.0))
+        .with_height(Size::px(400.0))
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Vertical)
@@ -592,8 +445,6 @@ fn create_demo_ui(
             ..Default::default()
         })
         .with_children(grid_items);
-
-    grid_scroll_container.set_scroll_offset(grid_scroll_offset);
 
     // Root with centered layout
     Node::new()
@@ -701,7 +552,6 @@ impl ApplicationHandler for App {
                     let mut ui = create_demo_ui(
                         gpu_state.config.width as f32,
                         gpu_state.config.height as f32,
-                        &self.scroll_offsets,
                         &self.item_heights,
                         &self.item_widths,
                     );
@@ -716,109 +566,12 @@ impl ApplicationHandler for App {
                     );
                     ui.compute_layout(window_rect);
 
-                    let (events, _) = gpu_state
+                    // Dispatch events (scroll events are automatically processed internally)
+                    let (_events, _) = gpu_state
                         .event_dispatcher
                         .dispatch(&gpu_state.input, &mut ui);
 
-                    // Process scroll events and update offsets
-                    for event in &events {
-                        if let InteractionEvent::Scroll { delta, .. } = event.event {
-                            let target_id = event.target.as_str();
-
-                            // Handle all scroll containers
-                            if target_id == "scroll_container"
-                                || target_id == "horizontal_scroll_container"
-                                || target_id == "grid_scroll_container"
-                            {
-                                // Find the node to get its scroll properties
-                                if let Some(node) = find_node_by_id(&ui, target_id) {
-                                    let scroll_speed = node.scroll_speed();
-                                    let scroll_direction = node.scroll_direction();
-                                    let layout_direction = node.layout_direction();
-
-                                    let current = self
-                                        .scroll_offsets
-                                        .get(target_id)
-                                        .copied()
-                                        .unwrap_or((0.0, 0.0));
-
-                                    // Apply scroll speed and direction
-                                    let direction_multiplier = match scroll_direction {
-                                        ScrollDirection::Normal => 1.0,
-                                        ScrollDirection::Inverted => -1.0,
-                                    };
-
-                                    let adjusted_delta = (
-                                        delta.0 * scroll_speed * direction_multiplier,
-                                        delta.1 * scroll_speed * direction_multiplier,
-                                    );
-
-                                    // Calculate max scroll based on content size
-                                    let max_scroll = calculate_max_scroll(node);
-
-                                    // Debug logging for grid container
-                                    if target_id == "grid_scroll_container" {
-                                        println!("Grid scroll - shift_held: {}, max_scroll: {:?}, current: {:?}, delta: {:?}",
-                                            gpu_state.input.shift_held, max_scroll, current, adjusted_delta);
-                                    }
-
-                                    // For grid container: shift = horizontal, normal = vertical
-                                    // For horizontal layouts: apply vertical scroll to horizontal axis
-                                    // For vertical layouts: normal vertical scrolling
-                                    let new_target = if target_id == "grid_scroll_container" {
-                                        // 2D scrolling: shift for horizontal, normal for vertical
-                                        if gpu_state.input.shift_held {
-                                            let new = (
-                                                (current.0 + adjusted_delta.1)
-                                                    .clamp(0.0, max_scroll.0),
-                                                current.1,
-                                            );
-                                            println!(
-                                                "  -> Horizontal scroll: new_target = {:?}",
-                                                new
-                                            );
-                                            new
-                                        } else {
-                                            let new = (
-                                                current.0,
-                                                (current.1 + adjusted_delta.1)
-                                                    .clamp(0.0, max_scroll.1),
-                                            );
-                                            println!(
-                                                "  -> Vertical scroll: new_target = {:?}",
-                                                new
-                                            );
-                                            new
-                                        }
-                                    } else {
-                                        match layout_direction {
-                                            Layout::Horizontal => (
-                                                (current.0 + adjusted_delta.1)
-                                                    .clamp(0.0, max_scroll.0),
-                                                current.1,
-                                            ),
-                                            Layout::Vertical => (
-                                                current.0,
-                                                (current.1 + adjusted_delta.1)
-                                                    .clamp(0.0, max_scroll.1),
-                                            ),
-                                            Layout::Stack => (
-                                                (current.0 + adjusted_delta.0)
-                                                    .clamp(0.0, max_scroll.0),
-                                                (current.1 + adjusted_delta.1)
-                                                    .clamp(0.0, max_scroll.1),
-                                            ),
-                                        }
-                                    };
-
-                                    self.scroll_targets
-                                        .insert(target_id.to_string(), new_target);
-                                }
-                            }
-                        }
-                    }
-
-                    // Smooth scroll interpolation
+                    // Update smooth scroll animations
                     let now = std::time::Instant::now();
                     let dt = self
                         .last_frame_time
@@ -826,22 +579,12 @@ impl ApplicationHandler for App {
                         .unwrap_or(0.016); // Default to ~60fps
                     self.last_frame_time = Some(now);
 
-                    const SCROLL_SMOOTHNESS: f32 = 10.0; // Higher = faster, lower = smoother
-                    for (id, target) in &self.scroll_targets {
-                        let current = self.scroll_offsets.get(id).copied().unwrap_or((0.0, 0.0));
-                        let t = 1.0 - (-SCROLL_SMOOTHNESS * dt).exp(); // Exponential ease-out
-                        let new_offset = (
-                            current.0 + (target.0 - current.0) * t,
-                            current.1 + (target.1 - current.1) * t,
-                        );
-                        self.scroll_offsets.insert(id.clone(), new_offset);
-                    }
+                    ui.update_all_scroll_animations(dt);
 
                     // Clear input for next frame
                     gpu_state.input.begin_frame();
 
                     match gpu_state.render(
-                        &self.scroll_offsets,
                         &self.debug_options,
                         &self.item_heights,
                         &self.item_widths,
@@ -896,8 +639,6 @@ fn main() {
     let mut app = App {
         window: None,
         gpu_state: None,
-        scroll_offsets: HashMap::new(),
-        scroll_targets: HashMap::new(),
         debug_options: DebugOptions::none(),
         last_frame_time: None,
         item_heights,
