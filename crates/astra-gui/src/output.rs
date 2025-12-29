@@ -247,12 +247,23 @@ fn collect_clipped_shapes_with_opacity(
         }
     }
 
+    // Apply scroll offset to children if this is a scroll container
+    let child_transform = if node.overflow() == Overflow::Scroll {
+        let scroll_offset = node.scroll_offset();
+        let mut scrolled_transform = world_transform;
+        scrolled_transform.translation.x -= scroll_offset.0;
+        scrolled_transform.translation.y -= scroll_offset.1;
+        scrolled_transform
+    } else {
+        world_transform
+    };
+
     for child in node.children() {
         collect_clipped_shapes_with_opacity(
             child,
             window_rect,
             effective_clip_rect,
-            world_transform, // Pass accumulated transform
+            child_transform, // Pass accumulated transform with scroll offset
             debug_options,
             out,
             combined_opacity,

@@ -68,6 +68,10 @@ pub struct Node {
     ///
     /// Default: `Overflow::Hidden`.
     overflow: Overflow,
+    /// Scroll offset for Overflow::Scroll containers (horizontal, vertical in pixels)
+    ///
+    /// Default: (0.0, 0.0)
+    scroll_offset: (f32, f32),
     /// Opacity of this node and all its children (0.0 = transparent, 1.0 = opaque).
     ///
     /// Default: 1.0 (fully opaque).
@@ -109,6 +113,7 @@ impl Node {
             gap: 0.0,
             layout_direction: Layout::default(),
             overflow: Overflow::default(),
+            scroll_offset: (0.0, 0.0),
             opacity: 1.0,
             shape: None,
             content: None,
@@ -351,6 +356,23 @@ impl Node {
     /// Get the overflow policy
     pub(crate) fn overflow(&self) -> Overflow {
         self.overflow
+    }
+
+    /// Get the scroll offset (horizontal, vertical)
+    pub fn scroll_offset(&self) -> (f32, f32) {
+        self.scroll_offset
+    }
+
+    /// Set the scroll offset (horizontal, vertical)
+    pub fn set_scroll_offset(&mut self, offset: (f32, f32)) {
+        self.scroll_offset = offset;
+    }
+
+    /// Scroll by a delta (horizontal, vertical)
+    pub fn scroll_by(&mut self, delta: (f32, f32)) {
+        self.scroll_offset.0 += delta.0;
+        self.scroll_offset.1 += delta.1;
+        // TODO: Clamp to content bounds
     }
 
     /// Get the shape, if any

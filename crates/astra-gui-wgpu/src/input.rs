@@ -32,6 +32,8 @@ pub struct InputState {
     pub shift_held: bool,
     /// Whether Ctrl (or Cmd on macOS) is currently held down
     pub ctrl_held: bool,
+    /// Scroll delta this frame (horizontal, vertical)
+    pub scroll_delta: (f32, f32),
 }
 
 impl InputState {
@@ -47,6 +49,7 @@ impl InputState {
             keys_just_released: Vec::new(),
             shift_held: false,
             ctrl_held: false,
+            scroll_delta: (0.0, 0.0),
         }
     }
 
@@ -60,6 +63,7 @@ impl InputState {
         self.characters_typed.clear();
         self.keys_just_pressed.clear();
         self.keys_just_released.clear();
+        self.scroll_delta = (0.0, 0.0);
     }
 
     /// Process a winit WindowEvent and update internal state
@@ -75,6 +79,22 @@ impl InputState {
             }
             WindowEvent::CursorLeft { .. } => {
                 self.cursor_position = None;
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                use winit::event::MouseScrollDelta;
+                match delta {
+                    MouseScrollDelta::LineDelta(x, y) => {
+                        // Line delta - multiply by pixels per line (typical: 20-40)
+                        const PIXELS_PER_LINE: f32 = 20.0;
+                        self.scroll_delta.0 += x * PIXELS_PER_LINE;
+                        self.scroll_delta.1 += y * PIXELS_PER_LINE;
+                    }
+                    MouseScrollDelta::PixelDelta(pos) => {
+                        // Pixel delta - use directly
+                        self.scroll_delta.0 += pos.x as f32;
+                        self.scroll_delta.1 += pos.y as f32;
+                    }
+                }
             }
             WindowEvent::MouseInput { state, button, .. } => match state {
                 ElementState::Pressed => {

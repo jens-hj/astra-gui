@@ -36,6 +36,11 @@ pub enum InteractionEvent {
     Focus,
     /// Node lost focus
     Blur,
+    /// Mouse wheel scroll event
+    Scroll {
+        delta: (f32, f32), // (horizontal, vertical) scroll delta
+        position: Point,
+    },
 }
 
 /// An interaction event targeted at a specific node
@@ -313,7 +318,7 @@ impl EventDispatcher {
 
         // Check for new clicks (only if not currently dragging)
         if self.drag_state.is_none() {
-            if let Some((target_id, local_pos, _)) = deepest_target {
+            if let Some((target_id, local_pos, _)) = &deepest_target {
                 // Check for left-click
                 if input.is_button_just_pressed(MouseButton::Left) {
                     events.push(TargetedEvent {
@@ -322,7 +327,7 @@ impl EventDispatcher {
                             position: cursor_pos,
                         },
                         target: target_id.clone(),
-                        local_position: local_pos,
+                        local_position: *local_pos,
                     });
 
                     // Start drag state for potential drag
@@ -340,7 +345,7 @@ impl EventDispatcher {
                             position: cursor_pos,
                         },
                         target: target_id.clone(),
-                        local_position: local_pos,
+                        local_position: *local_pos,
                     });
                 }
 
@@ -351,10 +356,24 @@ impl EventDispatcher {
                             button: MouseButton::Right,
                             position: cursor_pos,
                         },
-                        target: target_id,
-                        local_position: local_pos,
+                        target: target_id.clone(),
+                        local_position: *local_pos,
                     });
                 }
+            }
+        }
+
+        // Handle scroll events - apply to deepest scrollable container
+        if input.scroll_delta != (0.0, 0.0) {
+            if let Some((target_id, local_pos, _)) = &deepest_target {
+                events.push(TargetedEvent {
+                    event: InteractionEvent::Scroll {
+                        delta: input.scroll_delta,
+                        position: cursor_pos,
+                    },
+                    target: target_id.clone(),
+                    local_position: *local_pos,
+                });
             }
         }
 

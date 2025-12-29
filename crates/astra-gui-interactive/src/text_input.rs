@@ -234,7 +234,7 @@ pub fn text_input(
                     .with_shape(Shape::rect())
                     .with_style(Style {
                         fill_color: Some(style.selection_color),
-                        // corner_shape: Some(CornerShape::Round(5.0)),
+                        corner_shape: Some(CornerShape::Round(5.0)),
                         ..Default::default()
                     }),
             );
@@ -365,6 +365,7 @@ pub fn text_input(
         .with_padding(style.padding)
         .with_layout_direction(Layout::Stack)
         .with_shape(astra_gui::Shape::rect())
+        .with_overflow(astra_gui::Overflow::Hidden)
         .with_style(Style {
             fill_color: Some(fill_color),
             stroke: Some(Stroke::new(stroke_width, stroke_color)),
