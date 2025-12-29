@@ -126,6 +126,7 @@ struct App {
     scroll_targets: HashMap<String, (f32, f32)>, // Target scroll positions for smooth scrolling
     debug_options: DebugOptions,
     last_frame_time: Option<std::time::Instant>,
+    item_heights: Vec<f32>, // Random heights for each item, generated once
 }
 
 struct GpuState {
@@ -260,6 +261,7 @@ impl GpuState {
             self.config.width as f32,
             self.config.height as f32,
             scroll_offsets,
+            item_heights,
         );
 
         // Dispatch events
@@ -364,14 +366,20 @@ fn calculate_max_scroll(container: &Node) -> (f32, f32) {
     (max_scroll_x, max_scroll_y)
 }
 
-fn create_demo_ui(_width: f32, _height: f32, scroll_offsets: &HashMap<String, (f32, f32)>) -> Node {
+fn create_demo_ui(
+    _width: f32,
+    _height: f32,
+    scroll_offsets: &HashMap<String, (f32, f32)>,
+    item_heights: &[f32],
+) -> Node {
     // Create a scrollable container with many items
     let mut items = Vec::new();
-    for i in 0..30 {
+    for i in 0..item_heights.len() {
+        let height = item_heights[i];
         items.push(
             Node::new()
                 .with_width(Size::Fill)
-                .with_height(Size::px(50.0))
+                .with_height(Size::px(height))
                 .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(if i % 2 == 0 {
@@ -383,7 +391,7 @@ fn create_demo_ui(_width: f32, _height: f32, scroll_offsets: &HashMap<String, (f
                     ..Default::default()
                 })
                 .with_content(Content::Text(TextContent {
-                    text: format!("Item {}", i + 1),
+                    text: format!("Item {}, height {:.2}", i + 1, random_height),
                     font_size: 24.0,
                     color: mocha::TEXT,
                     h_align: HorizontalAlign::Center,
@@ -401,7 +409,7 @@ fn create_demo_ui(_width: f32, _height: f32, scroll_offsets: &HashMap<String, (f
     let mut scroll_container = Node::new()
         .with_id(NodeId::new("scroll_container"))
         .with_width(Size::px(400.0))
-        .with_height(Size::px(500.0))
+        .with_height(Size::px(800.0))
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Vertical)
@@ -501,6 +509,7 @@ impl ApplicationHandler for App {
                         gpu_state.config.width as f32,
                         gpu_state.config.height as f32,
                         &self.scroll_offsets,
+                        &self.item_heights,
                     );
 
                     // IMPORTANT: Compute layout before dispatching events so hit testing works
@@ -617,6 +626,11 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
 
+    // Generate random heights for items once at startup
+    let item_heights: Vec<f32> = (0..30)
+        .map(|_| rand::random::<f32>() * 100.0 + 50.0)
+        .collect();
+
     let mut app = App {
         window: None,
         gpu_state: None,
@@ -624,6 +638,7 @@ fn main() {
         scroll_targets: HashMap::new(),
         debug_options: DebugOptions::none(),
         last_frame_time: None,
+        item_heights,
     };
 
     println!("{}", DEBUG_HELP_TEXT);

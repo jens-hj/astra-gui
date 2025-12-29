@@ -21,4 +21,5 @@ winit = { workspace = true }
 pollster = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
+rand = { workspace = true }
 astra-gui-interactive = { workspace = true }

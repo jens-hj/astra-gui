@@ -162,7 +162,7 @@ fn collect_clipped_shapes_with_opacity(
     }
 
     // Compute AABB (axis-aligned bounding box) of transformed rect for clipping
-    let transformed_aabb = compute_transformed_aabb(node_rect, &world_transform);
+    let _transformed_aabb = compute_transformed_aabb(node_rect, &world_transform);
 
     // Update effective clip rect based on this node's overflow policy.
     let effective_clip_rect = match node.overflow() {

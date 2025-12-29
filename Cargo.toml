@@ -30,6 +30,8 @@ cosmic-text = "0.15"
 # Logging
 log = "0.4"
 env_logger = "0.11"
+# Random number generation
+rand = "0.9"
 # Astra GUI
 astra-gui = { path = "crates/astra-gui" }
 astra-gui-fonts = { path = "crates/astra-gui-fonts" }
