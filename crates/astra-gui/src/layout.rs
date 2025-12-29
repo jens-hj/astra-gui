@@ -263,21 +263,39 @@ impl Transform2D {
     }
 
     /// Apply inverse transform (for hit testing)
+    ///
+    /// Inverse of: translate first, then rotate
+    /// So we: inverse rotate first, then inverse translate
     pub fn apply_inverse(&self, point: [f32; 2], rect_size: [f32; 2]) -> [f32; 2] {
-        let (origin_x, origin_y) = self.origin.resolve(rect_size[0], rect_size[1]);
+        // Use absolute_origin if set, otherwise resolve the percentage-based origin
+        let (origin_x, origin_y) = if let Some(abs_origin) = self.absolute_origin {
+            (abs_origin[0], abs_origin[1])
+        } else {
+            self.origin.resolve(rect_size[0], rect_size[1])
+        };
 
-        // Remove translation
-        let x = point[0] - self.translation.x - origin_x;
-        let y = point[1] - self.translation.y - origin_y;
+        // 1. Translate to origin for inverse rotation
+        let mut x = point[0] - origin_x;
+        let mut y = point[1] - origin_y;
 
-        // Inverse rotate (negate angle)
+        // 2. Inverse rotate (negate angle)
         let cos_r = self.rotation.cos();
         let sin_r = self.rotation.sin();
         let rx = x * cos_r - y * sin_r;
         let ry = x * sin_r + y * cos_r;
 
-        // Translate back from origin
-        [rx + origin_x, ry + origin_y]
+        x = rx;
+        y = ry;
+
+        // 3. Translate back from origin
+        x += origin_x;
+        y += origin_y;
+
+        // 4. Remove translation
+        x -= self.translation.x;
+        y -= self.translation.y;
+
+        [x, y]
     }
 
     /// Compose two transforms (apply self, then other)
