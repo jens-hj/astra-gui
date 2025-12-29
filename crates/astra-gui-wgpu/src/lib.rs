@@ -143,6 +143,14 @@ pub struct Renderer {
         (gui_text::ShapedLine, gui_text::LinePlacement),
     >,
 
+    // Glyph metrics cache - stores bearing and size to avoid rasterizing just for metrics
+    // Key: GlyphKey (font_id, glyph_id, px_size, subpixel)
+    #[cfg(feature = "text-cosmic")]
+    glyph_metrics_cache: std::collections::HashMap<
+        text::atlas::GlyphKey,
+        ([i32; 2], [u32; 2]), // (bearing_px, size_px)
+    >,
+
     // Performance profiling
     frame_counter: u64,
 }
@@ -559,6 +567,8 @@ impl Renderer {
             text_engine: gui_text::Engine::new_default(),
             #[cfg(feature = "text-cosmic")]
             shape_cache: std::collections::HashMap::new(),
+            #[cfg(feature = "text-cosmic")]
+            glyph_metrics_cache: std::collections::HashMap::new(),
 
             frame_counter: 0,
         }
@@ -943,49 +953,57 @@ impl Renderer {
 
                 let atlas_start = std::time::Instant::now();
                 for g in &shaped.glyphs {
-                    let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
-                        continue;
-                    };
-
-                    // Map backend-agnostic `GlyphKey` to the atlas key used by this backend.
-                    let key = text::atlas::GlyphKey::new(
-                        bitmap.key.font_id.0,
-                        bitmap.key.glyph_id,
-                        bitmap.key.px_size,
-                        bitmap.key.subpixel_x_64 as u16,
+                    // OPTIMIZATION: Check atlas first before expensive rasterization
+                    // Map glyph key to atlas key
+                    let atlas_key = text::atlas::GlyphKey::new(
+                        g.key.font_id.0,
+                        g.key.glyph_id,
+                        g.key.px_size,
+                        g.key.subpixel_x_64 as u16,
                     );
 
-                    let placed = match self.atlas.insert(key.clone(), bitmap.size_px) {
-                        text::atlas::AtlasInsert::AlreadyPresent => self.atlas.get(&key),
-                        text::atlas::AtlasInsert::Placed(p) => {
-                            let rect_px = text::atlas::GlyphAtlas::upload_rect_px(p);
-                            let pad = p.padding_px;
-                            queue.write_texture(
-                                wgpu::TexelCopyTextureInfo {
-                                    texture: &self.atlas_texture,
-                                    mip_level: 0,
-                                    origin: wgpu::Origin3d {
-                                        x: rect_px.min.x + pad,
-                                        y: rect_px.min.y + pad,
-                                        z: 0,
+                    // Check if glyph is already in atlas
+                    let placed = if let Some(existing) = self.atlas.get(&atlas_key) {
+                        // Already in atlas - skip rasterization entirely
+                        Some(existing)
+                    } else {
+                        // Not in atlas - rasterize and upload
+                        let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
+                            continue;
+                        };
+
+                        match self.atlas.insert(atlas_key.clone(), bitmap.size_px) {
+                            text::atlas::AtlasInsert::AlreadyPresent => self.atlas.get(&atlas_key),
+                            text::atlas::AtlasInsert::Placed(p) => {
+                                let rect_px = text::atlas::GlyphAtlas::upload_rect_px(p);
+                                let pad = p.padding_px;
+                                queue.write_texture(
+                                    wgpu::TexelCopyTextureInfo {
+                                        texture: &self.atlas_texture,
+                                        mip_level: 0,
+                                        origin: wgpu::Origin3d {
+                                            x: rect_px.min.x + pad,
+                                            y: rect_px.min.y + pad,
+                                            z: 0,
+                                        },
+                                        aspect: wgpu::TextureAspect::All,
                                     },
-                                    aspect: wgpu::TextureAspect::All,
-                                },
-                                &bitmap.pixels,
-                                wgpu::TexelCopyBufferLayout {
-                                    offset: 0,
-                                    bytes_per_row: Some(bitmap.size_px[0]),
-                                    rows_per_image: Some(bitmap.size_px[1]),
-                                },
-                                wgpu::Extent3d {
-                                    width: bitmap.size_px[0],
-                                    height: bitmap.size_px[1],
-                                    depth_or_array_layers: 1,
-                                },
-                            );
-                            Some(p)
+                                    &bitmap.pixels,
+                                    wgpu::TexelCopyBufferLayout {
+                                        offset: 0,
+                                        bytes_per_row: Some(bitmap.size_px[0]),
+                                        rows_per_image: Some(bitmap.size_px[1]),
+                                    },
+                                    wgpu::Extent3d {
+                                        width: bitmap.size_px[0],
+                                        height: bitmap.size_px[1],
+                                        depth_or_array_layers: 1,
+                                    },
+                                );
+                                Some(p)
+                            }
+                            text::atlas::AtlasInsert::Full => None,
                         }
-                        text::atlas::AtlasInsert::Full => None,
                     };
 
                     let Some(placed) = placed else {
@@ -993,10 +1011,26 @@ impl Renderer {
                     };
 
                     // Quad in screen px (origin from placement + shaped glyph offset).
-                    let x0 = placement.origin_px[0] + g.x_px + bitmap.bearing_px[0] as f32;
-                    let y0 = placement.origin_px[1] + g.y_px + bitmap.bearing_px[1] as f32;
-                    let x1 = x0 + bitmap.size_px[0] as f32;
-                    let y1 = y0 + bitmap.size_px[1] as f32;
+                    // Get glyph metrics from cache or rasterize if needed
+                    let (glyph_bearing, glyph_size) =
+                        if let Some(&metrics) = self.glyph_metrics_cache.get(&atlas_key) {
+                            // Cache hit - use cached metrics
+                            metrics
+                        } else {
+                            // Cache miss - rasterize to get metrics and cache them
+                            if let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) {
+                                let metrics = (bitmap.bearing_px, bitmap.size_px);
+                                self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
+                                metrics
+                            } else {
+                                continue;
+                            }
+                        };
+
+                    let x0 = placement.origin_px[0] + g.x_px + glyph_bearing[0] as f32;
+                    let y0 = placement.origin_px[1] + g.y_px + glyph_bearing[1] as f32;
+                    let x1 = x0 + glyph_size[0] as f32;
+                    let y1 = y0 + glyph_size[1] as f32;
 
                     // Apply full transform (translation + rotation) to the glyph quad vertices
                     let translation = clipped.transform.translation;
