@@ -143,12 +143,12 @@ pub struct Renderer {
         (gui_text::ShapedLine, gui_text::LinePlacement),
     >,
 
-    // Glyph metrics cache - stores bearing and size to avoid rasterizing just for metrics
+    // Glyph metrics cache - stores bearing, size, AND atlas placement to avoid lookups
     // Key: GlyphKey (font_id, glyph_id, px_size, subpixel)
     #[cfg(feature = "text-cosmic")]
     glyph_metrics_cache: std::collections::HashMap<
         text::atlas::GlyphKey,
-        ([i32; 2], [u32; 2]), // (bearing_px, size_px)
+        ([i32; 2], [u32; 2], text::atlas::PlacedGlyph), // (bearing_px, size_px, placement)
     >,
 
     // Performance profiling
@@ -596,9 +596,15 @@ impl Renderer {
     ) {
         let render_start = std::time::Instant::now();
 
+        let mut sdf_time = std::time::Duration::ZERO;
+        let mut text_prep_time = std::time::Duration::ZERO;
+        let mut buffer_upload_time = std::time::Duration::ZERO;
+        let mut draw_time = std::time::Duration::ZERO;
+
         // Separate shapes into SDF-renderable and tessellated.
         // SDF rendering is used for simple shapes (currently: all fills, simple strokes).
         // OPTIMIZATION: Pre-allocate based on previous frame to reduce allocations
+        let sdf_start = std::time::Instant::now();
         self.sdf_instances.clear();
         self.sdf_instances
             .reserve(self.last_frame_sdf_instance_count);
@@ -672,7 +678,10 @@ impl Renderer {
             }
         }
 
+        sdf_time = sdf_start.elapsed();
+
         // Process mesh shapes if using Mesh render mode
+        let mesh_start = std::time::Instant::now();
         if self.render_mode == RenderMode::Mesh {
             // Tessellate all shapes using mesh rendering
             let mesh = self.tessellator.tessellate(&output.shapes);
@@ -738,7 +747,10 @@ impl Renderer {
             });
         }
 
+        let mesh_time = mesh_start.elapsed();
+
         // Upload geometry
+        let gpu_upload_start = std::time::Instant::now();
         if !self.frame_indices.is_empty() {
             queue.write_buffer(
                 &self.vertex_buffer,
@@ -775,8 +787,10 @@ impl Renderer {
                 bytemuck::cast_slice(&self.sdf_instances),
             );
         }
+        let gpu_upload_time = gpu_upload_start.elapsed();
 
         // Render pass
+        let render_pass_start = std::time::Instant::now();
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Astra UI Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -953,7 +967,6 @@ impl Renderer {
 
                 let atlas_start = std::time::Instant::now();
                 for g in &shaped.glyphs {
-                    // OPTIMIZATION: Check atlas first before expensive rasterization
                     // Map glyph key to atlas key
                     let atlas_key = text::atlas::GlyphKey::new(
                         g.key.font_id.0,
@@ -962,69 +975,66 @@ impl Renderer {
                         g.key.subpixel_x_64 as u16,
                     );
 
-                    // Check if glyph is already in atlas
-                    let placed = if let Some(existing) = self.atlas.get(&atlas_key) {
-                        // Already in atlas - skip rasterization entirely
-                        Some(existing)
-                    } else {
-                        // Not in atlas - rasterize and upload
-                        let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
-                            continue;
-                        };
-
-                        match self.atlas.insert(atlas_key.clone(), bitmap.size_px) {
-                            text::atlas::AtlasInsert::AlreadyPresent => self.atlas.get(&atlas_key),
-                            text::atlas::AtlasInsert::Placed(p) => {
-                                let rect_px = text::atlas::GlyphAtlas::upload_rect_px(p);
-                                let pad = p.padding_px;
-                                queue.write_texture(
-                                    wgpu::TexelCopyTextureInfo {
-                                        texture: &self.atlas_texture,
-                                        mip_level: 0,
-                                        origin: wgpu::Origin3d {
-                                            x: rect_px.min.x + pad,
-                                            y: rect_px.min.y + pad,
-                                            z: 0,
-                                        },
-                                        aspect: wgpu::TextureAspect::All,
-                                    },
-                                    &bitmap.pixels,
-                                    wgpu::TexelCopyBufferLayout {
-                                        offset: 0,
-                                        bytes_per_row: Some(bitmap.size_px[0]),
-                                        rows_per_image: Some(bitmap.size_px[1]),
-                                    },
-                                    wgpu::Extent3d {
-                                        width: bitmap.size_px[0],
-                                        height: bitmap.size_px[1],
-                                        depth_or_array_layers: 1,
-                                    },
-                                );
-                                Some(p)
-                            }
-                            text::atlas::AtlasInsert::Full => None,
-                        }
-                    };
-
-                    let Some(placed) = placed else {
-                        continue;
-                    };
-
-                    // Quad in screen px (origin from placement + shaped glyph offset).
-                    // Get glyph metrics from cache or rasterize if needed
-                    let (glyph_bearing, glyph_size) =
-                        if let Some(&metrics) = self.glyph_metrics_cache.get(&atlas_key) {
-                            // Cache hit - use cached metrics
-                            metrics
+                    // OPTIMIZATION: Check metrics cache first (includes placement)
+                    let (glyph_bearing, glyph_size, placed) =
+                        if let Some(&(bearing, size, placement)) =
+                            self.glyph_metrics_cache.get(&atlas_key)
+                        {
+                            // Cache hit - use cached metrics and placement (no atlas lookup!)
+                            (bearing, size, placement)
                         } else {
-                            // Cache miss - rasterize to get metrics and cache them
-                            if let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) {
-                                let metrics = (bitmap.bearing_px, bitmap.size_px);
-                                self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
-                                metrics
-                            } else {
+                            // Cache miss - need to rasterize and upload
+                            let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
                                 continue;
-                            }
+                            };
+
+                            // Insert into atlas
+                            let placed = match self.atlas.insert(atlas_key.clone(), bitmap.size_px)
+                            {
+                                text::atlas::AtlasInsert::AlreadyPresent => {
+                                    // Already in atlas, get placement
+                                    self.atlas.get(&atlas_key)
+                                }
+                                text::atlas::AtlasInsert::Placed(p) => {
+                                    // Newly placed - upload texture
+                                    let rect_px = text::atlas::GlyphAtlas::upload_rect_px(p);
+                                    let pad = p.padding_px;
+                                    queue.write_texture(
+                                        wgpu::TexelCopyTextureInfo {
+                                            texture: &self.atlas_texture,
+                                            mip_level: 0,
+                                            origin: wgpu::Origin3d {
+                                                x: rect_px.min.x + pad,
+                                                y: rect_px.min.y + pad,
+                                                z: 0,
+                                            },
+                                            aspect: wgpu::TextureAspect::All,
+                                        },
+                                        &bitmap.pixels,
+                                        wgpu::TexelCopyBufferLayout {
+                                            offset: 0,
+                                            bytes_per_row: Some(bitmap.size_px[0]),
+                                            rows_per_image: Some(bitmap.size_px[1]),
+                                        },
+                                        wgpu::Extent3d {
+                                            width: bitmap.size_px[0],
+                                            height: bitmap.size_px[1],
+                                            depth_or_array_layers: 1,
+                                        },
+                                    );
+                                    Some(p)
+                                }
+                                text::atlas::AtlasInsert::Full => None,
+                            };
+
+                            let Some(p) = placed else {
+                                continue;
+                            };
+
+                            // Cache metrics AND placement for future frames
+                            let metrics = (bitmap.bearing_px, bitmap.size_px, p);
+                            self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
+                            (bitmap.bearing_px, bitmap.size_px, p)
                         };
 
                     let x0 = placement.origin_px[0] + g.x_px + glyph_bearing[0] as f32;
@@ -1148,6 +1158,8 @@ impl Renderer {
             }
 
             if !draws.is_empty() {
+                let buffer_upload_start = std::time::Instant::now();
+
                 if self.text_vertices.len() > self.text_vertex_capacity {
                     self.text_vertex_capacity = (self.text_vertices.len() * 2).next_power_of_two();
                     self.text_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -1180,6 +1192,9 @@ impl Renderer {
                     0,
                     bytemuck::cast_slice(&self.text_indices),
                 );
+
+                let buffer_upload_time = buffer_upload_start.elapsed();
+                let draw_start = std::time::Instant::now();
 
                 render_pass.set_pipeline(&self.text_pipeline);
                 render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
@@ -1216,6 +1231,16 @@ impl Renderer {
                 render_pass.draw_indexed(batch_start..batch_end, 0, 0..1);
 
                 render_pass.set_scissor_rect(0, 0, screen_width as u32, screen_height as u32);
+
+                let draw_time = draw_start.elapsed();
+
+                if self.frame_counter % 60 == 0 {
+                    println!(
+                        "    Text buffers: Upload: {:.2}ms, Draw: {:.2}ms",
+                        buffer_upload_time.as_secs_f64() * 1000.0,
+                        draw_time.as_secs_f64() * 1000.0,
+                    );
+                }
             }
 
             // Update frame tracking for next frame's pre-allocation
@@ -1229,16 +1254,29 @@ impl Renderer {
         self.last_frame_sdf_instance_count = self.sdf_instances.len();
 
         let text_time = text_start.elapsed();
+        let render_pass_time = render_pass_start.elapsed();
         let total_render_time = render_start.elapsed();
 
         // Log every 60 frames
         self.frame_counter += 1;
         if self.frame_counter % 60 == 0 {
+            let other_time = total_render_time.as_secs_f64()
+                - sdf_time.as_secs_f64()
+                - mesh_time.as_secs_f64()
+                - gpu_upload_time.as_secs_f64()
+                - text_time.as_secs_f64();
+
             println!(
-                "  Render breakdown: Total: {:.2}ms, Text: {:.2}ms, Other: {:.2}ms",
+                "  Render breakdown: Total: {:.2}ms",
                 total_render_time.as_secs_f64() * 1000.0,
+            );
+            println!(
+                "    SDF prep: {:.2}ms, Mesh: {:.2}ms, GPU upload: {:.2}ms, Text: {:.2}ms, Other: {:.2}ms",
+                sdf_time.as_secs_f64() * 1000.0,
+                mesh_time.as_secs_f64() * 1000.0,
+                gpu_upload_time.as_secs_f64() * 1000.0,
                 text_time.as_secs_f64() * 1000.0,
-                (total_render_time.as_secs_f64() - text_time.as_secs_f64()) * 1000.0,
+                other_time * 1000.0,
             );
         }
     }

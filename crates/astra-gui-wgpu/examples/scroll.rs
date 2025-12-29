@@ -210,7 +210,12 @@ impl GpuState {
         }
     }
 
-    fn render(&mut self, ui_output: &FullOutput) -> Result<(), wgpu::SurfaceError> {
+    fn render(
+        &mut self,
+        ui_output: &FullOutput,
+    ) -> Result<(std::time::Duration, std::time::Duration), wgpu::SurfaceError> {
+        let gpu_work_start = std::time::Instant::now();
+
         let surface_texture = self.surface.get_current_texture()?;
         let view = surface_texture
             .texture
@@ -266,20 +271,75 @@ impl GpuState {
 
         self.queue.submit(std::iter::once(encoder.finish()));
 
-        surface_texture.present();
+        let gpu_work_time = gpu_work_start.elapsed();
 
-        Ok(())
+        let present_start = std::time::Instant::now();
+        surface_texture.present();
+        let present_time = present_start.elapsed();
+
+        Ok((gpu_work_time, present_time))
     }
 }
 
 fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: &[f32]) -> Node {
-    // Create a scrollable container with many items
+    // Create a scrollable container with many items - STRESS TEST with nested children
     let mut items = Vec::new();
     for (i, &height) in item_heights.iter().enumerate() {
+        // Create nested children for each item
+        let mut nested_children = vec![
+            Node::new()
+                .with_width(Size::Fill)
+                .with_height(Size::px(30.0))
+                .with_content(Content::Text(TextContent {
+                    text: format!("Item {}", i + 1),
+                    font_size: 20.0,
+                    color: mocha::TEXT,
+                    h_align: HorizontalAlign::Left,
+                    v_align: VerticalAlign::Center,
+                })),
+            Node::new()
+                .with_width(Size::Fill)
+                .with_height(Size::Fill)
+                .with_layout_direction(Layout::Horizontal)
+                .with_gap(5.0)
+                .with_children(vec![
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::Fill)
+                        .with_shape(Shape::rect())
+                        .with_style(Style {
+                            fill_color: Some(mocha::BLUE),
+                            corner_shape: Some(CornerShape::Round(4.0)),
+                            ..Default::default()
+                        }),
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::Fill)
+                        .with_shape(Shape::rect())
+                        .with_style(Style {
+                            fill_color: Some(mocha::GREEN),
+                            corner_shape: Some(CornerShape::Round(4.0)),
+                            ..Default::default()
+                        }),
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::Fill)
+                        .with_shape(Shape::rect())
+                        .with_style(Style {
+                            fill_color: Some(mocha::RED),
+                            corner_shape: Some(CornerShape::Round(4.0)),
+                            ..Default::default()
+                        }),
+                ]),
+        ];
+
         items.push(
             Node::new()
                 .with_width(Size::Fill)
                 .with_height(Size::px(height))
+                .with_padding(Spacing::all(8.0))
+                .with_gap(5.0)
+                .with_layout_direction(Layout::Vertical)
                 .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(if i % 2 == 0 {
@@ -290,13 +350,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     corner_shape: Some(CornerShape::Round(8.0)),
                     ..Default::default()
                 })
-                .with_content(Content::Text(TextContent {
-                    text: format!("Item {}, height {:.2}", i + 1, height),
-                    font_size: 24.0,
-                    color: mocha::TEXT,
-                    h_align: HorizontalAlign::Center,
-                    v_align: VerticalAlign::Center,
-                })),
+                .with_children(nested_children),
         );
     }
 
@@ -304,7 +358,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
     let scroll_container = Node::new()
         .with_id(NodeId::new("scroll_container"))
         .with_width(Size::px(400.0))
-        .with_height(Size::px(800.0))
+        .with_height(Size::Fill)
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Vertical)
@@ -317,13 +371,16 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         })
         .with_children(items);
 
-    // Create horizontal scrollable container
+    // Create horizontal scrollable container - STRESS TEST with nested children
     let mut horizontal_items = Vec::new();
     for (i, &width) in item_widths.iter().enumerate() {
         horizontal_items.push(
             Node::new()
                 .with_width(Size::px(width))
                 .with_height(Size::Fill)
+                .with_padding(Spacing::all(8.0))
+                .with_gap(5.0)
+                .with_layout_direction(Layout::Vertical)
                 .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(if i % 2 == 0 {
@@ -334,20 +391,59 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     corner_shape: Some(CornerShape::Round(8.0)),
                     ..Default::default()
                 })
-                .with_content(Content::Text(TextContent {
-                    text: format!("Item {}\nwidth {:.0}", i + 1, width),
-                    font_size: 20.0,
-                    color: mocha::TEXT,
-                    h_align: HorizontalAlign::Center,
-                    v_align: VerticalAlign::Center,
-                })),
+                .with_children(vec![
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::px(30.0))
+                        .with_content(Content::Text(TextContent {
+                            text: format!("H-Item {}", i + 1),
+                            font_size: 18.0,
+                            color: mocha::TEXT,
+                            h_align: HorizontalAlign::Center,
+                            v_align: VerticalAlign::Center,
+                        })),
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::Fill)
+                        .with_layout_direction(Layout::Vertical)
+                        .with_gap(3.0)
+                        .with_children(vec![
+                            Node::new()
+                                .with_width(Size::Fill)
+                                .with_height(Size::Fill)
+                                .with_shape(Shape::rect())
+                                .with_style(Style {
+                                    fill_color: Some(mocha::PEACH),
+                                    corner_shape: Some(CornerShape::Round(4.0)),
+                                    ..Default::default()
+                                }),
+                            Node::new()
+                                .with_width(Size::Fill)
+                                .with_height(Size::Fill)
+                                .with_shape(Shape::rect())
+                                .with_style(Style {
+                                    fill_color: Some(mocha::YELLOW),
+                                    corner_shape: Some(CornerShape::Round(4.0)),
+                                    ..Default::default()
+                                }),
+                            Node::new()
+                                .with_width(Size::Fill)
+                                .with_height(Size::Fill)
+                                .with_shape(Shape::rect())
+                                .with_style(Style {
+                                    fill_color: Some(mocha::TEAL),
+                                    corner_shape: Some(CornerShape::Round(4.0)),
+                                    ..Default::default()
+                                }),
+                        ]),
+                ]),
         );
     }
 
     let horizontal_scroll_container = Node::new()
         .with_id(NodeId::new("horizontal_scroll_container"))
         .with_width(Size::px(800.0))
-        .with_height(Size::px(400.0))
+        .with_height(Size::Fill)
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Horizontal)
@@ -360,15 +456,20 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         })
         .with_children(horizontal_items);
 
-    // Create 2D scrollable container (scrolls both X and Y)
+    // Create 2D scrollable container (scrolls both X and Y) - STRESS TEST with nested children
     let mut grid_items = Vec::new();
-    for row in 0..10 {
+    for row in 0..50 {
+        // 10 -> 50 rows
         let mut row_items = Vec::new();
-        for col in 0..10 {
+        for col in 0..50 {
+            // 10 -> 50 columns (2500 total grid cells!)
             row_items.push(
                 Node::new()
                     .with_width(Size::px(150.0))
                     .with_height(Size::px(100.0))
+                    .with_padding(Spacing::all(6.0))
+                    .with_gap(3.0)
+                    .with_layout_direction(Layout::Vertical)
                     .with_shape(Shape::rect())
                     .with_style(Style {
                         fill_color: Some(if (row + col) % 2 == 0 {
@@ -379,13 +480,43 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         corner_shape: Some(CornerShape::Round(8.0)),
                         ..Default::default()
                     })
-                    .with_content(Content::Text(TextContent {
-                        text: format!("R{} C{}", row + 1, col + 1),
-                        font_size: 20.0,
-                        color: mocha::TEXT,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    })),
+                    .with_children(vec![
+                        Node::new()
+                            .with_width(Size::Fill)
+                            .with_height(Size::px(25.0))
+                            .with_content(Content::Text(TextContent {
+                                text: format!("R{} C{}", row + 1, col + 1),
+                                font_size: 16.0,
+                                color: mocha::TEXT,
+                                h_align: HorizontalAlign::Center,
+                                v_align: VerticalAlign::Center,
+                            })),
+                        Node::new()
+                            .with_width(Size::Fill)
+                            .with_height(Size::Fill)
+                            .with_layout_direction(Layout::Horizontal)
+                            .with_gap(2.0)
+                            .with_children(vec![
+                                Node::new()
+                                    .with_width(Size::Fill)
+                                    .with_height(Size::Fill)
+                                    .with_shape(Shape::rect())
+                                    .with_style(Style {
+                                        fill_color: Some(mocha::MAUVE),
+                                        corner_shape: Some(CornerShape::Round(3.0)),
+                                        ..Default::default()
+                                    }),
+                                Node::new()
+                                    .with_width(Size::Fill)
+                                    .with_height(Size::Fill)
+                                    .with_shape(Shape::rect())
+                                    .with_style(Style {
+                                        fill_color: Some(mocha::LAVENDER),
+                                        corner_shape: Some(CornerShape::Round(3.0)),
+                                        ..Default::default()
+                                    }),
+                            ]),
+                    ]),
             );
         }
 
@@ -402,7 +533,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
     let grid_scroll_container = Node::new()
         .with_id(NodeId::new("grid_scroll_container"))
         .with_width(Size::px(600.0))
-        .with_height(Size::px(600.0))
+        .with_height(Size::Fill)
         .with_padding(Spacing::all(10.0))
         .with_gap(10.0)
         .with_layout_direction(Layout::Vertical)
@@ -430,7 +561,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     // Title
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_height(Size::px(60.0))
+                        .with_height(Size::fraction(0.1))
                         .with_content(Content::Text(TextContent {
                             text: "Scroll Example - Use Mouse Wheel (Shift for horizontal)"
                                 .to_string(),
@@ -442,7 +573,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     // Centered vertical scroll container
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_height(Size::Fill)
+                        // .with_height(Size::fraction(0.37))
+                        .with_height(Size::px(800.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(scroll_container)
@@ -450,7 +582,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     // 2D grid scroll container
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_height(Size::px(670.0))
+                        // .with_height(Size::fraction(0.33))
+                        .with_height(Size::px(600.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(grid_scroll_container)
@@ -458,7 +591,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     // Horizontal scroll container
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_height(Size::px(420.0))
+                        // .with_height(Size::fraction(0.2))
+                        .with_height(Size::px(400.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(horizontal_scroll_container)
@@ -589,28 +723,36 @@ impl ApplicationHandler for App {
                     gpu_state.input.begin_frame();
 
                     let render_start = std::time::Instant::now();
-                    match gpu_state.render(&ui_output) {
-                        Ok(_) => {}
+                    let (gpu_work_time, present_time) = match gpu_state.render(&ui_output) {
+                        Ok(times) => times,
                         Err(wgpu::SurfaceError::Lost) => {
                             if let Some(window) = &self.window {
                                 gpu_state.resize(window.inner_size())
                             }
+                            (std::time::Duration::ZERO, std::time::Duration::ZERO)
                         }
-                        Err(wgpu::SurfaceError::OutOfMemory) => event_loop.exit(),
-                        Err(e) => eprintln!("Render error: {:?}", e),
-                    }
+                        Err(wgpu::SurfaceError::OutOfMemory) => {
+                            event_loop.exit();
+                            (std::time::Duration::ZERO, std::time::Duration::ZERO)
+                        }
+                        Err(e) => {
+                            eprintln!("Render error: {:?}", e);
+                            (std::time::Duration::ZERO, std::time::Duration::ZERO)
+                        }
+                    };
                     let render_time = render_start.elapsed();
 
                     let frame_time = frame_start.elapsed();
 
                     // Print timing every 60 frames
                     if self.frame_count % 60 == 0 {
-                        println!("Frame time: {:.2}ms (UI build: {:.2}ms, Layout: {:.2}ms, Output: {:.2}ms, Render: {:.2}ms)",
+                        println!("Frame time: {:.2}ms (UI build: {:.2}ms, Layout: {:.2}ms, Output: {:.2}ms, GPU work: {:.2}ms, Present/VSync: {:.2}ms)",
                             frame_time.as_secs_f64() * 1000.0,
                             ui_build_time.as_secs_f64() * 1000.0,
                             layout_time.as_secs_f64() * 1000.0,
                             output_time.as_secs_f64() * 1000.0,
-                            render_time.as_secs_f64() * 1000.0,
+                            gpu_work_time.as_secs_f64() * 1000.0,
+                            present_time.as_secs_f64() * 1000.0,
                         );
                     }
                     self.frame_count += 1;
@@ -642,13 +784,13 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    // Generate random heights for vertical scroll items once at startup
-    let item_heights: Vec<f32> = (0..30)
+    // STRESS TEST: Generate many more items
+    let item_heights: Vec<f32> = (0..200) // 30 -> 200
         .map(|_| rand::random::<f32>() * 100.0 + 50.0)
         .collect();
 
-    // Generate random widths for horizontal scroll items once at startup
-    let item_widths: Vec<f32> = (0..30)
+    // STRESS TEST: Generate many more items
+    let item_widths: Vec<f32> = (0..200) // 30 -> 200
         .map(|_| rand::random::<f32>() * 150.0 + 100.0)
         .collect();
 
