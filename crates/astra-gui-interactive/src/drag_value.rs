@@ -325,7 +325,7 @@ pub fn drag_value_update(
 
         if enter_pressed {
             // Parse text and update value
-            if let Some(new_value) = parse_value(text_buffer) {
+            let changed = if let Some(new_value) = parse_value(text_buffer) {
                 let mut clamped_value = new_value;
 
                 // Apply range clamping
@@ -351,9 +351,15 @@ pub fn drag_value_update(
 
                 *value = clamped_value;
                 *drag_accumulator = clamped_value; // Reset accumulator to new value
-                return true;
-            }
-            return false;
+                true
+            } else {
+                false
+            };
+
+            // Unfocus after accepting the value
+            *focused = false;
+            event_dispatcher.set_focus(None);
+            return changed;
         } else if escape_pressed {
             // text_input_update already handled unfocusing
             return false;
