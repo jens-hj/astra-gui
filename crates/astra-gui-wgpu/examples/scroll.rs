@@ -375,8 +375,7 @@ fn create_demo_ui(
 ) -> Node {
     // Create a scrollable container with many items
     let mut items = Vec::new();
-    for i in 0..item_heights.len() {
-        let height = item_heights[i];
+    for (i, &height) in item_heights.iter().enumerate() {
         items.push(
             Node::new()
                 .with_width(Size::Fill)

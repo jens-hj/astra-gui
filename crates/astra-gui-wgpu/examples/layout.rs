@@ -1,4 +1,4 @@
-///! Demonstrates the node-based layout system with nested elements
+//! Demonstrates the node-based layout system with nested elements
 use astra_gui::{
     catppuccin::mocha, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout,
     Node, Shape, Size, Spacing, Stroke, StyledRect, TextContent, VerticalAlign,
@@ -255,11 +255,11 @@ impl GpuState {
 }
 
 fn child() -> Node {
-    return Node::new().with_height(Size::Fill).with_shape(Shape::Rect(
+    Node::new().with_height(Size::Fill).with_shape(Shape::Rect(
         StyledRect::new(Default::default(), mocha::SURFACE1)
             .with_corner_shape(CornerShape::Round(30.0))
             .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
-    ));
+    ))
 }
 
 fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> FullOutput {
