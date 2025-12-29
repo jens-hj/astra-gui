@@ -218,6 +218,7 @@ impl GpuState {
         &mut self,
         scroll_offsets: &HashMap<String, (f32, f32)>,
         debug_options: &DebugOptions,
+        item_heights: &[f32],
     ) -> Result<(), wgpu::SurfaceError> {
         let surface_texture = self.surface.get_current_texture()?;
         let view = surface_texture
@@ -391,7 +392,7 @@ fn create_demo_ui(
                     ..Default::default()
                 })
                 .with_content(Content::Text(TextContent {
-                    text: format!("Item {}, height {:.2}", i + 1, random_height),
+                    text: format!("Item {}, height {:.2}", i + 1, height),
                     font_size: 24.0,
                     color: mocha::TEXT,
                     h_align: HorizontalAlign::Center,
@@ -588,7 +589,11 @@ impl ApplicationHandler for App {
                     // Clear input for next frame
                     gpu_state.input.begin_frame();
 
-                    match gpu_state.render(&self.scroll_offsets, &self.debug_options) {
+                    match gpu_state.render(
+                        &self.scroll_offsets,
+                        &self.debug_options,
+                        &self.item_heights,
+                    ) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
                             if let Some(window) = &self.window {
