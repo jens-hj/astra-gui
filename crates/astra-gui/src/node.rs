@@ -960,6 +960,90 @@ impl Node {
             }
         };
 
+        // Calculate total size of children for alignment
+        let (total_children_width, total_children_height) = match self.layout_direction {
+            Layout::Horizontal => {
+                let mut total_width = total_horizontal_spacing;
+                for child in &self.children {
+                    if child.width.is_fill() {
+                        total_width += fill_size_width;
+                    } else if child.width.is_fit_content() {
+                        total_width += child.measure_node(measurer).width;
+                    } else {
+                        total_width += child.width.try_resolve(available_width).unwrap_or(0.0);
+                    }
+                }
+                (total_width, content_height)
+            }
+            Layout::Vertical => {
+                let mut total_height = total_vertical_spacing;
+                for child in &self.children {
+                    if child.height.is_fill() {
+                        total_height += fill_size_height;
+                    } else if child.height.is_fit_content() {
+                        total_height += child.measure_node(measurer).height;
+                    } else {
+                        total_height += child.height.try_resolve(available_height).unwrap_or(0.0);
+                    }
+                }
+                (content_width, total_height)
+            }
+            Layout::Stack => {
+                // For stack, use content dimensions
+                (content_width, content_height)
+            }
+        };
+
+        // Apply alignment offset
+        match self.layout_direction {
+            Layout::Horizontal => {
+                // h_align controls main axis (justify)
+                let remaining_width = (content_width - total_children_width).max(0.0);
+                current_x += match self.h_align {
+                    HorizontalAlign::Left => 0.0,
+                    HorizontalAlign::Center => remaining_width / 2.0,
+                    HorizontalAlign::Right => remaining_width,
+                };
+
+                // v_align controls cross axis
+                current_y += match self.v_align {
+                    VerticalAlign::Top => 0.0,
+                    VerticalAlign::Center => 0.0, // Will be applied per-child
+                    VerticalAlign::Bottom => 0.0, // Will be applied per-child
+                };
+            }
+            Layout::Vertical => {
+                // v_align controls main axis (justify)
+                let remaining_height = (content_height - total_children_height).max(0.0);
+                current_y += match self.v_align {
+                    VerticalAlign::Top => 0.0,
+                    VerticalAlign::Center => remaining_height / 2.0,
+                    VerticalAlign::Bottom => remaining_height,
+                };
+
+                // h_align controls cross axis
+                current_x += match self.h_align {
+                    HorizontalAlign::Left => 0.0,
+                    HorizontalAlign::Center => 0.0, // Will be applied per-child
+                    HorizontalAlign::Right => 0.0,  // Will be applied per-child
+                };
+            }
+            Layout::Stack => {
+                // Both alignments apply to all stacked children
+                current_x += match self.h_align {
+                    HorizontalAlign::Left => 0.0,
+                    HorizontalAlign::Center => 0.0, // Will be applied per-child based on child size
+                    HorizontalAlign::Right => 0.0,  // Will be applied per-child based on child size
+                };
+
+                current_y += match self.v_align {
+                    VerticalAlign::Top => 0.0,
+                    VerticalAlign::Center => 0.0, // Will be applied per-child based on child size
+                    VerticalAlign::Bottom => 0.0, // Will be applied per-child based on child size
+                };
+            }
+        }
+
         let num_children = self.children.len();
         for i in 0..num_children {
             if i == 0 {
@@ -1013,8 +1097,68 @@ impl Node {
                 self.overflow, // Pass this node's overflow to children
             );
 
+            // Apply cross-axis alignment after computing child layout
             if let Some(child_layout) = self.children[i].computed_layout() {
-                let child_rect = child_layout.rect;
+                let mut child_rect = child_layout.rect;
+                let child_width = child_rect.max[0] - child_rect.min[0];
+                let child_height = child_rect.max[1] - child_rect.min[1];
+
+                match self.layout_direction {
+                    Layout::Horizontal => {
+                        // For horizontal layout, v_align controls cross-axis (vertical) alignment
+                        let available_height = content_height;
+                        let offset_y = match self.v_align {
+                            VerticalAlign::Top => 0.0,
+                            VerticalAlign::Center => (available_height - child_height) / 2.0,
+                            VerticalAlign::Bottom => available_height - child_height,
+                        };
+                        let new_y = content_y + offset_y;
+                        let y_delta = new_y - child_rect.min[1];
+                        child_rect.min[1] += y_delta;
+                        child_rect.max[1] += y_delta;
+                        self.children[i].computed = Some(ComputedLayout::new(child_rect));
+                    }
+                    Layout::Vertical => {
+                        // For vertical layout, h_align controls cross-axis (horizontal) alignment
+                        let available_width = content_width;
+                        let offset_x = match self.h_align {
+                            HorizontalAlign::Left => 0.0,
+                            HorizontalAlign::Center => (available_width - child_width) / 2.0,
+                            HorizontalAlign::Right => available_width - child_width,
+                        };
+                        let new_x = content_x + offset_x;
+                        let x_delta = new_x - child_rect.min[0];
+                        child_rect.min[0] += x_delta;
+                        child_rect.max[0] += x_delta;
+                        self.children[i].computed = Some(ComputedLayout::new(child_rect));
+                    }
+                    Layout::Stack => {
+                        // For stack layout, apply both alignments
+                        let available_width = content_width;
+                        let available_height = content_height;
+
+                        let offset_x = match self.h_align {
+                            HorizontalAlign::Left => 0.0,
+                            HorizontalAlign::Center => (available_width - child_width) / 2.0,
+                            HorizontalAlign::Right => available_width - child_width,
+                        };
+                        let offset_y = match self.v_align {
+                            VerticalAlign::Top => 0.0,
+                            VerticalAlign::Center => (available_height - child_height) / 2.0,
+                            VerticalAlign::Bottom => available_height - child_height,
+                        };
+
+                        let new_x = content_x + offset_x;
+                        let new_y = content_y + offset_y;
+                        let x_delta = new_x - child_rect.min[0];
+                        let y_delta = new_y - child_rect.min[1];
+                        child_rect.min[0] += x_delta;
+                        child_rect.max[0] += x_delta;
+                        child_rect.min[1] += y_delta;
+                        child_rect.max[1] += y_delta;
+                        self.children[i].computed = Some(ComputedLayout::new(child_rect));
+                    }
+                }
 
                 if i + 1 < num_children {
                     match self.layout_direction {
