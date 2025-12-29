@@ -352,12 +352,32 @@ fn calculate_max_scroll(container: &Node) -> (f32, f32) {
     match layout_direction {
         Layout::Vertical => {
             // For vertical layout: accumulate heights, track max width
+            // For nested layouts (like grid), we need to look at the intrinsic width
             for (i, child) in children.iter().enumerate() {
                 if let Some(child_layout) = child.computed_layout() {
                     let child_width = child_layout.rect.max[0] - child_layout.rect.min[0];
                     let child_height = child_layout.rect.max[1] - child_layout.rect.min[1];
 
-                    content_width = content_width.max(child_width);
+                    // For horizontal child layouts, calculate their full content width
+                    let actual_child_width = if child.layout_direction() == Layout::Horizontal {
+                        let mut row_width = 0.0f32;
+                        let child_gap = child.gap();
+                        let child_padding = child.padding();
+
+                        for (j, grandchild) in child.children().iter().enumerate() {
+                            if let Some(gc_layout) = grandchild.computed_layout() {
+                                row_width += gc_layout.rect.max[0] - gc_layout.rect.min[0];
+                                if j < child.children().len() - 1 {
+                                    row_width += child_gap;
+                                }
+                            }
+                        }
+                        row_width + child_padding.left + child_padding.right
+                    } else {
+                        child_width
+                    };
+
+                    content_width = content_width.max(actual_child_width);
                     content_height += child_height;
 
                     // Add gap between items (but not after the last one)
@@ -610,7 +630,6 @@ fn create_demo_ui(
                     // 2D grid scroll container
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_height(Size::px(420.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(grid_scroll_container)
@@ -618,7 +637,6 @@ fn create_demo_ui(
                     // Horizontal scroll container
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_height(Size::px(220.0))
                         .with_layout_direction(Layout::Horizontal)
                         .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                         .with_child(horizontal_scroll_container)
