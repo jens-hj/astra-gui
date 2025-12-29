@@ -484,7 +484,6 @@ impl App {
                                     .with_height(Size::px(400.0))
                                     .with_rotation(self.outer_rotation.to_radians())
                                     .with_transform_origin(TransformOrigin::center())
-                                    .with_translation(Translation::new(100.0, 0.0))
                                     .with_shape(Shape::Rect(
                                         StyledRect::new(Default::default(), mocha::BLUE)
                                             .with_stroke(Stroke::new(3.0, mocha::LAVENDER)),
