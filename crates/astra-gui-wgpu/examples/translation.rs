@@ -12,7 +12,8 @@ use astra_gui::{
     Shape, Size, Spacing, Stroke, StyledRect, TextContent, Translation, VerticalAlign,
 };
 use astra_gui_interactive::{
-    button, button_clicked, slider, slider_drag, ButtonStyle, SliderStyle,
+    button, button_clicked, slider, slider_drag, toggle, toggle_clicked, ButtonStyle, SliderStyle,
+    ToggleStyle,
 };
 use astra_gui_text::Engine as TextEngine;
 use astra_gui_wgpu::{EventDispatcher, InputState, InteractiveStateManager, RenderMode, Renderer};
@@ -142,6 +143,7 @@ struct App {
     inner_translation_x: f32,
     inner_translation_y: f32,
     counter: i32,
+    toggle_state: bool,
     debug_options: DebugOptions,
     last_frame_time: std::time::Instant,
 }
@@ -168,6 +170,7 @@ impl App {
             inner_translation_x: 20.0,
             inner_translation_y: 20.0,
             counter: 0,
+            toggle_state: false,
             debug_options: DebugOptions::none(),
             last_frame_time: std::time::Instant::now(),
         }
@@ -210,6 +213,17 @@ impl App {
         if button_clicked("decrement_btn", &events) {
             self.counter -= 1;
             println!("Decrement clicked! Counter: {}", self.counter);
+        }
+
+        if button_clicked("reset_btn", &events) {
+            self.counter = 0;
+            println!("Reset clicked! Counter: {}", self.counter);
+        }
+
+        // Handle toggle
+        if toggle_clicked("toggle_switch", &events) {
+            self.toggle_state = !self.toggle_state;
+            println!("Toggle switched! State: {}", self.toggle_state);
         }
 
         // Handle translation sliders
@@ -347,6 +361,8 @@ impl App {
                 // Title
                 Node::new()
                     .with_width(Size::Fill)
+                    .with_height(Size::px(60.0))
+                    .with_padding(Spacing::vertical(10.0))
                     .with_content(Content::Text(TextContent {
                         text: "Transform Translation Example".to_string(),
                         font_size: 32.0,
@@ -387,8 +403,8 @@ impl App {
                                     .with_width(Size::Fill)
                                     .with_content(Content::Text(TextContent {
                                         text: "Outer Container X".to_string(),
-                                        font_size: 18.0,
-                                        color: mocha::BLUE,
+                                        font_size: 20.0,
+                                        color: mocha::LAVENDER,
                                         h_align: HorizontalAlign::Center,
                                         v_align: VerticalAlign::Center,
                                     })),
@@ -419,8 +435,8 @@ impl App {
                                     .with_width(Size::Fill)
                                     .with_content(Content::Text(TextContent {
                                         text: "Outer Container Y".to_string(),
-                                        font_size: 18.0,
-                                        color: mocha::BLUE,
+                                        font_size: 20.0,
+                                        color: mocha::LAVENDER,
                                         h_align: HorizontalAlign::Center,
                                         v_align: VerticalAlign::Center,
                                     })),
@@ -451,7 +467,7 @@ impl App {
                                     .with_width(Size::Fill)
                                     .with_content(Content::Text(TextContent {
                                         text: "Inner Container X".to_string(),
-                                        font_size: 18.0,
+                                        font_size: 20.0,
                                         color: mocha::GREEN,
                                         h_align: HorizontalAlign::Center,
                                         v_align: VerticalAlign::Center,
@@ -483,7 +499,7 @@ impl App {
                                     .with_width(Size::Fill)
                                     .with_content(Content::Text(TextContent {
                                         text: "Inner Container Y".to_string(),
-                                        font_size: 18.0,
+                                        font_size: 20.0,
                                         color: mocha::GREEN,
                                         h_align: HorizontalAlign::Center,
                                         v_align: VerticalAlign::Center,
@@ -535,24 +551,34 @@ impl App {
                                                 h_align: HorizontalAlign::Center,
                                                 v_align: VerticalAlign::Center,
                                             })),
+                                        Node::new()
+                                            .with_width(Size::Fill)
+                                            .with_content(Content::Text(TextContent {
+                                                text: format!("Toggle: {}", if self.toggle_state { "ON" } else { "OFF" }),
+                                                font_size: 20.0,
+                                                color: if self.toggle_state { mocha::GREEN } else { mocha::RED },
+                                                h_align: HorizontalAlign::Center,
+                                                v_align: VerticalAlign::Center,
+                                            })),
                                     ]),
                             ]),
-                        // Center - Translated containers
+                        // Right side - Translated containers with interactive elements
                         Node::new()
-                            .with_width(Size::px(500.0))
+                            .with_width(Size::Fill)
                             .with_height(Size::Fill)
                             .with_children(vec![
-                                // Outer translated container (blue)
+                                // Outer translated container (lavender border)
                                 Node::new()
                                     .with_width(Size::px(400.0))
-                                    .with_height(Size::px(350.0))
+                                    .with_height(Size::px(400.0))
                                     .with_translation(Translation::new(
                                         self.outer_translation_x,
                                         self.outer_translation_y,
                                     ))
                                     .with_shape(Shape::Rect(
-                                        StyledRect::new(Default::default(), mocha::BLUE)
-                                            .with_stroke(Stroke::new(3.0, mocha::LAVENDER)),
+                                        StyledRect::new(Default::default(), mocha::CRUST)
+                                            .with_stroke(Stroke::new(3.0, mocha::LAVENDER))
+                                            .with_corner_shape(astra_gui::CornerShape::Round(50.0)),
                                     ))
                                     .with_padding(Spacing::all(30.0))
                                     .with_layout_direction(Layout::Vertical)
@@ -562,17 +588,13 @@ impl App {
                                         Node::new()
                                             .with_width(Size::Fill)
                                             .with_content(Content::Text(TextContent {
-                                                text: format!(
-                                                    "Outer Container ({:.0}, {:.0})",
-                                                    self.outer_translation_x,
-                                                    self.outer_translation_y
-                                                ),
-                                                font_size: 20.0,
-                                                color: mocha::BASE,
+                                                text: "Outer Container".to_string(),
+                                                font_size: 24.0,
+                                                color: mocha::TEXT,
                                                 h_align: HorizontalAlign::Center,
                                                 v_align: VerticalAlign::Center,
                                             })),
-                                        // Counter buttons
+                                        // Counter buttons in outer container
                                         Node::new()
                                             .with_width(Size::Fill)
                                             .with_layout_direction(Layout::Horizontal)
@@ -590,50 +612,73 @@ impl App {
                                                     false,
                                                     &ButtonStyle::default(),
                                                 ),
+                                                button(
+                                                    "reset_btn",
+                                                    "Reset",
+                                                    false,
+                                                    &ButtonStyle::default(),
+                                                ),
                                             ]),
-                                        // Inner translated container (green)
+                                        // Inner translated container (green border)
                                         Node::new()
                                             .with_width(Size::Fill)
-                                            .with_height(Size::px(150.0))
+                                            .with_height(Size::px(200.0))
                                             .with_translation(Translation::new(
                                                 self.inner_translation_x,
                                                 self.inner_translation_y,
                                             ))
                                             .with_shape(Shape::Rect(
-                                                StyledRect::new(Default::default(), mocha::GREEN)
-                                                    .with_stroke(Stroke::new(2.0, mocha::BASE)),
+                                                StyledRect::new(Default::default(), mocha::CRUST)
+                                                    .with_stroke(Stroke::new(2.0, mocha::GREEN))
+                                                    .with_corner_shape(astra_gui::CornerShape::Cut(20.0)),
                                             ))
                                             .with_padding(Spacing::all(20.0))
                                             .with_layout_direction(Layout::Vertical)
-                                            .with_gap(10.0)
+                                            .with_gap(15.0)
                                             .with_children(vec![
                                                 // Label for inner container
                                                 Node::new()
                                                     .with_width(Size::Fill)
                                                     .with_content(Content::Text(TextContent {
-                                                        text: format!(
-                                                            "Inner Container ({:.0}, {:.0})",
-                                                            self.inner_translation_x,
-                                                            self.inner_translation_y
-                                                        ),
-                                                        font_size: 18.0,
-                                                        color: mocha::BASE,
+                                                        text: "Inner Container".to_string(),
+                                                        font_size: 20.0,
+                                                        color: mocha::TEXT,
                                                         h_align: HorizontalAlign::Center,
                                                         v_align: VerticalAlign::Center,
                                                     })),
-                                                // Total translation info
+                                                // Toggle in inner container
+                                                Node::new()
+                                                    .with_width(Size::Fill)
+                                                    .with_layout_direction(Layout::Horizontal)
+                                                    .with_gap(12.0)
+                                                    .with_children(vec![
+                                                        Node::new()
+                                                            .with_width(Size::Fill)
+                                                            .with_content(Content::Text(TextContent {
+                                                                text: "Toggle:".to_string(),
+                                                                font_size: 18.0,
+                                                                color: mocha::TEXT,
+                                                                h_align: HorizontalAlign::Right,
+                                                                v_align: VerticalAlign::Center,
+                                                            })),
+                                                        toggle(
+                                                            "toggle_switch",
+                                                            self.toggle_state,
+                                                            false,
+                                                            &ToggleStyle::default(),
+                                                        ),
+                                                    ]),
+                                                // Nested translation info
                                                 Node::new()
                                                     .with_width(Size::Fill)
                                                     .with_content(Content::Text(TextContent {
                                                         text: format!(
                                                             "Total: ({:.0}, {:.0})",
-                                                            self.outer_translation_x
-                                                                + self.inner_translation_x,
-                                                            self.outer_translation_y
-                                                                + self.inner_translation_y
+                                                            self.outer_translation_x + self.inner_translation_x,
+                                                            self.outer_translation_y + self.inner_translation_y
                                                         ),
                                                         font_size: 16.0,
-                                                        color: mocha::BASE,
+                                                        color: mocha::TEXT,
                                                         h_align: HorizontalAlign::Center,
                                                         v_align: VerticalAlign::Center,
                                                     })),
