@@ -87,6 +87,10 @@ pub struct Renderer {
     last_frame_vertex_count: usize,
     last_frame_index_count: usize,
 
+    // Persistent buffers reused across frames
+    frame_indices: Vec<u32>,
+    frame_geometry_draws: Vec<ClippedDraw>,
+
     // Rendering mode configuration
     render_mode: RenderMode,
 
@@ -502,6 +506,9 @@ impl Renderer {
             last_frame_vertex_count: 0,
             last_frame_index_count: 0,
 
+            frame_indices: Vec::new(),
+            frame_geometry_draws: Vec::new(),
+
             render_mode,
 
             sdf_pipeline,
@@ -573,10 +580,10 @@ impl Renderer {
         self.wgpu_vertices.clear();
         self.wgpu_vertices.reserve(self.last_frame_vertex_count);
 
-        let mut indices: Vec<u32> = Vec::new();
-        indices.reserve(self.last_frame_index_count);
+        self.frame_indices.clear();
+        self.frame_indices.reserve(self.last_frame_index_count);
 
-        let mut geometry_draws: Vec<ClippedDraw> = Vec::new();
+        self.frame_geometry_draws.clear();
 
         for clipped in &output.shapes {
             let Shape::Rect(_rect) = &clipped.shape else {
@@ -658,7 +665,7 @@ impl Renderer {
                 }
 
                 // Copy indices
-                indices.extend_from_slice(&mesh.indices);
+                self.frame_indices.extend_from_slice(&mesh.indices);
 
                 // Create draw calls with scissor rects
                 for clipped in &output.shapes {
@@ -672,10 +679,10 @@ impl Renderer {
 
                     if sc_w > 0 && sc_h > 0 {
                         // Use the entire mesh for now (TODO: track per-shape indices)
-                        geometry_draws.push(ClippedDraw {
+                        self.frame_geometry_draws.push(ClippedDraw {
                             scissor: (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h),
                             index_start: 0,
-                            index_end: indices.len() as u32,
+                            index_end: self.frame_indices.len() as u32,
                         });
                     }
                 }
@@ -694,8 +701,8 @@ impl Renderer {
         }
 
         // Resize index buffer if needed
-        if indices.len() > self.index_capacity {
-            self.index_capacity = (indices.len() * 2).next_power_of_two();
+        if self.frame_indices.len() > self.index_capacity {
+            self.index_capacity = (self.frame_indices.len() * 2).next_power_of_two();
             self.index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Astra UI Index Buffer"),
                 size: (self.index_capacity * std::mem::size_of::<u32>()) as u64,
@@ -705,13 +712,17 @@ impl Renderer {
         }
 
         // Upload geometry
-        if !indices.is_empty() {
+        if !self.frame_indices.is_empty() {
             queue.write_buffer(
                 &self.vertex_buffer,
                 0,
                 bytemuck::cast_slice(&self.wgpu_vertices),
             );
-            queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&indices));
+            queue.write_buffer(
+                &self.index_buffer,
+                0,
+                bytemuck::cast_slice(&self.frame_indices),
+            );
         }
 
         // Update uniforms (used by both passes)
@@ -780,18 +791,18 @@ impl Renderer {
 
         // Draw geometry with batched scissor clipping
         // OPTIMIZATION: Batch consecutive draws with the same scissor rect to reduce draw calls
-        if !geometry_draws.is_empty() {
+        if !self.frame_geometry_draws.is_empty() {
             render_pass.set_pipeline(&self.pipeline);
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
             // Batch consecutive draws with the same scissor rect
-            let mut current_scissor = geometry_draws[0].scissor;
-            let mut batch_start = geometry_draws[0].index_start;
-            let mut batch_end = geometry_draws[0].index_end;
+            let mut current_scissor = self.frame_geometry_draws[0].scissor;
+            let mut batch_start = self.frame_geometry_draws[0].index_start;
+            let mut batch_end = self.frame_geometry_draws[0].index_end;
 
-            for draw in &geometry_draws[1..] {
+            for draw in &self.frame_geometry_draws[1..] {
                 if draw.scissor == current_scissor && draw.index_start == batch_end {
                     // Extend current batch (consecutive indices, same scissor)
                     batch_end = draw.index_end;
@@ -1110,7 +1121,7 @@ impl Renderer {
 
         // Update frame tracking for geometry buffers
         self.last_frame_vertex_count = self.wgpu_vertices.len();
-        self.last_frame_index_count = indices.len();
+        self.last_frame_index_count = self.frame_indices.len();
         self.last_frame_sdf_instance_count = self.sdf_instances.len();
     }
 }
