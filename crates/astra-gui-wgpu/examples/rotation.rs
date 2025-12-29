@@ -1,6 +1,6 @@
-//! Rotation and transform example
+//! Rotation example
 //!
-//! Demonstrates rotation with nested transforms and interactive elements.
+//! Demonstrates rotation with nested rotations and interactive elements.
 //!
 //! Controls:
 //! - Click buttons inside rotated containers to verify hit testing
