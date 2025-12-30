@@ -50,14 +50,17 @@ astra-gui-wgpu = "0.3.0"
 
 See the `crates/astra-gui-wgpu/examples/` directory for usage examples:
 
-- `text.rs` - Text rendering
-- `layout.rs` - Layout system
-- `interactive.rs` - Interactive components
-- `stroke.rs` - Stroke rendering
+- `alignment.rs` - Text and layout alignment
 - `corner_shapes.rs` - Rounded corners and shapes
+- `drag_value.rs` - Draggable value widget
+- `interactive.rs` - Interactive components
+- `layout.rs` - Layout system
 - `overflow.rs` - Overflow handling
-- `scroll.rs` - Scrollable containers with nested scrolling
 - `rotation.rs` - Transform rotation with interactive controls
+- `scroll.rs` - Scrollable containers with nested scrolling
+- `slider_with_value.rs` - Slider with value display
+- `stroke.rs` - Stroke rendering
+- `text.rs` - Text rendering
 - `translation.rs` - Transform translation with nested transforms
 
 Run an example with optimized performance:
