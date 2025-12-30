@@ -233,8 +233,8 @@ impl App {
         // Helper function to create a colored box
         let create_box = |color: Color, text: &str| {
             Node::new()
-                .with_width(Size::fraction(1.0 / 3.0))
-                .with_height(Size::fraction(1.0 / 3.0))
+                .with_width(Size::fraction(1.0 / 4.0))
+                .with_height(Size::fraction(1.0 / 4.0))
                 .with_style(Style {
                     fill_color: Some(mocha::CRUST),
                     stroke: Some(Stroke::new(2.0, color)),
@@ -246,7 +246,7 @@ impl App {
                 .with_child(
                     Node::new().with_content(Content::Text(
                         TextContent::new(text)
-                            .with_font_size(20.0)
+                            .with_font_size(16.0)
                             .with_color(mocha::TEXT),
                     )),
                 )
@@ -291,10 +291,14 @@ impl App {
                             ..Default::default()
                         })
                         .with_padding(Spacing::all(12.0))
-                        .with_layout_direction(Layout::Horizontal)
+                        .with_layout_direction(Layout::Vertical)
                         .with_h_align(h_align)
                         .with_v_align(v_align)
-                        .with_child(create_box(mocha::BLUE, "Box")),
+                        .with_gap(10.0)
+                        .with_children(vec![
+                            create_box(mocha::RED, "Red"),
+                            create_box(mocha::GREEN, "Green"),
+                        ]),
                 ])
         };
 
@@ -313,27 +317,32 @@ impl App {
                 Node::new().with_height(Size::Fill),
                 // Title
                 Node::new()
+                    .with_margin(Spacing::bottom(50.0))
+                    .with_gap(10.0)
                     .with_width(Size::Fill)
-                    .with_height(Size::px(60.0))
-                    .with_padding(Spacing::vertical(10.0))
-                    .with_content(Content::Text(TextContent {
-                        text: "Alignment Examples".to_string(),
-                        font_size: 32.0,
-                        color: mocha::TEXT,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    })),
-                // Instructions
-                Node::new()
-                    .with_width(Size::Fill)
-                    .with_content(Content::Text(TextContent {
-                        text: "h_align and v_align control child positioning within containers"
-                            .to_string(),
-                        font_size: 16.0,
-                        color: mocha::SUBTEXT0,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    })),
+                    .with_children(vec![
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::px(60.0))
+                        .with_content(Content::Text(TextContent {
+                            text: "Alignment Examples".to_string(),
+                            font_size: 46.0,
+                            color: mocha::TEXT,
+                            h_align: HorizontalAlign::Center,
+                            v_align: VerticalAlign::Center,
+                        })),
+                    // Instructions
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_content(Content::Text(TextContent {
+                            text: "h_align and v_align control child positioning within containers"
+                                .to_string(),
+                            font_size: 24.0,
+                            color: mocha::SUBTEXT0,
+                            h_align: HorizontalAlign::Center,
+                            v_align: VerticalAlign::Center,
+                        })),
+                ]),
                 // Main content area
                 Node::new()
                     .with_width(Size::Fill)
