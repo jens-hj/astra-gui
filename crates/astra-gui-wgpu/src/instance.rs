@@ -172,6 +172,10 @@ impl From<&ClippedShape> for RectInstance {
 
         // Convert stroke (if present) and apply opacity
         let (stroke_color, stroke_width) = if let Some(stroke) = &rect.stroke {
+            // Resolve stroke width to f32 (should already be in physical pixels at this point)
+            let width = clipped.node_rect.max[0] - clipped.node_rect.min[0];
+            let resolved_width = stroke.width.try_resolve_with_scale(width, 1.0).unwrap_or(0.0);
+
             (
                 [
                     (stroke.color.r * 255.0).round().clamp(0.0, 255.0) as u8,
@@ -181,7 +185,7 @@ impl From<&ClippedShape> for RectInstance {
                         .round()
                         .clamp(0.0, 255.0) as u8,
                 ],
-                stroke.width,
+                resolved_width,
             )
         } else {
             ([0, 0, 0, 0], 0.0)

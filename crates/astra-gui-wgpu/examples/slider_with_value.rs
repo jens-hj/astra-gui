@@ -384,7 +384,7 @@ impl App {
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_layout_direction(Layout::Vertical)
-            .with_gap(20.0)
+            .with_gap(Size::px(20.0))
             .with_children(vec![
                 // Spacer
                 Node::new().with_height(Size::Fill),
@@ -393,7 +393,7 @@ impl App {
                     .with_width(Size::Fill)
                     .with_content(Content::Text(TextContent {
                         text: "Slider with Value Widget Example".to_string(),
-                        font_size: 32.0,
+                        font_size: Size::px(32.0),
                         color: mocha::TEXT,
                         h_align: HorizontalAlign::Center,
                         v_align: VerticalAlign::Center,
@@ -405,7 +405,7 @@ impl App {
                         text:
                             "Drag slider or value • Click value to type • Shift=precise, Ctrl=fast"
                                 .to_string(),
-                        font_size: 16.0,
+                        font_size: Size::px(16.0),
                         color: mocha::SUBTEXT0,
                         h_align: HorizontalAlign::Center,
                         v_align: VerticalAlign::Center,
@@ -469,14 +469,14 @@ impl App {
                 Node::new()
                     .with_width(Size::Fill)
                     .with_height(Size::px(30.0))
-                    .with_padding(Spacing::horizontal(10.0))
+                    .with_padding(Spacing::horizontal(Size::px(10.0)))
                     .with_shape(Shape::Rect(StyledRect::new(
                         Default::default(),
                         mocha::SURFACE0,
                     )))
                     .with_content(Content::Text(
                         TextContent::new(DEBUG_HELP_TEXT_ONELINE)
-                            .with_font_size(16.0)
+                            .with_font_size(Size::px(16.0))
                             .with_color(mocha::TEXT)
                             .with_h_align(HorizontalAlign::Left)
                             .with_v_align(VerticalAlign::Center),
@@ -500,7 +500,7 @@ impl App {
         Node::new()
             .with_width(Size::Fill)
             .with_layout_direction(Layout::Horizontal)
-            .with_gap(16.0)
+            .with_gap(Size::px(16.0))
             .with_children(vec![
                 // Spacer
                 Node::new().with_width(Size::Fill),
@@ -510,7 +510,7 @@ impl App {
                     .with_height(Size::Fill)
                     .with_content(Content::Text(TextContent {
                         text: label.to_string(),
-                        font_size: 20.0,
+                        font_size: Size::px(20.0),
                         color: mocha::TEXT,
                         h_align: HorizontalAlign::Right,
                         v_align: VerticalAlign::Center,

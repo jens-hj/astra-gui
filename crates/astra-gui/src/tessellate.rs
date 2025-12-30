@@ -45,7 +45,7 @@ impl Tessellator {
 
         // Tessellate stroke
         if let Some(stroke) = &rect.stroke {
-            if stroke.width > 0.0 && stroke.color.a > 0.0 {
+            if stroke.width.is_non_zero() && stroke.color.a > 0.0 {
                 self.add_rect_stroke(rect, stroke);
             }
         }
@@ -360,7 +360,14 @@ impl Tessellator {
             .extent()
             .min((max_x - min_x) * 0.5)
             .min((max_y - min_y) * 0.5);
-        let stroke_half_width = stroke.width * 0.5;
+
+        // Resolve stroke width to f32 (stroke width should already be in physical pixels at this point)
+        let width = max_x - min_x;
+        let stroke_width = stroke
+            .width
+            .try_resolve_with_scale(width, 1.0)
+            .unwrap_or(1.0);
+        let stroke_half_width = stroke_width * 0.5;
 
         let segments_per_corner = 8;
         let base_idx = self.mesh.vertices.len() as u32;
@@ -430,8 +437,8 @@ impl Tessellator {
                 // TODO: make it configurable with and angle of the cut
                 // let angle = PI / 4.0;
                 // let stroke_cut_offset =
-                //     f32::tan((PI + angle) / 2.0 - PI / 2.0) * stroke.width / 2.0;
-                let stroke_cut_offset = f32::tan(PI / 8.0) * stroke.width / 2.0;
+                //     f32::tan((PI + angle) / 2.0 - PI / 2.0) * stroke_width / 2.0;
+                let stroke_cut_offset = f32::tan(PI / 8.0) * stroke_width / 2.0;
 
                 let cut = extent;
 

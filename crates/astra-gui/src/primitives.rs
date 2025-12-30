@@ -39,12 +39,12 @@ impl From<Point> for [f32; 2] {
 /// Stroke definition with width and color
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stroke {
-    pub width: f32,
+    pub width: crate::layout::Size,
     pub color: Color,
 }
 
 impl Stroke {
-    pub const fn new(width: f32, color: Color) -> Self {
+    pub const fn new(width: crate::layout::Size, color: Color) -> Self {
         Self { width, color }
     }
 }
@@ -186,8 +186,8 @@ pub struct TextShape {
     pub rect: Rect,
     /// The text content to render
     pub text: String,
-    /// Font size in pixels
-    pub font_size: f32,
+    /// Font size in logical pixels
+    pub font_size: crate::layout::Size,
     /// Text color
     pub color: Color,
     /// Horizontal alignment

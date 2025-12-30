@@ -67,7 +67,7 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
         .with_width(Size::px(style.track_width))
         .with_height(Size::px(style.track_height))
         .with_layout_direction(Layout::Horizontal)
-        .with_padding(Spacing::all(style.knob_margin))
+        .with_padding(Spacing::all(Size::px(style.knob_margin)))
         .with_shape(astra_gui::Shape::rect())
         .with_style(Style {
             fill_color: Some(if value {

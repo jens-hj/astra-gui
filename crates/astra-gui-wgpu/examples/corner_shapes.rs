@@ -263,7 +263,7 @@ fn card(stroke_color: Color, corner_shape: CornerShape, stroke_width: f32) -> Sh
     Shape::Rect(
         StyledRect::new(Default::default(), mocha::SURFACE0)
             .with_corner_shape(corner_shape)
-            .with_stroke(Stroke::new(stroke_width, stroke_color)),
+            .with_stroke(Stroke::new(Size::px(stroke_width), stroke_color)),
     )
 }
 
@@ -280,41 +280,41 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
     // Create help bar at the bottom
     let help_text = Node::new()
         .with_height(Size::px(30.0))
-        .with_padding(Spacing::horizontal(10.0))
+        .with_padding(Spacing::horizontal(Size::px(10.0)))
         .with_shape(Shape::Rect(StyledRect::new(
             Default::default(),
             mocha::SURFACE0,
         )))
         .with_content(Content::Text(
             TextContent::new(DEBUG_HELP_TEXT_ONELINE)
-                .with_font_size(16.0)
+                .with_font_size(Size::px(16.0))
                 .with_color(mocha::TEXT)
                 .with_h_align(HorizontalAlign::Left)
                 .with_v_align(VerticalAlign::Center),
         ));
 
     let content = Node::new()
-        .with_padding(Spacing::all(40.0))
-        .with_gap(40.0)
+        .with_padding(Spacing::all(Size::px(40.0)))
+        .with_gap(Size::px(40.0))
         .with_width(Size::Fill)
         .with_height(Size::Fill)
         .with_layout_direction(Layout::Vertical)
         .with_children(vec![
             Node::new()
                 .with_height(Size::Fill)
-                .with_gap(40.0)
+                .with_gap(Size::px(40.0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_overflow(Overflow::Visible)
                 .with_children(vec![
                     // None
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_padding(Spacing::all(20.0))
+                        .with_padding(Spacing::all(Size::px(20.0)))
                         .with_shape(card(mocha::MAROON, CornerShape::None, stroke_width)),
                     // Round
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_padding(Spacing::all(20.0))
+                        .with_padding(Spacing::all(Size::px(20.0)))
                         .with_shape(card(
                             mocha::GREEN,
                             CornerShape::Round(corner_size),
@@ -323,7 +323,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                     // Cut
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_padding(Spacing::all(20.0))
+                        .with_padding(Spacing::all(Size::px(20.0)))
                         .with_shape(card(
                             mocha::BLUE,
                             CornerShape::Cut(corner_size),
@@ -332,14 +332,14 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                 ]),
             Node::new()
                 .with_height(Size::Fill)
-                .with_gap(40.0)
+                .with_gap(Size::px(40.0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_overflow(Overflow::Visible)
                 .with_children(vec![
                     // InverseRound
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_padding(Spacing::all(20.0))
+                        .with_padding(Spacing::all(Size::px(20.0)))
                         .with_shape(card(
                             mocha::YELLOW,
                             CornerShape::InverseRound(corner_size),
@@ -348,7 +348,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                     // Squircle low smoothness
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_padding(Spacing::all(20.0))
+                        .with_padding(Spacing::all(Size::px(20.0)))
                         .with_shape(card(
                             mocha::MAUVE,
                             CornerShape::Squircle {
@@ -360,7 +360,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                     // Squircle high smoothness
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_padding(Spacing::all(20.0))
+                        .with_padding(Spacing::all(Size::px(20.0)))
                         .with_shape(card(
                             mocha::TEAL,
                             CornerShape::Squircle {

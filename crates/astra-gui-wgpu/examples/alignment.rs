@@ -238,7 +238,7 @@ impl App {
                 .with_height(Size::fraction(1.0 / 4.0))
                 .with_style(Style {
                     fill_color: Some(mocha::CRUST),
-                    stroke: Some(Stroke::new(2.0, color)),
+                    stroke: Some(Stroke::new(Size::px(2.0), color)),
                     corner_shape: Some(CornerShape::Round(8.0)),
                     ..Default::default()
                 })
@@ -247,7 +247,7 @@ impl App {
                 .with_child(
                     Node::new().with_content(Content::Text(
                         TextContent::new(text)
-                            .with_font_size(16.0)
+                            .with_font_size(Size::px(16.0))
                             .with_color(mocha::TEXT),
                     )),
                 )
@@ -273,10 +273,10 @@ impl App {
                     Node::new()
                         // .with_height(Size::px(50.0))
                         .with_width(Size::Fill)
-                        .with_margin(Spacing::bottom(20.0))
+                        .with_margin(Spacing::bottom(Size::px(20.0)))
                         .with_content(Content::Text(TextContent {
                             text: format!("{} {}", h_label, v_label),
-                            font_size: 24.0,
+                            font_size: Size::px(24.0),
                             color: mocha::SUBTEXT0,
                             h_align: HorizontalAlign::Center,
                             v_align: VerticalAlign::Center,
@@ -287,15 +287,15 @@ impl App {
                         .with_height(Size::px(300.0))
                         .with_style(Style {
                             fill_color: Some(mocha::CRUST),
-                            stroke: Some(Stroke::new(2.0, mocha::SURFACE0)),
+                            stroke: Some(Stroke::new(Size::px(2.0), mocha::SURFACE0)),
                             corner_shape: Some(CornerShape::Round(18.0)),
                             ..Default::default()
                         })
-                        .with_padding(Spacing::all(12.0))
+                        .with_padding(Spacing::all(Size::px(12.0)))
                         .with_layout_direction(Layout::Vertical)
                         .with_h_align(h_align)
                         .with_v_align(v_align)
-                        .with_gap(10.0)
+                        .with_gap(Size::px(10.0))
                         .with_children(vec![
                             create_box(mocha::RED, "Red"),
                             create_box(mocha::GREEN, "Green"),
@@ -312,14 +312,14 @@ impl App {
                 ..Default::default()
             })
             .with_layout_direction(Layout::Vertical)
-            .with_gap(24.0)
+            .with_gap(Size::px(24.0))
             .with_children(vec![
                 // Spacer
                 Node::new().with_height(Size::Fill),
                 // Title
                 Node::new()
-                    .with_margin(Spacing::bottom(50.0))
-                    .with_gap(10.0)
+                    .with_margin(Spacing::bottom(Size::px(50.0)))
+                    .with_gap(Size::px(10.0))
                     .with_width(Size::Fill)
                     .with_children(vec![
                     Node::new()
@@ -327,7 +327,7 @@ impl App {
                         .with_height(Size::px(60.0))
                         .with_content(Content::Text(TextContent {
                             text: "Alignment Examples".to_string(),
-                            font_size: 46.0,
+                            font_size: Size::px(46.0),
                             color: mocha::TEXT,
                             h_align: HorizontalAlign::Center,
                             v_align: VerticalAlign::Center,
@@ -338,7 +338,7 @@ impl App {
                         .with_content(Content::Text(TextContent {
                             text: "h_align and v_align control child positioning within containers"
                                 .to_string(),
-                            font_size: 24.0,
+                            font_size: Size::px(24.0),
                             color: mocha::SUBTEXT0,
                             h_align: HorizontalAlign::Center,
                             v_align: VerticalAlign::Center,
@@ -348,19 +348,19 @@ impl App {
                 Node::new()
                     .with_width(Size::Fill)
                     .with_layout_direction(Layout::Horizontal)
-                    .with_gap(40.0)
+                    .with_gap(Size::px(40.0))
                     .with_children(vec![
                         // Spacer
                         Node::new().with_width(Size::Fill),
                         // Content container
                         Node::new()
                             .with_layout_direction(Layout::Vertical)
-                            .with_gap(36.0)
+                            .with_gap(Size::px(36.0))
                             .with_children(vec![
                                 // Horizontal Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(36.0)
+                                    .with_gap(Size::px(36.0))
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
@@ -378,7 +378,7 @@ impl App {
                                 // Vertical Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(36.0)
+                                    .with_gap(Size::px(36.0))
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
@@ -396,7 +396,7 @@ impl App {
                                 // Stack Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(36.0)
+                                    .with_gap(Size::px(36.0))
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
@@ -421,7 +421,7 @@ impl App {
                 Node::new()
                     .with_width(Size::Fill)
                     .with_height(Size::px(30.0))
-                    .with_padding(Spacing::horizontal(10.0))
+                    .with_padding(Spacing::horizontal(Size::px(10.0)))
                     .with_shape(Shape::rect())
                     .with_style(Style {
                         fill_color: Some(mocha::SURFACE0),
@@ -431,7 +431,7 @@ impl App {
                         TextContent::new(
                             "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | D:All | S:RenderMode | ESC:Exit",
                         )
-                        .with_font_size(16.0)
+                        .with_font_size(Size::px(16.0))
                         .with_color(mocha::TEXT)
                         .with_h_align(HorizontalAlign::Left)
                         .with_v_align(VerticalAlign::Center),

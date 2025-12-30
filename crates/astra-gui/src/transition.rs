@@ -65,10 +65,23 @@ pub fn lerp_color(a: Color, b: Color, t: f32) -> Color {
     }
 }
 
+/// Linearly interpolate between two Size values
+///
+/// Only interpolates if both sizes are the same variant. Otherwise returns b.
+pub fn lerp_size(a: crate::layout::Size, b: crate::layout::Size, t: f32) -> crate::layout::Size {
+    use crate::layout::Size;
+    match (a, b) {
+        (Size::Fixed(v1), Size::Fixed(v2)) => Size::Fixed(lerp_f32(v1, v2, t)),
+        (Size::Relative(v1), Size::Relative(v2)) => Size::Relative(lerp_f32(v1, v2, t)),
+        // For incompatible types or Fill/FitContent, snap to target
+        _ => b,
+    }
+}
+
 /// Linearly interpolate between two strokes
 pub fn lerp_stroke(a: Stroke, b: Stroke, t: f32) -> Stroke {
     Stroke {
-        width: lerp_f32(a.width, b.width, t),
+        width: lerp_size(a.width, b.width, t),
         color: lerp_color(a.color, b.color, t),
     }
 }

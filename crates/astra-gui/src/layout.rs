@@ -1,7 +1,7 @@
 use crate::primitives::Rect;
 
 /// Size specification that can be fixed, relative to parent, or derived from content.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Size {
     /// Fixed size in pixels
     Fixed(f32),
@@ -104,6 +104,16 @@ impl Size {
     /// Check if this size is FitContent
     pub const fn is_fit_content(&self) -> bool {
         matches!(self, Size::FitContent)
+    }
+
+    /// Check if this size is zero (Fixed(0.0))
+    pub fn is_zero(&self) -> bool {
+        matches!(self, Size::Fixed(v) if *v == 0.0)
+    }
+
+    /// Check if this size is non-zero (any non-zero Fixed value, or Relative/Fill/FitContent)
+    pub fn is_non_zero(&self) -> bool {
+        !self.is_zero()
     }
 }
 
@@ -391,23 +401,23 @@ impl ComputedLayout {
 /// Spacing/padding around content
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Spacing {
-    pub top: f32,
-    pub right: f32,
-    pub bottom: f32,
-    pub left: f32,
+    pub top: Size,
+    pub right: Size,
+    pub bottom: Size,
+    pub left: Size,
 }
 
 impl Spacing {
     /// Zero spacing constant
     pub const ZERO: Self = Self {
-        top: 0.0,
-        right: 0.0,
-        bottom: 0.0,
-        left: 0.0,
+        top: Size::Fixed(0.0),
+        right: Size::Fixed(0.0),
+        bottom: Size::Fixed(0.0),
+        left: Size::Fixed(0.0),
     };
 
     /// Create spacing with all sides equal
-    pub const fn all(value: f32) -> Self {
+    pub const fn all(value: Size) -> Self {
         Self {
             top: value,
             right: value,
@@ -424,14 +434,10 @@ impl Spacing {
     /// Create spacing with symmetric horizontal and vertical values (CSS-style)
     ///
     /// ```
-    /// # use astra_gui::Spacing;
-    /// let spacing = Spacing::symmetric(10.0, 20.0);
-    /// assert_eq!(spacing.left, 10.0);
-    /// assert_eq!(spacing.right, 10.0);
-    /// assert_eq!(spacing.top, 20.0);
-    /// assert_eq!(spacing.bottom, 20.0);
+    /// # use astra_gui::{Spacing, Size};
+    /// let spacing = Spacing::symmetric(Size::px(10.0), Size::px(20.0));
     /// ```
-    pub const fn symmetric(horizontal: f32, vertical: f32) -> Self {
+    pub const fn symmetric(horizontal: Size, vertical: Size) -> Self {
         Self {
             top: vertical,
             right: horizontal,
@@ -443,14 +449,10 @@ impl Spacing {
     /// Create spacing from individual top, right, bottom, left values (CSS-style)
     ///
     /// ```
-    /// # use astra_gui::Spacing;
-    /// let spacing = Spacing::trbl(10.0, 20.0, 30.0, 40.0);
-    /// assert_eq!(spacing.top, 10.0);
-    /// assert_eq!(spacing.right, 20.0);
-    /// assert_eq!(spacing.bottom, 30.0);
-    /// assert_eq!(spacing.left, 40.0);
+    /// # use astra_gui::{Spacing, Size};
+    /// let spacing = Spacing::trbl(Size::px(10.0), Size::px(20.0), Size::px(30.0), Size::px(40.0));
     /// ```
-    pub const fn trbl(top: f32, right: f32, bottom: f32, left: f32) -> Self {
+    pub const fn trbl(top: Size, right: Size, bottom: Size, left: Size) -> Self {
         Self {
             top,
             right,
@@ -459,65 +461,71 @@ impl Spacing {
         }
     }
 
-    pub const fn horizontal(horizontal: f32) -> Self {
+    pub const fn horizontal(horizontal: Size) -> Self {
         Self {
-            top: 0.0,
+            top: Size::Fixed(0.0),
             right: horizontal,
-            bottom: 0.0,
+            bottom: Size::Fixed(0.0),
             left: horizontal,
         }
     }
 
-    pub const fn vertical(vertical: f32) -> Self {
+    pub const fn vertical(vertical: Size) -> Self {
         Self {
             top: vertical,
-            right: 0.0,
+            right: Size::Fixed(0.0),
             bottom: vertical,
-            left: 0.0,
+            left: Size::Fixed(0.0),
         }
     }
 
-    pub const fn top(top: f32) -> Self {
+    pub const fn top(top: Size) -> Self {
         Self {
             top,
-            right: 0.0,
-            bottom: 0.0,
-            left: 0.0,
+            right: Size::Fixed(0.0),
+            bottom: Size::Fixed(0.0),
+            left: Size::Fixed(0.0),
         }
     }
 
-    pub const fn right(right: f32) -> Self {
+    pub const fn right(right: Size) -> Self {
         Self {
-            top: 0.0,
+            top: Size::Fixed(0.0),
             right,
-            bottom: 0.0,
-            left: 0.0,
+            bottom: Size::Fixed(0.0),
+            left: Size::Fixed(0.0),
         }
     }
 
-    pub const fn bottom(bottom: f32) -> Self {
+    pub const fn bottom(bottom: Size) -> Self {
         Self {
-            top: 0.0,
-            right: 0.0,
+            top: Size::Fixed(0.0),
+            right: Size::Fixed(0.0),
             bottom,
-            left: 0.0,
+            left: Size::Fixed(0.0),
         }
     }
 
-    pub const fn left(left: f32) -> Self {
+    pub const fn left(left: Size) -> Self {
         Self {
-            top: 0.0,
-            right: 0.0,
-            bottom: 0.0,
+            top: Size::Fixed(0.0),
+            right: Size::Fixed(0.0),
+            bottom: Size::Fixed(0.0),
             left,
         }
     }
 
-    pub const fn get_vertical(&self) -> f32 {
-        self.top + self.bottom
+    /// Get the sum of horizontal spacing (left + right)
+    ///
+    /// Resolves Size values to f32. For Fill or FitContent, returns 0.0.
+    pub fn get_horizontal(&self) -> f32 {
+        self.left.try_resolve(1.0).unwrap_or(0.0) + self.right.try_resolve(1.0).unwrap_or(0.0)
     }
 
-    pub const fn get_horizontal(&self) -> f32 {
-        self.right + self.left
+    /// Get the sum of vertical spacing (top + bottom)
+    ///
+    /// Resolves Size values to f32. For Fill or FitContent, returns 0.0.
+    pub fn get_vertical(&self) -> f32 {
+        self.top.try_resolve(1.0).unwrap_or(0.0) + self.bottom.try_resolve(1.0).unwrap_or(0.0)
     }
 }

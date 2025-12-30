@@ -259,53 +259,53 @@ fn child() -> Node {
     Node::new().with_height(Size::Fill).with_shape(Shape::Rect(
         StyledRect::new(Default::default(), mocha::SURFACE1)
             .with_corner_shape(CornerShape::Round(30.0))
-            .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+            .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
     ))
 }
 
 fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> FullOutput {
     // Root container - full window with padding
     let root = Node::new()
-        .with_padding(Spacing::all(20.0))
-        .with_gap(25.0)
+        .with_padding(Spacing::all(Size::px(20.0)))
+        .with_gap(Size::px(25.0))
         .with_layout_direction(Layout::Vertical)
         .with_children(vec![
             // Header
             Node::new()
                 .with_layout_direction(Layout::Horizontal)
-                .with_gap(10.0)
+                .with_gap(Size::px(10.0))
                 .with_height(Size::fraction(0.15))
                 .with_shape(Shape::Rect(
                     StyledRect::new(Default::default(), mocha::SURFACE0)
                         .with_corner_shape(CornerShape::Round(50.0))
-                        .with_stroke(Stroke::new(3.0, mocha::BLUE)),
+                        .with_stroke(Stroke::new(Size::px(3.0), mocha::BLUE)),
                 ))
-                .with_padding(Spacing::all(20.0))
+                .with_padding(Spacing::all(Size::px(20.0)))
                 .with_children(vec![
                     Node::new()
                         .with_width(Size::Relative(0.7))
                         .with_shape(Shape::Rect(
                             StyledRect::new(Default::default(), mocha::SURFACE1)
                                 .with_corner_shape(CornerShape::Round(30.0))
-                                .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                                .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                         )),
                     Node::new()
                         .with_width(Size::Fill)
                         .with_layout_direction(Layout::Vertical)
-                        .with_gap(10.0)
+                        .with_gap(Size::px(10.0))
                         .with_children(vec![
                             Node::new()
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
                                         .with_corner_shape(CornerShape::Round(30.0))
-                                        .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                                        .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                                 ))
                                 .with_height(Size::Fill),
                             Node::new()
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
                                         .with_corner_shape(CornerShape::Round(30.0))
-                                        .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                                        .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                                 ))
                                 .with_height(Size::Fill),
                         ]),
@@ -313,18 +313,18 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
             // Main content area - horizontal layout
             Node::new()
                 .with_height(Size::fraction(0.75))
-                .with_gap(25.0)
+                .with_gap(Size::px(25.0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_children(vec![
                     // Left sidebar - 25% width
                     Node::new()
                         .with_width(Size::fraction(0.25))
-                        .with_padding(Spacing::all(20.0))
-                        .with_gap(10.0)
+                        .with_padding(Spacing::all(Size::px(20.0)))
+                        .with_gap(Size::px(10.0))
                         .with_shape(Shape::Rect(
                             StyledRect::new(Default::default(), mocha::SURFACE0)
                                 .with_corner_shape(CornerShape::Round(50.0))
-                                .with_stroke(Stroke::new(3.0, mocha::MAUVE)),
+                                .with_stroke(Stroke::new(Size::px(3.0), mocha::MAUVE)),
                         ))
                         .with_layout_direction(Layout::Vertical)
                         .with_children(vec![
@@ -343,12 +343,12 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                     // Right of sidebar
                     Node::new()
                         .with_width(Size::fraction(0.75))
-                        .with_padding(Spacing::all(20.0))
-                        .with_gap(20.0)
+                        .with_padding(Spacing::all(Size::px(20.0)))
+                        .with_gap(Size::px(20.0))
                         .with_shape(Shape::Rect(
                             StyledRect::new(Default::default(), mocha::SURFACE0)
                                 .with_corner_shape(CornerShape::Round(50.0))
-                                .with_stroke(Stroke::new(3.0, mocha::PEACH)),
+                                .with_stroke(Stroke::new(Size::px(3.0), mocha::PEACH)),
                         ))
                         .with_layout_direction(Layout::Vertical)
                         .with_children(vec![
@@ -358,26 +358,26 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
                                         .with_corner_shape(CornerShape::Round(30.0))
-                                        .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                                        .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                                 )),
                             // Horizontal row of smaller cards
                             Node::new()
                                 .with_height(Size::fraction(0.3))
-                                .with_gap(20.0)
+                                .with_gap(Size::px(20.0))
                                 .with_layout_direction(Layout::Horizontal)
                                 .with_children(vec![
                                     Node::new().with_width(Size::fraction(0.5)).with_shape(
                                         Shape::Rect(
                                             StyledRect::new(Default::default(), mocha::SURFACE1)
                                                 .with_corner_shape(CornerShape::Cut(30.0))
-                                                .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                                                .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                                         ),
                                     ),
                                     Node::new().with_width(Size::fraction(0.5)).with_shape(
                                         Shape::Rect(
                                             StyledRect::new(Default::default(), mocha::SURFACE1)
                                                 .with_corner_shape(CornerShape::Cut(30.0))
-                                                .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                                                .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                                         ),
                                     ),
                                 ]),
@@ -386,36 +386,36 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
                                         .with_corner_shape(CornerShape::Round(30.0))
-                                        .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                                        .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                                 )),
                         ]),
                 ]),
             // Footer - 10% height with three Fill children laid out horizontally with gap
             Node::new()
                 .with_height(Size::fraction(0.1))
-                .with_padding(Spacing::all(20.0))
-                .with_gap(20.0)
+                .with_padding(Spacing::all(Size::px(20.0)))
+                .with_gap(Size::px(20.0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_shape(Shape::Rect(
                     StyledRect::new(Default::default(), mocha::SURFACE0)
                         .with_corner_shape(CornerShape::Round(50.0))
-                        .with_stroke(Stroke::new(3.0, mocha::BLUE)),
+                        .with_stroke(Stroke::new(Size::px(3.0), mocha::BLUE)),
                 ))
                 .with_children(vec![
                     Node::new().with_width(Size::Fill).with_shape(Shape::Rect(
                         StyledRect::new(Default::default(), mocha::SURFACE1)
                             .with_corner_shape(CornerShape::Round(30.0))
-                            .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                            .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                     )),
                     Node::new().with_width(Size::Fill).with_shape(Shape::Rect(
                         StyledRect::new(Default::default(), mocha::SURFACE1)
                             .with_corner_shape(CornerShape::Round(30.0))
-                            .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                            .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                     )),
                     Node::new().with_width(Size::Fill).with_shape(Shape::Rect(
                         StyledRect::new(Default::default(), mocha::SURFACE1)
                             .with_corner_shape(CornerShape::Round(30.0))
-                            .with_stroke(Stroke::new(3.0, mocha::SURFACE2)),
+                            .with_stroke(Stroke::new(Size::px(3.0), mocha::SURFACE2)),
                     )),
                 ]),
         ]);
@@ -423,14 +423,14 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
     // Create help bar at the bottom
     let help_text = Node::new()
         .with_height(Size::px(30.0))
-        .with_padding(Spacing::horizontal(10.0))
+        .with_padding(Spacing::horizontal(Size::px(10.0)))
         .with_shape(Shape::Rect(StyledRect::new(
             Default::default(),
             mocha::SURFACE0,
         )))
         .with_content(Content::Text(
             TextContent::new(DEBUG_HELP_TEXT_ONELINE)
-                .with_font_size(16.0)
+                .with_font_size(Size::px(16.0))
                 .with_color(mocha::TEXT)
                 .with_h_align(HorizontalAlign::Left)
                 .with_v_align(VerticalAlign::Center),

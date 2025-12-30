@@ -2,7 +2,7 @@
 //!
 //! Provides an egui-style slider with an integrated drag value field on the right.
 
-use astra_gui::{Layout, Node};
+use astra_gui::{Layout, Node, Size};
 use astra_gui_wgpu::{EventDispatcher, InputState, TargetedEvent};
 use std::ops::RangeInclusive;
 
@@ -46,7 +46,7 @@ pub fn slider_with_value(
 ) -> Node {
     Node::new()
         .with_layout_direction(Layout::Horizontal)
-        .with_gap(8.0)
+        .with_gap(Size::px(8.0))
         .with_children(vec![
             slider(slider_id, value, range.clone(), disabled, slider_style),
             drag_value(

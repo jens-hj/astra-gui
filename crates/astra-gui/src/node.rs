@@ -65,7 +65,7 @@ pub struct Node {
     /// Margin outside the node
     margin: Spacing,
     /// Gap between children in the layout direction
-    gap: f32,
+    gap: Size,
     /// Layout mode for children
     layout_direction: Layout,
     /// Horizontal alignment of children within this container
@@ -144,7 +144,7 @@ impl Node {
             transform_origin: TransformOrigin::center(),
             padding: Spacing::ZERO,
             margin: Spacing::ZERO,
-            gap: 0.0,
+            gap: Size::Fixed(0.0),
             layout_direction: Layout::default(),
             h_align: HorizontalAlign::Left,
             v_align: VerticalAlign::Top,
@@ -259,7 +259,7 @@ impl Node {
     }
 
     /// Set the gap between children
-    pub fn with_gap(mut self, gap: f32) -> Self {
+    pub fn with_gap(mut self, gap: Size) -> Self {
         self.gap = gap;
         self
     }
@@ -559,7 +559,7 @@ impl Node {
     }
 
     /// Get the gap between children
-    pub fn gap(&self) -> f32 {
+    pub fn gap(&self) -> Size {
         self.gap
     }
 
@@ -649,7 +649,17 @@ impl Node {
                 } else {
                     0.0
                 };
-                content_width + self.padding.left + self.padding.right
+                let padding_left = self
+                    .padding
+                    .left
+                    .try_resolve_with_scale(content_width, scale_factor)
+                    .unwrap_or(0.0);
+                let padding_right = self
+                    .padding
+                    .right
+                    .try_resolve_with_scale(content_width, scale_factor)
+                    .unwrap_or(0.0);
+                content_width + padding_left + padding_right
             }
             _ => {
                 // Fill/Relative: don't measure children, no intrinsic size
@@ -674,7 +684,17 @@ impl Node {
                 } else {
                     0.0
                 };
-                content_height + self.padding.top + self.padding.bottom
+                let padding_top = self
+                    .padding
+                    .top
+                    .try_resolve_with_scale(content_height, scale_factor)
+                    .unwrap_or(0.0);
+                let padding_bottom = self
+                    .padding
+                    .bottom
+                    .try_resolve_with_scale(content_height, scale_factor)
+                    .unwrap_or(0.0);
+                content_height + padding_top + padding_bottom
             }
             _ => {
                 // Fill/Relative: don't measure children, no intrinsic size
@@ -702,20 +722,46 @@ impl Node {
         }
 
         // Calculate spacing using the same collapsing rules as layout
+        // Note: For measurement, we use a large reference size for resolving margins/gaps
+        // The actual parent size isn't known yet during intrinsic measurement
+        let ref_size = 10000.0; // Large reference size for percentage-based margins
+        let scaled_gap = self
+            .gap
+            .try_resolve_with_scale(ref_size, scale_factor)
+            .unwrap_or(0.0);
+
         let (total_horizontal_spacing, total_vertical_spacing) = match self.layout_direction {
             Layout::Horizontal => {
                 let mut total = 0.0f32;
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
-                        total += child.margin.left;
+                        total += child
+                            .margin
+                            .left
+                            .try_resolve_with_scale(ref_size, scale_factor)
+                            .unwrap_or(0.0);
                     }
 
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
-                        let collapsed_margin = child.margin.right.max(next_child.margin.left);
-                        total += self.gap.max(collapsed_margin);
+                        let child_right = child
+                            .margin
+                            .right
+                            .try_resolve_with_scale(ref_size, scale_factor)
+                            .unwrap_or(0.0);
+                        let next_left = next_child
+                            .margin
+                            .left
+                            .try_resolve_with_scale(ref_size, scale_factor)
+                            .unwrap_or(0.0);
+                        let collapsed_margin = child_right.max(next_left);
+                        total += scaled_gap.max(collapsed_margin);
                     } else {
-                        total += child.margin.right;
+                        total += child
+                            .margin
+                            .right
+                            .try_resolve_with_scale(ref_size, scale_factor)
+                            .unwrap_or(0.0);
                     }
                 }
                 (total, 0.0)
@@ -724,15 +770,33 @@ impl Node {
                 let mut total = 0.0f32;
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
-                        total += child.margin.top;
+                        total += child
+                            .margin
+                            .top
+                            .try_resolve_with_scale(ref_size, scale_factor)
+                            .unwrap_or(0.0);
                     }
 
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
-                        let collapsed_margin = child.margin.bottom.max(next_child.margin.top);
-                        total += self.gap.max(collapsed_margin);
+                        let child_bottom = child
+                            .margin
+                            .bottom
+                            .try_resolve_with_scale(ref_size, scale_factor)
+                            .unwrap_or(0.0);
+                        let next_top = next_child
+                            .margin
+                            .top
+                            .try_resolve_with_scale(ref_size, scale_factor)
+                            .unwrap_or(0.0);
+                        let collapsed_margin = child_bottom.max(next_top);
+                        total += scaled_gap.max(collapsed_margin);
                     } else {
-                        total += child.margin.bottom;
+                        total += child
+                            .margin
+                            .bottom
+                            .try_resolve_with_scale(ref_size, scale_factor)
+                            .unwrap_or(0.0);
                     }
                 }
                 (0.0, total)
@@ -861,11 +925,27 @@ impl Node {
         scale_factor: f32,
     ) {
         // Account for this node's margins when calculating available space
-        // Apply scale_factor to margin values (logical -> physical pixels)
-        let margin_left = self.margin.left * scale_factor;
-        let margin_right = self.margin.right * scale_factor;
-        let margin_top = self.margin.top * scale_factor;
-        let margin_bottom = self.margin.bottom * scale_factor;
+        // Resolve margin values with scale_factor (logical -> physical pixels)
+        let margin_left = self
+            .margin
+            .left
+            .try_resolve_with_scale(parent_width, scale_factor)
+            .unwrap_or(0.0);
+        let margin_right = self
+            .margin
+            .right
+            .try_resolve_with_scale(parent_width, scale_factor)
+            .unwrap_or(0.0);
+        let margin_top = self
+            .margin
+            .top
+            .try_resolve_with_scale(parent_height, scale_factor)
+            .unwrap_or(0.0);
+        let margin_bottom = self
+            .margin
+            .bottom
+            .try_resolve_with_scale(parent_height, scale_factor)
+            .unwrap_or(0.0);
 
         let available_width = (parent_width - margin_left - margin_right).max(0.0);
         let available_height = (parent_height - margin_top - margin_bottom).max(0.0);
@@ -919,11 +999,27 @@ impl Node {
         let outer_y = available_rect.min[1];
 
         // Content area (after subtracting padding)
-        // Apply scale_factor to padding values (logical -> physical pixels)
-        let padding_left = self.padding.left * scale_factor;
-        let padding_right = self.padding.right * scale_factor;
-        let padding_top = self.padding.top * scale_factor;
-        let padding_bottom = self.padding.bottom * scale_factor;
+        // Resolve padding values with scale_factor (logical -> physical pixels)
+        let padding_left = self
+            .padding
+            .left
+            .try_resolve_with_scale(width, scale_factor)
+            .unwrap_or(0.0);
+        let padding_right = self
+            .padding
+            .right
+            .try_resolve_with_scale(width, scale_factor)
+            .unwrap_or(0.0);
+        let padding_top = self
+            .padding
+            .top
+            .try_resolve_with_scale(height, scale_factor)
+            .unwrap_or(0.0);
+        let padding_bottom = self
+            .padding
+            .bottom
+            .try_resolve_with_scale(height, scale_factor)
+            .unwrap_or(0.0);
 
         let content_x = outer_x + padding_left;
         let content_y = outer_y + padding_top;
@@ -941,28 +1037,48 @@ impl Node {
         let mut current_y = content_y;
 
         // Calculate total spacing in the layout direction (margins + gaps)
-        // Apply scale_factor to gap and child margins (logical -> physical pixels)
-        let scaled_gap = self.gap * scale_factor;
+        // Resolve gap and child margins with scale_factor (logical -> physical pixels)
+        let scaled_gap = self
+            .gap
+            .try_resolve_with_scale(content_width.max(content_height), scale_factor)
+            .unwrap_or(0.0);
         let (total_horizontal_spacing, total_vertical_spacing) = match self.layout_direction {
             Layout::Horizontal => {
                 let mut total = 0.0f32;
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
                         // First child: left margin doesn't collapse with parent padding
-                        total += child.margin.left * scale_factor;
+                        total += child
+                            .margin
+                            .left
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
                     }
 
                     // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
                         // Collapsed margin is the max of the two adjacent margins (scaled)
-                        let collapsed_margin = (child.margin.right * scale_factor)
-                            .max(next_child.margin.left * scale_factor);
+                        let child_right = child
+                            .margin
+                            .right
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
+                        let next_left = next_child
+                            .margin
+                            .left
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
+                        let collapsed_margin = child_right.max(next_left);
                         // Collapse gap with margin - use the larger of gap or collapsed margin
                         total += scaled_gap.max(collapsed_margin);
                     } else {
                         // Last child: just add its right margin
-                        total += child.margin.right * scale_factor;
+                        total += child
+                            .margin
+                            .right
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
                     }
                 }
                 (total, 0.0)
@@ -972,20 +1088,37 @@ impl Node {
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
                         // First child: top margin doesn't collapse with parent padding
-                        total += child.margin.top * scale_factor;
+                        total += child
+                            .margin
+                            .top
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
                     }
 
                     // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
                         // Collapsed margin is the max of the two adjacent margins (scaled)
-                        let collapsed_margin = (child.margin.bottom * scale_factor)
-                            .max(next_child.margin.top * scale_factor);
+                        let child_bottom = child
+                            .margin
+                            .bottom
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
+                        let next_top = next_child
+                            .margin
+                            .top
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
+                        let collapsed_margin = child_bottom.max(next_top);
                         // Collapse gap with margin - use the larger of gap or collapsed margin
                         total += scaled_gap.max(collapsed_margin);
                     } else {
                         // Last child: just add its bottom margin
-                        total += child.margin.bottom * scale_factor;
+                        total += child
+                            .margin
+                            .bottom
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
                     }
                 }
                 (0.0, total)
@@ -1145,10 +1278,18 @@ impl Node {
             if i == 0 {
                 match self.layout_direction {
                     Layout::Horizontal => {
-                        current_x += self.children[i].margin.left * scale_factor;
+                        current_x += self.children[i]
+                            .margin
+                            .left
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
                     }
                     Layout::Vertical => {
-                        current_y += self.children[i].margin.top * scale_factor;
+                        current_y += self.children[i]
+                            .margin
+                            .top
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
                     }
                     Layout::Stack => {
                         // In Stack layout, don't advance position for first child
@@ -1174,11 +1315,27 @@ impl Node {
                 }
             };
 
-            // Scale child margins before calculating parent dimensions
-            let child_margin_left = self.children[i].margin.left * scale_factor;
-            let child_margin_right = self.children[i].margin.right * scale_factor;
-            let child_margin_top = self.children[i].margin.top * scale_factor;
-            let child_margin_bottom = self.children[i].margin.bottom * scale_factor;
+            // Resolve child margins with scale_factor before calculating parent dimensions
+            let child_margin_left = self.children[i]
+                .margin
+                .left
+                .try_resolve_with_scale(content_width, scale_factor)
+                .unwrap_or(0.0);
+            let child_margin_right = self.children[i]
+                .margin
+                .right
+                .try_resolve_with_scale(content_width, scale_factor)
+                .unwrap_or(0.0);
+            let child_margin_top = self.children[i]
+                .margin
+                .top
+                .try_resolve_with_scale(content_height, scale_factor)
+                .unwrap_or(0.0);
+            let child_margin_bottom = self.children[i]
+                .margin
+                .bottom
+                .try_resolve_with_scale(content_height, scale_factor)
+                .unwrap_or(0.0);
 
             let child_parent_width = if self.children[i].width.is_fill() {
                 fill_size_width + child_margin_left + child_margin_right
@@ -1261,15 +1418,33 @@ impl Node {
                     match self.layout_direction {
                         Layout::Horizontal => {
                             // Collapse margins with scale_factor applied
-                            let collapsed_margin = (self.children[i].margin.right * scale_factor)
-                                .max(self.children[i + 1].margin.left * scale_factor);
+                            let child_right = self.children[i]
+                                .margin
+                                .right
+                                .try_resolve_with_scale(content_width, scale_factor)
+                                .unwrap_or(0.0);
+                            let next_left = self.children[i + 1]
+                                .margin
+                                .left
+                                .try_resolve_with_scale(content_width, scale_factor)
+                                .unwrap_or(0.0);
+                            let collapsed_margin = child_right.max(next_left);
                             let spacing = scaled_gap.max(collapsed_margin);
                             current_x = child_rect.max[0] + spacing;
                         }
                         Layout::Vertical => {
                             // Collapse margins with scale_factor applied
-                            let collapsed_margin = (self.children[i].margin.bottom * scale_factor)
-                                .max(self.children[i + 1].margin.top * scale_factor);
+                            let child_bottom = self.children[i]
+                                .margin
+                                .bottom
+                                .try_resolve_with_scale(content_height, scale_factor)
+                                .unwrap_or(0.0);
+                            let next_top = self.children[i + 1]
+                                .margin
+                                .top
+                                .try_resolve_with_scale(content_height, scale_factor)
+                                .unwrap_or(0.0);
+                            let collapsed_margin = child_bottom.max(next_top);
                             let spacing = scaled_gap.max(collapsed_margin);
                             current_y = child_rect.max[1] + spacing;
                         }
@@ -1290,11 +1465,27 @@ impl Node {
         scale_factor: f32,
     ) {
         // Account for this node's margins when calculating available space
-        // Apply scale_factor to margin values (logical -> physical pixels)
-        let margin_left = self.margin.left * scale_factor;
-        let margin_right = self.margin.right * scale_factor;
-        let margin_top = self.margin.top * scale_factor;
-        let margin_bottom = self.margin.bottom * scale_factor;
+        // Resolve margin values with scale_factor (logical -> physical pixels)
+        let margin_left = self
+            .margin
+            .left
+            .try_resolve_with_scale(parent_width, scale_factor)
+            .unwrap_or(0.0);
+        let margin_right = self
+            .margin
+            .right
+            .try_resolve_with_scale(parent_width, scale_factor)
+            .unwrap_or(0.0);
+        let margin_top = self
+            .margin
+            .top
+            .try_resolve_with_scale(parent_height, scale_factor)
+            .unwrap_or(0.0);
+        let margin_bottom = self
+            .margin
+            .bottom
+            .try_resolve_with_scale(parent_height, scale_factor)
+            .unwrap_or(0.0);
 
         let available_width = (parent_width - margin_left - margin_right).max(0.0);
         let available_height = (parent_height - margin_top - margin_bottom).max(0.0);
@@ -1316,11 +1507,27 @@ impl Node {
         let outer_y = available_rect.min[1];
 
         // Content area (after subtracting padding)
-        // Apply scale_factor to padding values (logical -> physical pixels)
-        let padding_left = self.padding.left * scale_factor;
-        let padding_right = self.padding.right * scale_factor;
-        let padding_top = self.padding.top * scale_factor;
-        let padding_bottom = self.padding.bottom * scale_factor;
+        // Resolve padding values with scale_factor (logical -> physical pixels)
+        let padding_left = self
+            .padding
+            .left
+            .try_resolve_with_scale(width, scale_factor)
+            .unwrap_or(0.0);
+        let padding_right = self
+            .padding
+            .right
+            .try_resolve_with_scale(width, scale_factor)
+            .unwrap_or(0.0);
+        let padding_top = self
+            .padding
+            .top
+            .try_resolve_with_scale(height, scale_factor)
+            .unwrap_or(0.0);
+        let padding_bottom = self
+            .padding
+            .bottom
+            .try_resolve_with_scale(height, scale_factor)
+            .unwrap_or(0.0);
 
         let content_x = outer_x + padding_left;
         let content_y = outer_y + padding_top;
@@ -1338,28 +1545,48 @@ impl Node {
         let mut current_y = content_y;
 
         // Calculate total spacing in the layout direction (margins + gaps)
-        // Apply scale_factor to gap and child margins (logical -> physical pixels)
-        let scaled_gap = self.gap * scale_factor;
+        // Resolve gap and child margins with scale_factor (logical -> physical pixels)
+        let scaled_gap = self
+            .gap
+            .try_resolve_with_scale(content_width.max(content_height), scale_factor)
+            .unwrap_or(0.0);
         let (total_horizontal_spacing, total_vertical_spacing) = match self.layout_direction {
             Layout::Horizontal => {
                 let mut total = 0.0f32;
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
                         // First child: left margin doesn't collapse with parent padding
-                        total += child.margin.left * scale_factor;
+                        total += child
+                            .margin
+                            .left
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
                     }
 
                     // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
                         // Collapsed margin is the max of the two adjacent margins (scaled)
-                        let collapsed_margin = (child.margin.right * scale_factor)
-                            .max(next_child.margin.left * scale_factor);
+                        let child_right = child
+                            .margin
+                            .right
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
+                        let next_left = next_child
+                            .margin
+                            .left
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
+                        let collapsed_margin = child_right.max(next_left);
                         // Collapse gap with margin - use the larger of gap or collapsed margin
                         total += scaled_gap.max(collapsed_margin);
                     } else {
                         // Last child: just add its right margin
-                        total += child.margin.right * scale_factor;
+                        total += child
+                            .margin
+                            .right
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
                     }
                 }
                 (total, 0.0)
@@ -1369,20 +1596,37 @@ impl Node {
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
                         // First child: top margin doesn't collapse with parent padding
-                        total += child.margin.top * scale_factor;
+                        total += child
+                            .margin
+                            .top
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
                     }
 
                     // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
                         // Collapsed margin is the max of the two adjacent margins (scaled)
-                        let collapsed_margin = (child.margin.bottom * scale_factor)
-                            .max(next_child.margin.top * scale_factor);
+                        let child_bottom = child
+                            .margin
+                            .bottom
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
+                        let next_top = next_child
+                            .margin
+                            .top
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
+                        let collapsed_margin = child_bottom.max(next_top);
                         // Collapse gap with margin - use the larger of gap or collapsed margin
                         total += scaled_gap.max(collapsed_margin);
                     } else {
                         // Last child: just add its bottom margin
-                        total += child.margin.bottom * scale_factor;
+                        total += child
+                            .margin
+                            .bottom
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
                     }
                 }
                 (0.0, total)
@@ -1467,10 +1711,18 @@ impl Node {
             if i == 0 {
                 match self.layout_direction {
                     Layout::Horizontal => {
-                        current_x += self.children[i].margin.left;
+                        current_x += self.children[i]
+                            .margin
+                            .left
+                            .try_resolve_with_scale(content_width, scale_factor)
+                            .unwrap_or(0.0);
                     }
                     Layout::Vertical => {
-                        current_y += self.children[i].margin.top;
+                        current_y += self.children[i]
+                            .margin
+                            .top
+                            .try_resolve_with_scale(content_height, scale_factor)
+                            .unwrap_or(0.0);
                     }
                     Layout::Stack => {
                         // In Stack layout, don't advance position for first child
@@ -1504,15 +1756,36 @@ impl Node {
 
             // Pass the available dimensions for size calculations
             // For Fill children, we need to add back their own margins since they'll subtract them
+            let child_margin_left = self.children[i]
+                .margin
+                .left
+                .try_resolve_with_scale(content_width, scale_factor)
+                .unwrap_or(0.0);
+            let child_margin_right = self.children[i]
+                .margin
+                .right
+                .try_resolve_with_scale(content_width, scale_factor)
+                .unwrap_or(0.0);
+            let child_margin_top = self.children[i]
+                .margin
+                .top
+                .try_resolve_with_scale(content_height, scale_factor)
+                .unwrap_or(0.0);
+            let child_margin_bottom = self.children[i]
+                .margin
+                .bottom
+                .try_resolve_with_scale(content_height, scale_factor)
+                .unwrap_or(0.0);
+
             let child_parent_width = if self.children[i].width.is_fill() {
-                fill_size_width + self.children[i].margin.left + self.children[i].margin.right
+                fill_size_width + child_margin_left + child_margin_right
             } else {
-                available_width + self.children[i].margin.left + self.children[i].margin.right
+                available_width + child_margin_left + child_margin_right
             };
             let child_parent_height = if self.children[i].height.is_fill() {
-                fill_size_height + self.children[i].margin.top + self.children[i].margin.bottom
+                fill_size_height + child_margin_top + child_margin_bottom
             } else {
-                available_height + self.children[i].margin.top + self.children[i].margin.bottom
+                available_height + child_margin_top + child_margin_bottom
             };
 
             self.children[i].compute_layout_with_parent_size(
@@ -1530,22 +1803,36 @@ impl Node {
                     match self.layout_direction {
                         Layout::Horizontal => {
                             // Move to end of current child, then add collapsed spacing
-                            let collapsed_margin = self.children[i]
+                            let child_right = self.children[i]
                                 .margin
                                 .right
-                                .max(self.children[i + 1].margin.left);
+                                .try_resolve_with_scale(content_width, scale_factor)
+                                .unwrap_or(0.0);
+                            let next_left = self.children[i + 1]
+                                .margin
+                                .left
+                                .try_resolve_with_scale(content_width, scale_factor)
+                                .unwrap_or(0.0);
+                            let collapsed_margin = child_right.max(next_left);
                             // Collapse gap with margin - use the larger value
-                            let spacing = self.gap.max(collapsed_margin);
+                            let spacing = scaled_gap.max(collapsed_margin);
                             current_x = child_rect.max[0] + spacing;
                         }
                         Layout::Vertical => {
                             // Move to end of current child, then add collapsed spacing
-                            let collapsed_margin = self.children[i]
+                            let child_bottom = self.children[i]
                                 .margin
                                 .bottom
-                                .max(self.children[i + 1].margin.top);
+                                .try_resolve_with_scale(content_height, scale_factor)
+                                .unwrap_or(0.0);
+                            let next_top = self.children[i + 1]
+                                .margin
+                                .top
+                                .try_resolve_with_scale(content_height, scale_factor)
+                                .unwrap_or(0.0);
+                            let collapsed_margin = child_bottom.max(next_top);
                             // Collapse gap with margin - use the larger value
-                            let spacing = self.gap.max(collapsed_margin);
+                            let spacing = scaled_gap.max(collapsed_margin);
                             current_y = child_rect.max[1] + spacing;
                         }
                         Layout::Stack => {
@@ -1592,14 +1879,39 @@ impl Node {
                 match content {
                     crate::content::Content::Text(text_content) => {
                         // Calculate content area (after padding)
+                        // NOTE: During rendering, we use scale_factor=1.0 because padding was already
+                        // resolved during layout. We just need the logical pixel values here.
+                        let width = layout.rect.max[0] - layout.rect.min[0];
+                        let height = layout.rect.max[1] - layout.rect.min[1];
+                        let padding_left = self
+                            .padding
+                            .left
+                            .try_resolve_with_scale(width, 1.0)
+                            .unwrap_or(0.0);
+                        let padding_right = self
+                            .padding
+                            .right
+                            .try_resolve_with_scale(width, 1.0)
+                            .unwrap_or(0.0);
+                        let padding_top = self
+                            .padding
+                            .top
+                            .try_resolve_with_scale(height, 1.0)
+                            .unwrap_or(0.0);
+                        let padding_bottom = self
+                            .padding
+                            .bottom
+                            .try_resolve_with_scale(height, 1.0)
+                            .unwrap_or(0.0);
+
                         let content_rect = Rect::new(
                             [
-                                layout.rect.min[0] + self.padding.left,
-                                layout.rect.min[1] + self.padding.top,
+                                layout.rect.min[0] + padding_left,
+                                layout.rect.min[1] + padding_top,
                             ],
                             [
-                                layout.rect.max[0] - self.padding.right,
-                                layout.rect.max[1] - self.padding.bottom,
+                                layout.rect.max[0] - padding_right,
+                                layout.rect.max[1] - padding_bottom,
                             ],
                         );
                         let mut text_shape =
@@ -1627,23 +1939,64 @@ impl Node {
 
         if let Some(layout) = &self.computed {
             let rect = layout.rect;
+            let width = rect.max[0] - rect.min[0];
+            let height = rect.max[1] - rect.min[1];
+
+            // Resolve margin and padding values (use scale_factor=1.0 since layout is already computed)
+            let margin_left = self
+                .margin
+                .left
+                .try_resolve_with_scale(width, 1.0)
+                .unwrap_or(0.0);
+            let margin_right = self
+                .margin
+                .right
+                .try_resolve_with_scale(width, 1.0)
+                .unwrap_or(0.0);
+            let margin_top = self
+                .margin
+                .top
+                .try_resolve_with_scale(height, 1.0)
+                .unwrap_or(0.0);
+            let margin_bottom = self
+                .margin
+                .bottom
+                .try_resolve_with_scale(height, 1.0)
+                .unwrap_or(0.0);
+            let padding_left = self
+                .padding
+                .left
+                .try_resolve_with_scale(width, 1.0)
+                .unwrap_or(0.0);
+            let padding_right = self
+                .padding
+                .right
+                .try_resolve_with_scale(width, 1.0)
+                .unwrap_or(0.0);
+            let padding_top = self
+                .padding
+                .top
+                .try_resolve_with_scale(height, 1.0)
+                .unwrap_or(0.0);
+            let padding_bottom = self
+                .padding
+                .bottom
+                .try_resolve_with_scale(height, 1.0)
+                .unwrap_or(0.0);
 
             // Draw margin area (outermost, semi-transparent red showing margin space)
             if options.show_margins
-                && (self.margin.top > 0.0
-                    || self.margin.right > 0.0
-                    || self.margin.bottom > 0.0
-                    || self.margin.left > 0.0)
+                && (margin_top > 0.0
+                    || margin_right > 0.0
+                    || margin_bottom > 0.0
+                    || margin_left > 0.0)
             {
                 // Draw top margin
-                if self.margin.top > 0.0 {
+                if margin_top > 0.0 {
                     shapes.push((
                         Rect::new(
-                            [
-                                rect.min[0] - self.margin.left,
-                                rect.min[1] - self.margin.top,
-                            ],
-                            [rect.max[0] + self.margin.right, rect.min[1]],
+                            [rect.min[0] - margin_left, rect.min[1] - margin_top],
+                            [rect.max[0] + margin_right, rect.min[1]],
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
@@ -1652,11 +2005,11 @@ impl Node {
                     ));
                 }
                 // Draw right margin (excluding top and bottom corners)
-                if self.margin.right > 0.0 {
+                if margin_right > 0.0 {
                     shapes.push((
                         Rect::new(
                             [rect.max[0], rect.min[1]],
-                            [rect.max[0] + self.margin.right, rect.max[1]],
+                            [rect.max[0] + margin_right, rect.max[1]],
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
@@ -1665,14 +2018,11 @@ impl Node {
                     ));
                 }
                 // Draw bottom margin (full width including corners)
-                if self.margin.bottom > 0.0 {
+                if margin_bottom > 0.0 {
                     shapes.push((
                         Rect::new(
-                            [rect.min[0] - self.margin.left, rect.max[1]],
-                            [
-                                rect.max[0] + self.margin.right,
-                                rect.max[1] + self.margin.bottom,
-                            ],
+                            [rect.min[0] - margin_left, rect.max[1]],
+                            [rect.max[0] + margin_right, rect.max[1] + margin_bottom],
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
@@ -1681,10 +2031,10 @@ impl Node {
                     ));
                 }
                 // Draw left margin (excluding top and bottom corners)
-                if self.margin.left > 0.0 {
+                if margin_left > 0.0 {
                     shapes.push((
                         Rect::new(
-                            [rect.min[0] - self.margin.left, rect.min[1]],
+                            [rect.min[0] - margin_left, rect.min[1]],
                             [rect.min[0], rect.max[1]],
                         ),
                         Shape::Rect(StyledRect::new(
@@ -1697,43 +2047,38 @@ impl Node {
 
             // Draw content area (yellow outline - area inside padding)
             if options.show_content_area
-                && (self.padding.top > 0.0
-                    || self.padding.right > 0.0
-                    || self.padding.bottom > 0.0
-                    || self.padding.left > 0.0)
+                && (padding_top > 0.0
+                    || padding_right > 0.0
+                    || padding_bottom > 0.0
+                    || padding_left > 0.0)
             {
                 let content_rect = Rect::new(
-                    [
-                        rect.min[0] + self.padding.left,
-                        rect.min[1] + self.padding.top,
-                    ],
-                    [
-                        rect.max[0] - self.padding.right,
-                        rect.max[1] - self.padding.bottom,
-                    ],
+                    [rect.min[0] + padding_left, rect.min[1] + padding_top],
+                    [rect.max[0] - padding_right, rect.max[1] - padding_bottom],
                 );
                 shapes.push((
                     content_rect,
                     Shape::Rect(
-                        StyledRect::new(Default::default(), Color::transparent())
-                            .with_stroke(Stroke::new(1.0, Color::new(1.0, 1.0, 0.0, 0.5))),
+                        StyledRect::new(Default::default(), Color::transparent()).with_stroke(
+                            Stroke::new(Size::px(1.0), Color::new(1.0, 1.0, 0.0, 0.5)),
+                        ),
                     ),
                 ));
             }
 
             // Draw padding area (semi-transparent blue showing the padding inset)
             if options.show_padding
-                && (self.padding.top > 0.0
-                    || self.padding.right > 0.0
-                    || self.padding.bottom > 0.0
-                    || self.padding.left > 0.0)
+                && (padding_top > 0.0
+                    || padding_right > 0.0
+                    || padding_bottom > 0.0
+                    || padding_left > 0.0)
             {
                 // Draw top padding (full width)
-                if self.padding.top > 0.0 {
+                if padding_top > 0.0 {
                     shapes.push((
                         Rect::new(
                             [rect.min[0], rect.min[1]],
-                            [rect.max[0], rect.min[1] + self.padding.top],
+                            [rect.max[0], rect.min[1] + padding_top],
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
@@ -1742,14 +2087,11 @@ impl Node {
                     ));
                 }
                 // Draw right padding (excluding top and bottom corners)
-                if self.padding.right > 0.0 {
+                if padding_right > 0.0 {
                     shapes.push((
                         Rect::new(
-                            [
-                                rect.max[0] - self.padding.right,
-                                rect.min[1] + self.padding.top,
-                            ],
-                            [rect.max[0], rect.max[1] - self.padding.bottom],
+                            [rect.max[0] - padding_right, rect.min[1] + padding_top],
+                            [rect.max[0], rect.max[1] - padding_bottom],
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
@@ -1758,10 +2100,10 @@ impl Node {
                     ));
                 }
                 // Draw bottom padding (full width)
-                if self.padding.bottom > 0.0 {
+                if padding_bottom > 0.0 {
                     shapes.push((
                         Rect::new(
-                            [rect.min[0], rect.max[1] - self.padding.bottom],
+                            [rect.min[0], rect.max[1] - padding_bottom],
                             [rect.max[0], rect.max[1]],
                         ),
                         Shape::Rect(StyledRect::new(
@@ -1771,14 +2113,11 @@ impl Node {
                     ));
                 }
                 // Draw left padding (excluding top and bottom corners)
-                if self.padding.left > 0.0 {
+                if padding_left > 0.0 {
                     shapes.push((
                         Rect::new(
-                            [rect.min[0], rect.min[1] + self.padding.top],
-                            [
-                                rect.min[0] + self.padding.left,
-                                rect.max[1] - self.padding.bottom,
-                            ],
+                            [rect.min[0], rect.min[1] + padding_top],
+                            [rect.min[0] + padding_left, rect.max[1] - padding_bottom],
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
@@ -1793,8 +2132,9 @@ impl Node {
                 shapes.push((
                     rect,
                     Shape::Rect(
-                        StyledRect::new(Default::default(), Color::transparent())
-                            .with_stroke(Stroke::new(1.0, Color::new(0.0, 1.0, 0.0, 0.5))),
+                        StyledRect::new(Default::default(), Color::transparent()).with_stroke(
+                            Stroke::new(Size::px(1.0), Color::new(0.0, 1.0, 0.0, 0.5)),
+                        ),
                     ),
                 ));
             }
@@ -1813,10 +2153,31 @@ impl Node {
         };
 
         // Get container dimensions (after padding)
-        let container_width =
-            layout.rect.max[0] - layout.rect.min[0] - self.padding.left - self.padding.right;
-        let container_height =
-            layout.rect.max[1] - layout.rect.min[1] - self.padding.top - self.padding.bottom;
+        let width = layout.rect.max[0] - layout.rect.min[0];
+        let height = layout.rect.max[1] - layout.rect.min[1];
+        let padding_left = self
+            .padding
+            .left
+            .try_resolve_with_scale(width, 1.0)
+            .unwrap_or(0.0);
+        let padding_right = self
+            .padding
+            .right
+            .try_resolve_with_scale(width, 1.0)
+            .unwrap_or(0.0);
+        let padding_top = self
+            .padding
+            .top
+            .try_resolve_with_scale(height, 1.0)
+            .unwrap_or(0.0);
+        let padding_bottom = self
+            .padding
+            .bottom
+            .try_resolve_with_scale(height, 1.0)
+            .unwrap_or(0.0);
+
+        let container_width = width - padding_left - padding_right;
+        let container_height = height - padding_top - padding_bottom;
 
         // Calculate total content size based on layout direction
         if self.children.is_empty() {
@@ -1838,16 +2199,30 @@ impl Node {
                         // For horizontal child layouts, calculate their full content width
                         let actual_child_width = if child.layout_direction == Layout::Horizontal {
                             let mut row_width = 0.0f32;
+                            let child_gap = child
+                                .gap
+                                .try_resolve_with_scale(child_width, 1.0)
+                                .unwrap_or(0.0);
 
                             for (j, grandchild) in child.children.iter().enumerate() {
                                 if let Some(gc_layout) = grandchild.computed_layout() {
                                     row_width += gc_layout.rect.max[0] - gc_layout.rect.min[0];
                                     if j < child.children.len() - 1 {
-                                        row_width += child.gap;
+                                        row_width += child_gap;
                                     }
                                 }
                             }
-                            row_width + child.padding.left + child.padding.right
+                            let child_padding_left = child
+                                .padding
+                                .left
+                                .try_resolve_with_scale(child_width, 1.0)
+                                .unwrap_or(0.0);
+                            let child_padding_right = child
+                                .padding
+                                .right
+                                .try_resolve_with_scale(child_width, 1.0)
+                                .unwrap_or(0.0);
+                            row_width + child_padding_left + child_padding_right
                         } else {
                             child_width
                         };
@@ -1856,7 +2231,11 @@ impl Node {
                         content_height += child_height;
 
                         if i < self.children.len() - 1 {
-                            content_height += self.gap;
+                            let gap = self
+                                .gap
+                                .try_resolve_with_scale(container_height, 1.0)
+                                .unwrap_or(0.0);
+                            content_height += gap;
                         }
                     }
                 }
@@ -1872,7 +2251,11 @@ impl Node {
                         content_height = content_height.max(child_height);
 
                         if i < self.children.len() - 1 {
-                            content_width += self.gap;
+                            let gap = self
+                                .gap
+                                .try_resolve_with_scale(container_width, 1.0)
+                                .unwrap_or(0.0);
+                            content_width += gap;
                         }
                     }
                 }

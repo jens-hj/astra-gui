@@ -293,7 +293,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                 .with_height(Size::px(30.0))
                 .with_content(Content::Text(TextContent {
                     text: format!("Item {}", i + 1),
-                    font_size: 20.0,
+                    font_size: Size::px(20.0),
                     color: mocha::TEXT,
                     h_align: HorizontalAlign::Left,
                     v_align: VerticalAlign::Center,
@@ -302,7 +302,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                 .with_width(Size::Fill)
                 .with_height(Size::Fill)
                 .with_layout_direction(Layout::Horizontal)
-                .with_gap(5.0)
+                .with_gap(Size::px(5.0))
                 .with_children(vec![
                     Node::new()
                         .with_width(Size::Fill)
@@ -338,8 +338,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
             Node::new()
                 .with_width(Size::Fill)
                 .with_height(Size::px(height))
-                .with_padding(Spacing::all(8.0))
-                .with_gap(5.0)
+                .with_padding(Spacing::all(Size::px(8.0)))
+                .with_gap(Size::px(5.0))
                 .with_layout_direction(Layout::Vertical)
                 .with_shape(Shape::rect())
                 .with_style(Style {
@@ -360,8 +360,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_id(NodeId::new("scroll_container"))
         .with_width(Size::px(400.0))
         .with_height(Size::Fill)
-        .with_padding(Spacing::all(10.0))
-        .with_gap(10.0)
+        .with_padding(Spacing::all(Size::px(10.0)))
+        .with_gap(Size::px(10.0))
         .with_layout_direction(Layout::Vertical)
         .with_overflow(Overflow::Scroll)
         .with_shape(Shape::rect())
@@ -379,8 +379,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
             Node::new()
                 .with_width(Size::px(width))
                 .with_height(Size::Fill)
-                .with_padding(Spacing::all(8.0))
-                .with_gap(5.0)
+                .with_padding(Spacing::all(Size::px(8.0)))
+                .with_gap(Size::px(5.0))
                 .with_layout_direction(Layout::Vertical)
                 .with_shape(Shape::rect())
                 .with_style(Style {
@@ -398,7 +398,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         .with_height(Size::px(30.0))
                         .with_content(Content::Text(TextContent {
                             text: format!("H-Item {}", i + 1),
-                            font_size: 18.0,
+                            font_size: Size::px(18.0),
                             color: mocha::TEXT,
                             h_align: HorizontalAlign::Center,
                             v_align: VerticalAlign::Center,
@@ -407,7 +407,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         .with_width(Size::Fill)
                         .with_height(Size::Fill)
                         .with_layout_direction(Layout::Vertical)
-                        .with_gap(3.0)
+                        .with_gap(Size::px(3.0))
                         .with_children(vec![
                             Node::new()
                                 .with_width(Size::Fill)
@@ -445,8 +445,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_id(NodeId::new("horizontal_scroll_container"))
         .with_width(Size::px(800.0))
         .with_height(Size::Fill)
-        .with_padding(Spacing::all(10.0))
-        .with_gap(10.0)
+        .with_padding(Spacing::all(Size::px(10.0)))
+        .with_gap(Size::px(10.0))
         .with_layout_direction(Layout::Horizontal)
         .with_overflow(Overflow::Scroll)
         .with_shape(Shape::rect())
@@ -468,8 +468,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                 Node::new()
                     .with_width(Size::px(150.0))
                     .with_height(Size::px(100.0))
-                    .with_padding(Spacing::all(6.0))
-                    .with_gap(3.0)
+                    .with_padding(Spacing::all(Size::px(6.0)))
+                    .with_gap(Size::px(3.0))
                     .with_layout_direction(Layout::Vertical)
                     .with_shape(Shape::rect())
                     .with_style(Style {
@@ -487,7 +487,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                             .with_height(Size::px(25.0))
                             .with_content(Content::Text(TextContent {
                                 text: format!("R{} C{}", row + 1, col + 1),
-                                font_size: 16.0,
+                                font_size: Size::px(16.0),
                                 color: mocha::TEXT,
                                 h_align: HorizontalAlign::Center,
                                 v_align: VerticalAlign::Center,
@@ -496,7 +496,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                             .with_width(Size::Fill)
                             .with_height(Size::Fill)
                             .with_layout_direction(Layout::Horizontal)
-                            .with_gap(2.0)
+                            .with_gap(Size::px(2.0))
                             .with_children(vec![
                                 Node::new()
                                     .with_width(Size::Fill)
@@ -526,7 +526,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                 .with_width(Size::FitContent)
                 .with_height(Size::px(100.0))
                 .with_layout_direction(Layout::Horizontal)
-                .with_gap(10.0)
+                .with_gap(Size::px(10.0))
                 .with_children(row_items),
         );
     }
@@ -535,8 +535,8 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_id(NodeId::new("grid_scroll_container"))
         .with_width(Size::px(600.0))
         .with_height(Size::Fill)
-        .with_padding(Spacing::all(10.0))
-        .with_gap(10.0)
+        .with_padding(Spacing::all(Size::px(10.0)))
+        .with_gap(Size::px(10.0))
         .with_layout_direction(Layout::Vertical)
         .with_overflow(Overflow::Scroll)
         .with_shape(Shape::rect())
@@ -551,13 +551,13 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
     Node::new()
         .with_width(Size::Fill)
         .with_height(Size::Fill)
-        .with_padding(Spacing::all(40.0))
+        .with_padding(Spacing::all(Size::px(40.0)))
         .with_child(
             Node::new()
                 .with_width(Size::Fill)
                 .with_height(Size::Fill)
                 .with_layout_direction(Layout::Vertical)
-                .with_gap(20.0)
+                .with_gap(Size::px(20.0))
                 .with_children(vec![
                     // Title
                     Node::new()
@@ -566,7 +566,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         .with_content(Content::Text(TextContent {
                             text: "Scroll Example - Use Mouse Wheel (Shift for horizontal)"
                                 .to_string(),
-                            font_size: 32.0,
+                            font_size: Size::px(32.0),
                             color: mocha::TEXT,
                             h_align: HorizontalAlign::Center,
                             v_align: VerticalAlign::Center,

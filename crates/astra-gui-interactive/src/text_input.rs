@@ -113,7 +113,7 @@ impl Default for TextInputStyle {
             disabled_text_color: mocha::SUBTEXT0,
             // Other
             selection_color: mocha::LAVENDER.with_alpha(0.3),
-            padding: Spacing::symmetric(10.0, 8.0),
+            padding: Spacing::symmetric(Size::px(10.0), Size::px(8.0)),
             border_radius: 8.0,
             font_size: 20.0,
             cursor_style: CursorStyle::default(),
@@ -285,7 +285,7 @@ pub fn text_input(
             .with_height(Size::Fill)
             .with_content(Content::Text(TextContent {
                 text: display_text,
-                font_size: style.font_size,
+                font_size: Size::px(style.font_size),
                 color: text_color,
                 h_align: style.text_align,
                 v_align: VerticalAlign::Center,
@@ -405,13 +405,16 @@ pub fn text_input(
         .with_overflow(Overflow::Hidden)
         .with_style(Style {
             fill_color: Some(fill_color),
-            stroke: Some(Stroke::new(stroke_width, stroke_color)),
+            stroke: Some(Stroke::new(Size::px(stroke_width), stroke_color)),
             corner_shape: Some(CornerShape::Round(style.border_radius)),
             ..Default::default()
         })
         .with_disabled_style(Style {
             fill_color: Some(style.disabled_color),
-            stroke: Some(Stroke::new(stroke_width, style.disabled_stroke_color)),
+            stroke: Some(Stroke::new(
+                Size::px(stroke_width),
+                style.disabled_stroke_color,
+            )),
             ..Default::default()
         })
         .with_disabled(disabled)

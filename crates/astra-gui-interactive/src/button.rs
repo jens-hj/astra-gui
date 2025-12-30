@@ -98,7 +98,7 @@ impl Default for ButtonStyle {
             text_color: mocha::TEXT,
             disabled_text_color: mocha::SUBTEXT1,
             // Others
-            padding: Spacing::symmetric(32.0, 16.0),
+            padding: Spacing::symmetric(Size::px(32.0), Size::px(16.0)),
             border_radius: 24.0,
             font_size: 32.0,
         }
@@ -133,7 +133,7 @@ pub fn button(
         .with_shape(astra_gui::Shape::rect())
         .with_content(Content::Text(TextContent {
             text: label.into(),
-            font_size: style.font_size,
+            font_size: Size::px(style.font_size),
             color: style.text_color,
             h_align: HorizontalAlign::Center,
             v_align: VerticalAlign::Center,
@@ -143,23 +143,23 @@ pub fn button(
             fill_color: Some(style.idle_color),
             text_color: Some(style.text_color),
             corner_shape: Some(CornerShape::Round(style.border_radius)),
-            stroke: Some(Stroke::new(2.0, style.idle_stroke_color)),
+            stroke: Some(Stroke::new(Size::px(2.0), style.idle_stroke_color)),
             ..Default::default()
         })
         .with_hover_style(Style {
             fill_color: Some(style.hover_color),
-            stroke: Some(Stroke::new(3.0, style.hover_stroke_color)),
+            stroke: Some(Stroke::new(Size::px(3.0), style.hover_stroke_color)),
             ..Default::default()
         })
         .with_active_style(Style {
             fill_color: Some(style.pressed_color),
-            stroke: Some(Stroke::new(2.0, style.pressed_stroke_color)),
+            stroke: Some(Stroke::new(Size::px(2.0), style.pressed_stroke_color)),
             ..Default::default()
         })
         .with_disabled_style(Style {
             fill_color: Some(style.disabled_color),
             text_color: Some(style.disabled_text_color),
-            stroke: Some(Stroke::new(2.0, style.disabled_stroke_color)),
+            stroke: Some(Stroke::new(Size::px(2.0), style.disabled_stroke_color)),
             ..Default::default()
         })
         .with_disabled(disabled)

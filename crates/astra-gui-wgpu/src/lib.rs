@@ -898,10 +898,17 @@ impl Renderer {
                 let index_start = self.text_indices.len() as u32;
 
                 // Shape + placement (backend-agnostic) with caching
+                // Resolve font size to f32 (should already be in physical pixels)
+                let width = rect.max[0] - rect.min[0];
+                let font_size_px = text_shape
+                    .font_size
+                    .try_resolve_with_scale(width, 1.0)
+                    .unwrap_or(16.0);
+
                 // Create cache key from text + font size + rect dimensions
                 let cache_key = (
                     text.to_string(),
-                    text_shape.font_size as u32,
+                    font_size_px as u32,
                     (rect.max[0] - rect.min[0]) as u32,
                     (rect.max[1] - rect.min[1]) as u32,
                 );
@@ -915,7 +922,7 @@ impl Renderer {
                         self.text_engine.shape_line(gui_text::ShapeLineRequest {
                             text,
                             rect,
-                            font_px: text_shape.font_size,
+                            font_px: font_size_px,
                             h_align: text_shape.h_align,
                             v_align: text_shape.v_align,
                             family: None,

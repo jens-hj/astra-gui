@@ -15,8 +15,8 @@ pub enum Content {
 pub struct TextContent {
     /// The text to display
     pub text: String,
-    /// Font size in pixels
-    pub font_size: f32,
+    /// Font size in logical pixels
+    pub font_size: crate::layout::Size,
     /// Text color
     pub color: Color,
     /// Horizontal alignment within the node
@@ -30,7 +30,7 @@ impl TextContent {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
-            font_size: 16.0,
+            font_size: crate::layout::Size::px(16.0),
             color: Color::new(1.0, 1.0, 1.0, 1.0),
             h_align: HorizontalAlign::Left,
             v_align: VerticalAlign::Top,
@@ -38,7 +38,7 @@ impl TextContent {
     }
 
     /// Set the font size
-    pub fn with_font_size(mut self, size: f32) -> Self {
+    pub fn with_font_size(mut self, size: crate::layout::Size) -> Self {
         self.font_size = size;
         self
     }

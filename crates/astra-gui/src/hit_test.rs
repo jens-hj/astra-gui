@@ -148,14 +148,38 @@ fn hit_test_recursive(
     let child_clip_rect = match node.overflow() {
         Overflow::Hidden | Overflow::Scroll => {
             // This node clips its children - intersect with current clip
+            // Resolve padding with scale_factor=1.0 since we're using already-computed layout positions
+            let width = node_rect.max[0] - node_rect.min[0];
+            let height = node_rect.max[1] - node_rect.min[1];
+            let padding_left = node
+                .padding()
+                .left
+                .try_resolve_with_scale(width, 1.0)
+                .unwrap_or(0.0);
+            let padding_right = node
+                .padding()
+                .right
+                .try_resolve_with_scale(width, 1.0)
+                .unwrap_or(0.0);
+            let padding_top = node
+                .padding()
+                .top
+                .try_resolve_with_scale(height, 1.0)
+                .unwrap_or(0.0);
+            let padding_bottom = node
+                .padding()
+                .bottom
+                .try_resolve_with_scale(height, 1.0)
+                .unwrap_or(0.0);
+
             let content_rect = Rect {
                 min: [
-                    node_rect.min[0] + node.padding().left,
-                    node_rect.min[1] + node.padding().top,
+                    node_rect.min[0] + padding_left,
+                    node_rect.min[1] + padding_top,
                 ],
                 max: [
-                    node_rect.max[0] - node.padding().right,
-                    node_rect.max[1] - node.padding().bottom,
+                    node_rect.max[0] - padding_right,
+                    node_rect.max[1] - padding_bottom,
                 ],
             };
 

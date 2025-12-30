@@ -261,11 +261,11 @@ impl App {
             .with_shape(Shape::rect())
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::SURFACE0),
-                stroke: Some(Stroke::new(2.0, mocha::OVERLAY0)),
+                stroke: Some(Stroke::new(Size::px(2.0), mocha::OVERLAY0)),
                 corner_shape: Some(CornerShape::Round(8.0)),
                 ..Default::default()
             })
-            .with_padding(Spacing::all(15.0))
+            .with_padding(Spacing::all(Size::px(15.0)))
             .with_content(astra_gui::Content::Text(TextContent {
                 text: format!(
                     "Zoom: {:.0}%\nPan: ({:.0}, {:.0})\n\nWheel: Zoom\nArrows: Pan\nR: Reset",
@@ -273,7 +273,7 @@ impl App {
                     self.pan_offset.0,
                     self.pan_offset.1
                 ),
-                font_size: 14.0,
+                font_size: Size::px(14.0),
                 color: mocha::TEXT,
                 h_align: HorizontalAlign::Left,
                 v_align: VerticalAlign::Top,
@@ -305,14 +305,14 @@ impl App {
                         .with_shape(Shape::rect())
                         .with_style(astra_gui::Style {
                             fill_color: Some(color),
-                            stroke: Some(Stroke::new(2.0, mocha::SURFACE0)),
+                            stroke: Some(Stroke::new(Size::px(2.0), mocha::SURFACE0)),
                             corner_shape: Some(CornerShape::Round(12.0)),
                             ..Default::default()
                         })
-                        .with_padding(Spacing::all(20.0))
+                        .with_padding(Spacing::all(Size::px(20.0)))
                         .with_content(astra_gui::Content::Text(TextContent {
                             text: format!("{},{}", row + 1, col + 1),
-                            font_size: 24.0,
+                            font_size: Size::px(24.0),
                             color: mocha::TEXT,
                             h_align: HorizontalAlign::Center,
                             v_align: VerticalAlign::Center,
@@ -323,15 +323,16 @@ impl App {
             grid_rows.push(
                 Node::new()
                     .with_layout_direction(Layout::Horizontal)
-                    .with_gap(20.0)
+                    .with_height(Size::Fill)
+                    .with_gap(Size::px(20.0))
                     .with_children(row_children),
             );
         }
 
         let content_grid = Node::new()
             .with_layout_direction(Layout::Vertical)
-            .with_gap(20.0)
-            .with_padding(Spacing::all(50.0))
+            .with_gap(Size::px(20.0))
+            .with_padding(Spacing::all(Size::px(50.0)))
             .with_children(grid_rows);
 
         // Root: Stack layout with debug panel on top
