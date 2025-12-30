@@ -1,9 +1,9 @@
 [package]
 name = "astra-gui-text"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Backend-agnostic text shaping and glyph rasterization for astra-gui"
-license = "MIT OR Apache-2.0"
+license.workspace = true
 
 [features]
 default = ["cosmic"]

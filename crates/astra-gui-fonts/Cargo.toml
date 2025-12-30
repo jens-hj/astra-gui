@@ -1,9 +1,9 @@
 [package]
 name = "astra-gui-fonts"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Bundled default fonts for astra-gui (Inter, etc.)"
-license = "MIT OR Apache-2.0"
+license.workspace = true
 
 [features]
 default = ["inter"]
