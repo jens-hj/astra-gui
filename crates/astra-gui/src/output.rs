@@ -1,7 +1,7 @@
 use crate::layout::{Overflow, Transform2D};
 use crate::measure::ContentMeasurer;
 use crate::node::Node;
-use crate::primitives::{ClippedShape, Rect, Shape};
+use crate::primitives::{ClippedShape, Rect, Shape, Stroke};
 
 /// Output from the UI system containing all shapes to render
 #[derive(Clone, Debug, Default)]
@@ -253,10 +253,24 @@ fn collect_clipped_shapes_with_opacity(
     if let Some(shape) = node.shape() {
         // OPTIMIZATION: Store opacity in ClippedShape instead of applying it to the shape
         // This eliminates 325 shape clones per frame - opacity will be applied during rendering
+
+        // Scale stroke width (logical -> physical pixels)
+        let scaled_shape = match shape {
+            Shape::Rect(styled_rect) => {
+                let mut scaled_rect = styled_rect.clone();
+                if let Some(ref stroke) = scaled_rect.stroke {
+                    scaled_rect.stroke =
+                        Some(Stroke::new(stroke.width * scale_factor, stroke.color));
+                }
+                Shape::Rect(scaled_rect)
+            }
+            Shape::Text(_) => shape.clone(),
+        };
+
         out.push((
             node_rect,
             inherited_clip_rect,
-            shape.clone(),
+            scaled_shape,
             world_transform,
             combined_opacity,
         ));
@@ -304,6 +318,7 @@ fn collect_clipped_shapes_with_opacity(
                 &options,
                 &world_transform,
                 out,
+                scale_factor,
             );
         }
     }
@@ -311,7 +326,14 @@ fn collect_clipped_shapes_with_opacity(
     // Collect gap debug shapes between children
     if let Some(options) = debug_options {
         if options.show_gaps && node.gap() > 0.0 {
-            collect_gap_debug_shapes(node, effective_clip_rect, &options, &world_transform, out);
+            collect_gap_debug_shapes(
+                node,
+                effective_clip_rect,
+                &options,
+                &world_transform,
+                out,
+                scale_factor,
+            );
         }
     }
 
@@ -387,9 +409,10 @@ fn collect_debug_shapes_clipped(
     options: &crate::debug::DebugOptions,
     transform: &Transform2D,
     out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
+    scale_factor: f32,
 ) {
     use crate::color::Color;
-    use crate::primitives::{Stroke, StyledRect};
+    use crate::primitives::StyledRect;
 
     let margin = node.margin();
     let padding = node.padding();
@@ -488,8 +511,10 @@ fn collect_debug_shapes_clipped(
             content_rect,
             clip_rect,
             Shape::Rect(
-                StyledRect::new(Default::default(), Color::transparent())
-                    .with_stroke(Stroke::new(1.0, Color::new(1.0, 1.0, 0.0, 0.5))),
+                StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
+                    1.0 * scale_factor,
+                    Color::new(1.0, 1.0, 0.0, 0.5),
+                )),
             ),
             *transform,
             1.0,
@@ -578,8 +603,10 @@ fn collect_debug_shapes_clipped(
             node_rect,
             clip_rect,
             Shape::Rect(
-                StyledRect::new(Default::default(), Color::transparent())
-                    .with_stroke(Stroke::new(1.0, Color::new(0.0, 1.0, 0.0, 0.5))),
+                StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
+                    1.0 * scale_factor,
+                    Color::new(0.0, 1.0, 0.0, 0.5),
+                )),
             ),
             *transform,
             1.0,
@@ -593,8 +620,10 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             clip_rect, // Don't clip the clip rect visualization itself
             Shape::Rect(
-                StyledRect::new(Default::default(), Color::transparent())
-                    .with_stroke(Stroke::new(2.0, Color::new(1.0, 0.0, 0.0, 0.8))),
+                StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
+                    2.0 * scale_factor,
+                    Color::new(1.0, 0.0, 0.0, 0.8),
+                )),
             ),
             Transform2D::IDENTITY, // Clip rects are already in world space
             1.0,
@@ -672,8 +701,11 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(
                 StyledRect::new(circle_rect, Color::transparent())
-                    .with_corner_shape(CornerShape::Round(circle_radius))
-                    .with_stroke(Stroke::new(2.0, Color::new(1.0, 0.5, 0.0, 0.9))), // Orange stroke
+                    .with_corner_shape(CornerShape::Round(circle_radius * scale_factor))
+                    .with_stroke(Stroke::new(
+                        2.0 * scale_factor,
+                        Color::new(1.0, 0.5, 0.0, 0.9),
+                    )), // Orange stroke
             ),
             *transform,
             1.0,
@@ -687,6 +719,7 @@ fn collect_gap_debug_shapes(
     _options: &crate::debug::DebugOptions,
     transform: &Transform2D,
     out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
+    _scale_factor: f32,
 ) {
     use crate::color::Color;
     use crate::layout::Layout;
