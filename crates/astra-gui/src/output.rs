@@ -135,6 +135,7 @@ impl FullOutput {
             initial_transform, // Start with pan offset applied
             debug_options,
             &mut raw_shapes,
+            scale_factor,
         );
 
         let shapes = raw_shapes
@@ -167,6 +168,7 @@ fn collect_clipped_shapes(
     parent_transform: Transform2D,
     debug_options: Option<crate::debug::DebugOptions>,
     out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
+    scale_factor: f32,
 ) {
     collect_clipped_shapes_with_opacity(
         node,
@@ -176,6 +178,7 @@ fn collect_clipped_shapes(
         debug_options,
         out,
         1.0,
+        scale_factor,
     );
 }
 
@@ -188,6 +191,7 @@ fn collect_clipped_shapes_with_opacity(
     debug_options: Option<crate::debug::DebugOptions>,
     out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
     parent_opacity: f32,
+    scale_factor: f32,
 ) {
     let combined_opacity = parent_opacity * node.opacity();
 
@@ -275,7 +279,9 @@ fn collect_clipped_shapes_with_opacity(
                         node_rect.max[1] - padding.bottom,
                     ],
                 );
-                let text_shape = crate::primitives::TextShape::new(content_rect, text_content);
+                let mut text_shape = crate::primitives::TextShape::new(content_rect, text_content);
+                // Scale font size by scale_factor for zoom
+                text_shape.font_size *= scale_factor;
                 // OPTIMIZATION: Store opacity instead of applying it to shape
                 out.push((
                     node_rect,
@@ -329,6 +335,7 @@ fn collect_clipped_shapes_with_opacity(
             debug_options,
             out,
             combined_opacity,
+            scale_factor,
         );
     }
 }

@@ -626,7 +626,7 @@ impl Node {
     ///
     /// NOTE: This always measures content size, regardless of the node's Size type.
     /// The Size type only matters when the parent is aggregating children for FitContent sizing.
-    fn measure_node(&self, measurer: &mut dyn ContentMeasurer) -> IntrinsicSize {
+    fn measure_node(&self, measurer: &mut dyn ContentMeasurer, scale_factor: f32) -> IntrinsicSize {
         // Short-circuit: if both dimensions are Fixed, we can return immediately
         if let (Size::Fixed(w), Size::Fixed(h)) = (self.width, self.height) {
             return IntrinsicSize::new(w, h);
@@ -639,13 +639,13 @@ impl Node {
                 let content_width = if let Some(content) = &self.content {
                     match content {
                         Content::Text(text_content) => {
-                            measurer
-                                .measure_text(MeasureTextRequest::from_text_content(text_content))
-                                .width
+                            let mut request = MeasureTextRequest::from_text_content(text_content);
+                            request.font_size *= scale_factor;
+                            measurer.measure_text(request).width
                         }
                     }
                 } else if !self.children.is_empty() {
-                    self.measure_children(measurer).width
+                    self.measure_children(measurer, scale_factor).width
                 } else {
                     0.0
                 };
@@ -664,13 +664,13 @@ impl Node {
                 let content_height = if let Some(content) = &self.content {
                     match content {
                         Content::Text(text_content) => {
-                            measurer
-                                .measure_text(MeasureTextRequest::from_text_content(text_content))
-                                .height
+                            let mut request = MeasureTextRequest::from_text_content(text_content);
+                            request.font_size *= scale_factor;
+                            measurer.measure_text(request).height
                         }
                     }
                 } else if !self.children.is_empty() {
-                    self.measure_children(measurer).height
+                    self.measure_children(measurer, scale_factor).height
                 } else {
                     0.0
                 };
@@ -692,7 +692,11 @@ impl Node {
     /// measured (for layout purposes) but don't contribute to parent's intrinsic size.
     ///
     /// OPTIMIZATION: Avoids Vec allocation by computing width/height in a single pass
-    fn measure_children(&self, measurer: &mut dyn ContentMeasurer) -> IntrinsicSize {
+    fn measure_children(
+        &self,
+        measurer: &mut dyn ContentMeasurer,
+        scale_factor: f32,
+    ) -> IntrinsicSize {
         if self.children.is_empty() {
             return IntrinsicSize::zero();
         }
@@ -749,7 +753,7 @@ impl Node {
                 let mut max_height = 0.0f32;
 
                 for child in &self.children {
-                    let size = child.measure_node(measurer);
+                    let size = child.measure_node(measurer, scale_factor);
                     total_width += size.width;
                     max_height = max_height.max(size.height);
                 }
@@ -763,7 +767,7 @@ impl Node {
                 let mut max_width = 0.0f32;
 
                 for child in &self.children {
-                    let size = child.measure_node(measurer);
+                    let size = child.measure_node(measurer, scale_factor);
                     total_height += size.height;
                     max_width = max_width.max(size.width);
                 }
@@ -776,7 +780,7 @@ impl Node {
                 let mut max_height = 0.0f32;
 
                 for child in &self.children {
-                    let size = child.measure_node(measurer);
+                    let size = child.measure_node(measurer, scale_factor);
                     max_width = max_width.max(size.width);
                     max_height = max_height.max(size.height);
                 }
@@ -873,7 +877,7 @@ impl Node {
         // OPTIMIZATION: Cache measurement result to avoid calling measure_node() twice when both
         // width and height are FitContent
         let measured_size = if self.width.is_fit_content() || self.height.is_fit_content() {
-            Some(self.measure_node(measurer))
+            Some(self.measure_node(measurer, scale_factor))
         } else {
             None
         };
@@ -1006,7 +1010,7 @@ impl Node {
                     if child.width.is_fill() {
                         fill_count += 1;
                     } else if child.width.is_fit_content() {
-                        used_width += child.measure_node(measurer).width;
+                        used_width += child.measure_node(measurer, scale_factor).width;
                     } else {
                         // Must be Fixed or Relative
                         used_width += child.width.try_resolve(available_width).unwrap();
@@ -1030,7 +1034,7 @@ impl Node {
                     if child.height.is_fill() {
                         fill_count += 1;
                     } else if child.height.is_fit_content() {
-                        used_height += child.measure_node(measurer).height;
+                        used_height += child.measure_node(measurer, scale_factor).height;
                     } else {
                         // Must be Fixed or Relative
                         used_height += child.height.try_resolve(available_height).unwrap();
@@ -1060,7 +1064,7 @@ impl Node {
                     if child.width.is_fill() {
                         total_width += fill_size_width;
                     } else if child.width.is_fit_content() {
-                        total_width += child.measure_node(measurer).width;
+                        total_width += child.measure_node(measurer, scale_factor).width;
                     } else {
                         total_width += child.width.try_resolve(available_width).unwrap_or(0.0);
                     }
@@ -1073,7 +1077,7 @@ impl Node {
                     if child.height.is_fill() {
                         total_height += fill_size_height;
                     } else if child.height.is_fit_content() {
-                        total_height += child.measure_node(measurer).height;
+                        total_height += child.measure_node(measurer, scale_factor).height;
                     } else {
                         total_height += child.height.try_resolve(available_height).unwrap_or(0.0);
                     }
