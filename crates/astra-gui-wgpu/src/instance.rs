@@ -15,10 +15,10 @@ pub struct RectInstance {
     pub translation: [f32; 2],
     /// Rotation in radians (clockwise positive, CSS convention)
     pub rotation: f32,
+    /// Uniform scale factor (1.0 = no scale)
+    pub scale: f32,
     /// Transform origin (absolute pixels from rect origin)
     pub transform_origin: [f32; 2],
-    /// Padding for alignment
-    pub _padding1: f32,
     /// Fill color (RGBA, normalized to 0-255)
     pub fill_color: [u8; 4],
     /// Stroke color (RGBA, normalized to 0-255)
@@ -61,13 +61,18 @@ impl RectInstance {
                 shader_location: 4,
                 format: wgpu::VertexFormat::Float32,
             },
-            // transform_origin: vec2<f32> at location 5
+            // scale: f32 at location 6
             wgpu::VertexAttribute {
                 offset: 28,
+                shader_location: 6,
+                format: wgpu::VertexFormat::Float32,
+            },
+            // transform_origin: vec2<f32> at location 5
+            wgpu::VertexAttribute {
+                offset: 32,
                 shader_location: 5,
                 format: wgpu::VertexFormat::Float32x2,
             },
-            // _padding1: f32 (skip, location 6 unused)
             // fill_color: vec4<f32> at location 7 (Unorm8x4)
             wgpu::VertexAttribute {
                 offset: 40,
@@ -138,6 +143,7 @@ impl From<&ClippedShape> for RectInstance {
             clipped.transform.translation.y,
         ];
         let rotation = clipped.transform.rotation;
+        let scale = clipped.transform.scale;
 
         // Resolve transform origin to absolute world-space pixels
         // If absolute_origin is set (from hierarchical rotation), use it
@@ -195,8 +201,8 @@ impl From<&ClippedShape> for RectInstance {
             half_size,
             translation,
             rotation,
+            scale,
             transform_origin,
-            _padding1: 0.0,
             fill_color,
             stroke_color,
             stroke_width,

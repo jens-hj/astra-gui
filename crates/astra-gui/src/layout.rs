@@ -80,8 +80,17 @@ impl Size {
     /// This is a non-panicking version of `resolve()` that returns `None`
     /// for sizes that cannot be resolved without additional context.
     pub fn try_resolve(&self, parent_size: f32) -> Option<f32> {
+        self.try_resolve_with_scale(parent_size, 1.0)
+    }
+
+    /// Try to resolve the size with a scale factor applied to Fixed sizes
+    ///
+    /// The `scale_factor` converts logical pixels to physical pixels for Fixed sizes.
+    /// Relative sizes are not affected by the scale factor as they are already
+    /// proportional to the parent size.
+    pub fn try_resolve_with_scale(&self, parent_size: f32, scale_factor: f32) -> Option<f32> {
         match self {
-            Size::Fixed(px) => Some(*px),
+            Size::Fixed(px) => Some(*px * scale_factor),
             Size::Relative(fraction) => Some(parent_size * fraction),
             Size::Fill | Size::FitContent => None,
         }
@@ -232,11 +241,12 @@ impl Default for TransformOrigin {
     }
 }
 
-/// 2D transform combining translation, rotation, and origin
+/// 2D transform combining translation, rotation, scale, and origin
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Transform2D {
     pub translation: Translation,
     pub rotation: f32, // Radians, clockwise positive (CSS convention)
+    pub scale: f32,    // Uniform scale factor (1.0 = no scale)
     pub origin: TransformOrigin,
     /// Absolute world-space origin position (resolved during transform composition)
     /// This is used for hierarchical rotations - children rotate around this point
@@ -247,6 +257,7 @@ impl Transform2D {
     pub const IDENTITY: Self = Self {
         translation: Translation::ZERO,
         rotation: 0.0,
+        scale: 1.0,
         origin: TransformOrigin {
             x_percent: 0.5,
             y_percent: 0.5,
@@ -257,6 +268,7 @@ impl Transform2D {
     };
 
     /// Apply transform to a point (forward transform)
+    /// Order: Scale → Rotate → Translate (around origin)
     pub fn apply(&self, point: [f32; 2], rect_size: [f32; 2]) -> [f32; 2] {
         let (origin_x, origin_y) = self.origin.resolve(rect_size[0], rect_size[1]);
 
@@ -264,11 +276,15 @@ impl Transform2D {
         let x = point[0] - origin_x;
         let y = point[1] - origin_y;
 
+        // Scale
+        let sx = x * self.scale;
+        let sy = y * self.scale;
+
         // Rotate (clockwise positive)
         let cos_r = self.rotation.cos();
         let sin_r = self.rotation.sin();
-        let rx = x * cos_r + y * sin_r;
-        let ry = -x * sin_r + y * cos_r;
+        let rx = sx * cos_r + sy * sin_r;
+        let ry = -sx * sin_r + sy * cos_r;
 
         // Translate back and apply translation
         [
@@ -279,8 +295,8 @@ impl Transform2D {
 
     /// Apply inverse transform (for hit testing)
     ///
-    /// Inverse of: translate first, then rotate
-    /// So we: inverse rotate first, then inverse translate
+    /// Inverse of: Scale → Rotate → Translate
+    /// So we: Inverse Translate → Inverse Rotate → Inverse Scale
     pub fn apply_inverse(&self, point: [f32; 2], rect_size: [f32; 2]) -> [f32; 2] {
         // Use absolute_origin if set, otherwise resolve the percentage-based origin
         let (origin_x, origin_y) = if let Some(abs_origin) = self.absolute_origin {
@@ -289,11 +305,15 @@ impl Transform2D {
             self.origin.resolve(rect_size[0], rect_size[1])
         };
 
-        // 1. Translate to origin for inverse rotation
-        let mut x = point[0] - origin_x;
-        let mut y = point[1] - origin_y;
+        // 1. Remove translation
+        let mut x = point[0] - self.translation.x;
+        let mut y = point[1] - self.translation.y;
 
-        // 2. Inverse rotate (negate angle)
+        // 2. Translate to origin for inverse rotation
+        x -= origin_x;
+        y -= origin_y;
+
+        // 3. Inverse rotate (negate angle)
         let cos_r = self.rotation.cos();
         let sin_r = self.rotation.sin();
         let rx = x * cos_r - y * sin_r;
@@ -302,18 +322,19 @@ impl Transform2D {
         x = rx;
         y = ry;
 
-        // 3. Translate back from origin
+        // 4. Inverse scale (divide by scale)
+        x /= self.scale;
+        y /= self.scale;
+
+        // 5. Translate back from origin
         x += origin_x;
         y += origin_y;
-
-        // 4. Remove translation
-        x -= self.translation.x;
-        y -= self.translation.y;
 
         [x, y]
     }
 
     /// Compose two transforms (apply self, then other)
+    /// Scales multiply, rotations add, translations add
     pub fn then(&self, other: &Transform2D, _rect_size: [f32; 2]) -> Transform2D {
         // If parent has rotation or an absolute origin, use parent's absolute origin
         // Otherwise, use child's origin (will be resolved later)
@@ -332,6 +353,7 @@ impl Transform2D {
                 y: self.translation.y + other.translation.y,
             },
             rotation: self.rotation + other.rotation,
+            scale: self.scale * other.scale, // Multiply scales
             origin: effective_origin,
             absolute_origin,
         }

@@ -21,7 +21,7 @@ struct InstanceInput {
     @location(3) translation: vec2<f32>,
     @location(4) rotation: f32,
     @location(5) transform_origin: vec2<f32>,
-    // location 6 is padding, skipped
+    @location(6) scale: f32,
     @location(7) fill_color: vec4<f32>,
     @location(8) stroke_color: vec4<f32>,
     @location(9) stroke_width: f32,
@@ -41,6 +41,7 @@ struct VertexOutput {
     @location(6) corner_param1: f32,
     @location(7) corner_param2: f32,
     @location(8) half_size: vec2<f32>,
+    @location(9) scale: f32,
 }
 
 @group(0) @binding(0)
@@ -59,23 +60,26 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     let padding = inst.stroke_width * 0.5;
     let expanded_size = inst.half_size + vec2<f32>(padding);
 
-    // Apply translation first (post-layout offset), then rotation
+    // Apply transforms: Scale → Rotate → Translate (around transform origin)
     // 1. Start with center position + translation
     let translated_center = inst.center + inst.translation;
     let local_pos = translated_center + vert.pos * expanded_size;
 
-    // 2. Translate to transform origin for rotation
+    // 2. Translate to transform origin for scale and rotation
     let centered = local_pos - inst.transform_origin;
 
-    // 3. Rotate (clockwise positive, CSS convention)
+    // 3. Scale
+    let scaled = centered * inst.scale;
+
+    // 4. Rotate (clockwise positive, CSS convention)
     let cos_r = cos(inst.rotation);
     let sin_r = sin(inst.rotation);
     let rotated = vec2<f32>(
-        centered.x * cos_r + centered.y * sin_r,
-        -centered.x * sin_r + centered.y * cos_r
+        scaled.x * cos_r + scaled.y * sin_r,
+        -scaled.x * sin_r + scaled.y * cos_r
     );
 
-    // 4. Translate back from origin
+    // 5. Translate back from origin
     out.world_pos = rotated + inst.transform_origin;
 
     // Convert to normalized device coordinates (NDC)
@@ -94,6 +98,7 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     out.corner_param1 = inst.corner_param1;
     out.corner_param2 = inst.corner_param2;
     out.half_size = inst.half_size;
+    out.scale = inst.scale;
 
     return out;
 }
@@ -222,8 +227,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // Anti-aliasing width based on screen-space derivative
-    // This ensures AA is always ~1 pixel wide regardless of zoom level
-    let aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist)));
+    // Adjust for scale: larger scale = sharper AA (divide by scale)
+    // This ensures AA stays crisp when zoomed in
+    let aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist))) / in.scale;
 
     // Stroke rendering: stroke is a ring, fill is the interior
     // We need to choose stroke OR fill, not blend them

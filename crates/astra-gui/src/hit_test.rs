@@ -31,8 +31,17 @@ pub struct HitTestResult {
 /// # Returns
 /// Vector of hit test results, ordered from shallowest (root) to deepest (leaf)
 pub fn hit_test_point(root: &Node, point: Point) -> Vec<HitTestResult> {
+    // Apply pan offset from root node for camera-style zoom
+    let initial_transform = Transform2D {
+        translation: root.pan_offset(),
+        rotation: 0.0,
+        scale: 1.0,
+        origin: crate::layout::TransformOrigin::center(),
+        absolute_origin: None,
+    };
+
     let mut results = Vec::new();
-    hit_test_recursive(root, point, None, Transform2D::IDENTITY, &mut results);
+    hit_test_recursive(root, point, None, initial_transform, &mut results);
     results
 }
 
@@ -77,6 +86,7 @@ fn hit_test_recursive(
     let local_transform = Transform2D {
         translation: node.translation(),
         rotation: node.rotation(),
+        scale: node.scale(),
         origin: node.transform_origin(),
         absolute_origin: None,
     };

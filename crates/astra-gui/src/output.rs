@@ -22,7 +22,19 @@ impl FullOutput {
     ///
     /// `window_size` is the (width, height) of the window
     pub fn from_node(root: Node, window_size: (f32, f32)) -> Self {
-        Self::from_node_with_debug(root, window_size, None)
+        Self::from_node_with_scale_factor(root, window_size, 1.0)
+    }
+
+    /// Create output from a node tree with a scale factor for logical-to-physical pixel conversion
+    ///
+    /// `window_size` is the (width, height) of the window
+    /// `scale_factor` is multiplied with all Fixed sizes, padding, margins, gaps, and font sizes
+    pub fn from_node_with_scale_factor(
+        root: Node,
+        window_size: (f32, f32),
+        scale_factor: f32,
+    ) -> Self {
+        Self::from_node_with_debug_and_scale_factor(root, window_size, None, scale_factor)
     }
 
     /// Create output from a node tree with optional debug visualization
@@ -34,7 +46,27 @@ impl FullOutput {
         window_size: (f32, f32),
         debug_options: Option<crate::debug::DebugOptions>,
     ) -> Self {
-        Self::from_node_with_debug_and_measurer(root, window_size, debug_options, None)
+        Self::from_node_with_debug_and_scale_factor(root, window_size, debug_options, 1.0)
+    }
+
+    /// Create output from a node tree with debug visualization and scale factor
+    ///
+    /// `window_size` is the (width, height) of the window
+    /// `debug_options` configures which debug visualizations to show
+    /// `scale_factor` is multiplied with all Fixed sizes, padding, margins, gaps, and font sizes
+    pub fn from_node_with_debug_and_scale_factor(
+        root: Node,
+        window_size: (f32, f32),
+        debug_options: Option<crate::debug::DebugOptions>,
+        scale_factor: f32,
+    ) -> Self {
+        Self::from_node_with_debug_measurer_and_scale_factor(
+            root,
+            window_size,
+            debug_options,
+            None,
+            scale_factor,
+        )
     }
 
     /// Create output from a node tree with optional debug visualization and measurer
@@ -43,18 +75,40 @@ impl FullOutput {
     /// `debug_options` configures which debug visualizations to show
     /// `measurer` enables `Size::FitContent` to resolve to intrinsic content size
     pub fn from_node_with_debug_and_measurer(
+        root: Node,
+        window_size: (f32, f32),
+        debug_options: Option<crate::debug::DebugOptions>,
+        measurer: Option<&mut dyn ContentMeasurer>,
+    ) -> Self {
+        Self::from_node_with_debug_measurer_and_scale_factor(
+            root,
+            window_size,
+            debug_options,
+            measurer,
+            1.0,
+        )
+    }
+
+    /// Create output from a node tree with debug visualization, measurer, and scale factor
+    ///
+    /// `window_size` is the (width, height) of the window
+    /// `debug_options` configures which debug visualizations to show
+    /// `measurer` enables `Size::FitContent` to resolve to intrinsic content size
+    /// `scale_factor` is multiplied with all Fixed sizes, padding, margins, gaps, and font sizes
+    pub fn from_node_with_debug_measurer_and_scale_factor(
         mut root: Node,
         window_size: (f32, f32),
         debug_options: Option<crate::debug::DebugOptions>,
         measurer: Option<&mut dyn ContentMeasurer>,
+        scale_factor: f32,
     ) -> Self {
         // Compute layout starting from the full window
         let window_rect = Rect::new([0.0, 0.0], [window_size.0, window_size.1]);
 
         if let Some(m) = measurer {
-            root.compute_layout_with_measurer(window_rect, m);
+            root.compute_layout_with_measurer_and_scale_factor(window_rect, m, scale_factor);
         } else {
-            root.compute_layout(window_rect);
+            root.compute_layout_with_scale_factor(window_rect, scale_factor);
         }
 
         // Convert to ClippedShapes (including optional debug shapes), with overflow-aware clip rects.
@@ -63,12 +117,22 @@ impl FullOutput {
         // - If any ancestor has `Overflow::Hidden` (or `Scroll`, for now), shapes are clipped to the
         //   intersection of those ancestor rects.
         // - If all ancestors are `Overflow::Visible`, the clip rect remains the full window rect.
+
+        // Apply pan offset from root node for camera-style zoom
+        let initial_transform = Transform2D {
+            translation: root.pan_offset(),
+            rotation: 0.0,
+            scale: 1.0,
+            origin: crate::layout::TransformOrigin::center(),
+            absolute_origin: None,
+        };
+
         let mut raw_shapes = Vec::new();
         collect_clipped_shapes(
             &root,
             window_rect,
             window_rect,
-            Transform2D::IDENTITY, // Start with identity transform
+            initial_transform, // Start with pan offset applied
             debug_options,
             &mut raw_shapes,
         );
@@ -142,6 +206,7 @@ fn collect_clipped_shapes_with_opacity(
     let local_transform = Transform2D {
         translation: node.translation(),
         rotation: node.rotation(),
+        scale: node.scale(),
         origin: node.transform_origin(),
         absolute_origin: None, // Will be set during composition if needed
     };

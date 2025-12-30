@@ -54,7 +54,11 @@ pub struct Node {
     translation: Translation,
     /// Rotation in radians, clockwise positive (CSS convention)
     rotation: f32,
-    /// Transform origin for rotation
+    /// Uniform scale factor (1.0 = no scale, 2.0 = double size, 0.5 = half size)
+    scale: f32,
+    /// Pan offset for camera-style zoom (typically applied at root node)
+    pan_offset: Translation,
+    /// Transform origin for rotation and scale
     transform_origin: TransformOrigin,
     /// Padding inside the node
     padding: Spacing,
@@ -135,6 +139,8 @@ impl Node {
             height: Size::default(),
             translation: Translation::ZERO,
             rotation: 0.0,
+            scale: 1.0,
+            pan_offset: Translation::ZERO,
             transform_origin: TransformOrigin::center(),
             padding: Spacing::ZERO,
             margin: Spacing::ZERO,
@@ -222,7 +228,19 @@ impl Node {
         self
     }
 
-    /// Set the transform origin for rotation
+    /// Set the scale factor (1.0 = no scale, 2.0 = double size, 0.5 = half size)
+    pub fn with_scale(mut self, scale: f32) -> Self {
+        self.scale = scale;
+        self
+    }
+
+    /// Set the pan offset for camera-style zoom (typically used on root node)
+    pub fn with_pan_offset(mut self, pan_offset: Translation) -> Self {
+        self.pan_offset = pan_offset;
+        self
+    }
+
+    /// Set the transform origin for rotation and scale
     pub fn with_transform_origin(mut self, origin: TransformOrigin) -> Self {
         self.transform_origin = origin;
         self
@@ -402,6 +420,16 @@ impl Node {
     /// Set the rotation (used by style system)
     pub(crate) fn set_rotation(&mut self, rotation: f32) {
         self.rotation = rotation;
+    }
+
+    /// Get the scale factor
+    pub(crate) fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    /// Get the pan offset
+    pub(crate) fn pan_offset(&self) -> Translation {
+        self.pan_offset
     }
 
     /// Get the transform origin
@@ -762,10 +790,18 @@ impl Node {
     ///
     /// `available_rect` is the space available for this node (typically parent's content area)
     pub fn compute_layout(&mut self, available_rect: Rect) {
+        self.compute_layout_with_scale_factor(available_rect, 1.0);
+    }
+
+    /// Compute layout with a scale factor for logical-to-physical pixel conversion
+    ///
+    /// `scale_factor` is multiplied with all Fixed sizes, padding, margins, gaps, and font sizes
+    pub fn compute_layout_with_scale_factor(&mut self, available_rect: Rect, scale_factor: f32) {
         self.compute_layout_with_parent_size(
             available_rect,
             available_rect.width(),
             available_rect.height(),
+            scale_factor,
         );
     }
 
@@ -777,12 +813,23 @@ impl Node {
         available_rect: Rect,
         measurer: &mut dyn ContentMeasurer,
     ) {
+        self.compute_layout_with_measurer_and_scale_factor(available_rect, measurer, 1.0);
+    }
+
+    /// Compute layout with both a measurer and scale factor
+    pub fn compute_layout_with_measurer_and_scale_factor(
+        &mut self,
+        available_rect: Rect,
+        measurer: &mut dyn ContentMeasurer,
+        scale_factor: f32,
+    ) {
         self.compute_layout_with_parent_size_and_measurer(
             available_rect,
             available_rect.width(),
             available_rect.height(),
             measurer,
             Overflow::Visible, // Root has no parent, assume Visible
+            scale_factor,
         );
     }
 
@@ -807,10 +854,17 @@ impl Node {
         parent_height: f32,
         measurer: &mut dyn ContentMeasurer,
         parent_overflow: Overflow,
+        scale_factor: f32,
     ) {
         // Account for this node's margins when calculating available space
-        let available_width = (parent_width - self.margin.left - self.margin.right).max(0.0);
-        let available_height = (parent_height - self.margin.top - self.margin.bottom).max(0.0);
+        // Apply scale_factor to margin values (logical -> physical pixels)
+        let margin_left = self.margin.left * scale_factor;
+        let margin_right = self.margin.right * scale_factor;
+        let margin_top = self.margin.top * scale_factor;
+        let margin_bottom = self.margin.bottom * scale_factor;
+
+        let available_width = (parent_width - margin_left - margin_right).max(0.0);
+        let available_height = (parent_height - margin_top - margin_bottom).max(0.0);
 
         // Resolve width and height
         // IMPORTANT: Only measure FitContent dimensions. For Fixed/Relative/Fill, use constraints directly.
@@ -861,10 +915,16 @@ impl Node {
         let outer_y = available_rect.min[1];
 
         // Content area (after subtracting padding)
-        let content_x = outer_x + self.padding.left;
-        let content_y = outer_y + self.padding.top;
-        let content_width = width - self.padding.left - self.padding.right;
-        let content_height = height - self.padding.top - self.padding.bottom;
+        // Apply scale_factor to padding values (logical -> physical pixels)
+        let padding_left = self.padding.left * scale_factor;
+        let padding_right = self.padding.right * scale_factor;
+        let padding_top = self.padding.top * scale_factor;
+        let padding_bottom = self.padding.bottom * scale_factor;
+
+        let content_x = outer_x + padding_left;
+        let content_y = outer_y + padding_top;
+        let content_width = width - padding_left - padding_right;
+        let content_height = height - padding_top - padding_bottom;
 
         // Store computed layout for this node (untransformed - translation applied during rendering)
         self.computed = Some(ComputedLayout::new(Rect::new(
@@ -877,20 +937,28 @@ impl Node {
         let mut current_y = content_y;
 
         // Calculate total spacing in the layout direction (margins + gaps)
+        // Apply scale_factor to gap and child margins (logical -> physical pixels)
+        let scaled_gap = self.gap * scale_factor;
         let (total_horizontal_spacing, total_vertical_spacing) = match self.layout_direction {
             Layout::Horizontal => {
                 let mut total = 0.0f32;
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
-                        total += child.margin.left;
+                        // First child: left margin doesn't collapse with parent padding
+                        total += child.margin.left * scale_factor;
                     }
 
+                    // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
-                        let collapsed_margin = child.margin.right.max(next_child.margin.left);
-                        total += self.gap.max(collapsed_margin);
+                        // Collapsed margin is the max of the two adjacent margins (scaled)
+                        let collapsed_margin = (child.margin.right * scale_factor)
+                            .max(next_child.margin.left * scale_factor);
+                        // Collapse gap with margin - use the larger of gap or collapsed margin
+                        total += scaled_gap.max(collapsed_margin);
                     } else {
-                        total += child.margin.right;
+                        // Last child: just add its right margin
+                        total += child.margin.right * scale_factor;
                     }
                 }
                 (total, 0.0)
@@ -899,15 +967,21 @@ impl Node {
                 let mut total = 0.0f32;
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
-                        total += child.margin.top;
+                        // First child: top margin doesn't collapse with parent padding
+                        total += child.margin.top * scale_factor;
                     }
 
+                    // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
-                        let collapsed_margin = child.margin.bottom.max(next_child.margin.top);
-                        total += self.gap.max(collapsed_margin);
+                        // Collapsed margin is the max of the two adjacent margins (scaled)
+                        let collapsed_margin = (child.margin.bottom * scale_factor)
+                            .max(next_child.margin.top * scale_factor);
+                        // Collapse gap with margin - use the larger of gap or collapsed margin
+                        total += scaled_gap.max(collapsed_margin);
                     } else {
-                        total += child.margin.bottom;
+                        // Last child: just add its bottom margin
+                        total += child.margin.bottom * scale_factor;
                     }
                 }
                 (0.0, total)
@@ -1067,10 +1141,10 @@ impl Node {
             if i == 0 {
                 match self.layout_direction {
                     Layout::Horizontal => {
-                        current_x += self.children[i].margin.left;
+                        current_x += self.children[i].margin.left * scale_factor;
                     }
                     Layout::Vertical => {
-                        current_y += self.children[i].margin.top;
+                        current_y += self.children[i].margin.top * scale_factor;
                     }
                     Layout::Stack => {
                         // In Stack layout, don't advance position for first child
@@ -1096,15 +1170,21 @@ impl Node {
                 }
             };
 
+            // Scale child margins before calculating parent dimensions
+            let child_margin_left = self.children[i].margin.left * scale_factor;
+            let child_margin_right = self.children[i].margin.right * scale_factor;
+            let child_margin_top = self.children[i].margin.top * scale_factor;
+            let child_margin_bottom = self.children[i].margin.bottom * scale_factor;
+
             let child_parent_width = if self.children[i].width.is_fill() {
-                fill_size_width + self.children[i].margin.left + self.children[i].margin.right
+                fill_size_width + child_margin_left + child_margin_right
             } else {
-                available_width + self.children[i].margin.left + self.children[i].margin.right
+                available_width + child_margin_left + child_margin_right
             };
             let child_parent_height = if self.children[i].height.is_fill() {
-                fill_size_height + self.children[i].margin.top + self.children[i].margin.bottom
+                fill_size_height + child_margin_top + child_margin_bottom
             } else {
-                available_height + self.children[i].margin.top + self.children[i].margin.bottom
+                available_height + child_margin_top + child_margin_bottom
             };
 
             self.children[i].compute_layout_with_parent_size_and_measurer(
@@ -1113,6 +1193,7 @@ impl Node {
                 child_parent_height,
                 measurer,
                 self.overflow, // Pass this node's overflow to children
+                scale_factor,
             );
 
             // Apply cross-axis alignment after computing child layout
@@ -1175,19 +1256,17 @@ impl Node {
                 if i + 1 < num_children {
                     match self.layout_direction {
                         Layout::Horizontal => {
-                            let collapsed_margin = self.children[i]
-                                .margin
-                                .right
-                                .max(self.children[i + 1].margin.left);
-                            let spacing = self.gap.max(collapsed_margin);
+                            // Collapse margins with scale_factor applied
+                            let collapsed_margin = (self.children[i].margin.right * scale_factor)
+                                .max(self.children[i + 1].margin.left * scale_factor);
+                            let spacing = scaled_gap.max(collapsed_margin);
                             current_x = child_rect.max[0] + spacing;
                         }
                         Layout::Vertical => {
-                            let collapsed_margin = self.children[i]
-                                .margin
-                                .bottom
-                                .max(self.children[i + 1].margin.top);
-                            let spacing = self.gap.max(collapsed_margin);
+                            // Collapse margins with scale_factor applied
+                            let collapsed_margin = (self.children[i].margin.bottom * scale_factor)
+                                .max(self.children[i + 1].margin.top * scale_factor);
+                            let spacing = scaled_gap.max(collapsed_margin);
                             current_y = child_rect.max[1] + spacing;
                         }
                         Layout::Stack => {
@@ -1204,20 +1283,28 @@ impl Node {
         available_rect: Rect,
         parent_width: f32,
         parent_height: f32,
+        scale_factor: f32,
     ) {
         // Account for this node's margins when calculating available space
-        let available_width = (parent_width - self.margin.left - self.margin.right).max(0.0);
-        let available_height = (parent_height - self.margin.top - self.margin.bottom).max(0.0);
+        // Apply scale_factor to margin values (logical -> physical pixels)
+        let margin_left = self.margin.left * scale_factor;
+        let margin_right = self.margin.right * scale_factor;
+        let margin_top = self.margin.top * scale_factor;
+        let margin_bottom = self.margin.bottom * scale_factor;
+
+        let available_width = (parent_width - margin_left - margin_right).max(0.0);
+        let available_height = (parent_height - margin_top - margin_bottom).max(0.0);
 
         // Resolve width and height from available space (after margins)
         // NOTE: Without a measurer, FitContent falls back to available size
+        // Apply scale_factor to Fixed sizes (logical -> physical pixels)
         let width = self
             .width
-            .try_resolve(available_width)
+            .try_resolve_with_scale(available_width, scale_factor)
             .unwrap_or(available_width);
         let height = self
             .height
-            .try_resolve(available_height)
+            .try_resolve_with_scale(available_height, scale_factor)
             .unwrap_or(available_height);
 
         // Position is already adjusted for margins by parent, don't add them again
@@ -1225,10 +1312,16 @@ impl Node {
         let outer_y = available_rect.min[1];
 
         // Content area (after subtracting padding)
-        let content_x = outer_x + self.padding.left;
-        let content_y = outer_y + self.padding.top;
-        let content_width = width - self.padding.left - self.padding.right;
-        let content_height = height - self.padding.top - self.padding.bottom;
+        // Apply scale_factor to padding values (logical -> physical pixels)
+        let padding_left = self.padding.left * scale_factor;
+        let padding_right = self.padding.right * scale_factor;
+        let padding_top = self.padding.top * scale_factor;
+        let padding_bottom = self.padding.bottom * scale_factor;
+
+        let content_x = outer_x + padding_left;
+        let content_y = outer_y + padding_top;
+        let content_width = width - padding_left - padding_right;
+        let content_height = height - padding_top - padding_bottom;
 
         // Store computed layout for this node (untransformed - translation applied during rendering)
         self.computed = Some(ComputedLayout::new(Rect::new(
@@ -1241,25 +1334,28 @@ impl Node {
         let mut current_y = content_y;
 
         // Calculate total spacing in the layout direction (margins + gaps)
+        // Apply scale_factor to gap and child margins (logical -> physical pixels)
+        let scaled_gap = self.gap * scale_factor;
         let (total_horizontal_spacing, total_vertical_spacing) = match self.layout_direction {
             Layout::Horizontal => {
                 let mut total = 0.0f32;
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
                         // First child: left margin doesn't collapse with parent padding
-                        total += child.margin.left;
+                        total += child.margin.left * scale_factor;
                     }
 
                     // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
-                        // Collapsed margin is the max of the two adjacent margins
-                        let collapsed_margin = child.margin.right.max(next_child.margin.left);
+                        // Collapsed margin is the max of the two adjacent margins (scaled)
+                        let collapsed_margin = (child.margin.right * scale_factor)
+                            .max(next_child.margin.left * scale_factor);
                         // Collapse gap with margin - use the larger of gap or collapsed margin
-                        total += self.gap.max(collapsed_margin);
+                        total += scaled_gap.max(collapsed_margin);
                     } else {
                         // Last child: just add its right margin
-                        total += child.margin.right;
+                        total += child.margin.right * scale_factor;
                     }
                 }
                 (total, 0.0)
@@ -1269,19 +1365,20 @@ impl Node {
                 for (i, child) in self.children.iter().enumerate() {
                     if i == 0 {
                         // First child: top margin doesn't collapse with parent padding
-                        total += child.margin.top;
+                        total += child.margin.top * scale_factor;
                     }
 
                     // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
                         let next_child = &self.children[i + 1];
-                        // Collapsed margin is the max of the two adjacent margins
-                        let collapsed_margin = child.margin.bottom.max(next_child.margin.top);
+                        // Collapsed margin is the max of the two adjacent margins (scaled)
+                        let collapsed_margin = (child.margin.bottom * scale_factor)
+                            .max(next_child.margin.top * scale_factor);
                         // Collapse gap with margin - use the larger of gap or collapsed margin
-                        total += self.gap.max(collapsed_margin);
+                        total += scaled_gap.max(collapsed_margin);
                     } else {
                         // Last child: just add its bottom margin
-                        total += child.margin.bottom;
+                        total += child.margin.bottom * scale_factor;
                     }
                 }
                 (0.0, total)
@@ -1308,9 +1405,10 @@ impl Node {
                         fill_count += 1;
                     } else {
                         // For FitContent without measurer, fall back to available width
+                        // Apply scale_factor to Fixed sizes
                         used_width += child
                             .width
-                            .try_resolve(available_width)
+                            .try_resolve_with_scale(available_width, scale_factor)
                             .unwrap_or(available_width);
                     }
                 }
@@ -1335,9 +1433,10 @@ impl Node {
                         fill_count += 1;
                     } else {
                         // For FitContent without measurer, fall back to available height
+                        // Apply scale_factor to Fixed sizes
                         used_height += child
                             .height
-                            .try_resolve(available_height)
+                            .try_resolve_with_scale(available_height, scale_factor)
                             .unwrap_or(available_height);
                     }
                 }
@@ -1416,6 +1515,7 @@ impl Node {
                 child_available_rect,
                 child_parent_width,
                 child_parent_height,
+                scale_factor,
             );
 
             // Advance position for next child with collapsed spacing (gap collapsed with margins)
