@@ -3,10 +3,13 @@
 //! Provides an editable text input field with cursor, selection, and keyboard support.
 
 use astra_gui::{
-    catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, Rect, Shape,
-    Size, Spacing, Stroke, Style, StyledRect, TextContent, Transition, Translation, VerticalAlign,
+    catppuccin::mocha, Color, Content, ContentMeasurer, CornerShape, HorizontalAlign, Layout,
+    MeasureTextRequest, Node, NodeId, Overflow, Rect, Shape, Size, Spacing, Stroke, Style,
+    StyledRect, TextContent, Transition, Translation, VerticalAlign,
 };
-use astra_gui_wgpu::{InteractionEvent, Key, NamedKey, TargetedEvent};
+use astra_gui_wgpu::{
+    EventDispatcher, InputState, InteractionEvent, Key, MouseButton, NamedKey, TargetedEvent,
+};
 use std::time::Duration;
 
 /// Cursor shape for text input
@@ -145,11 +148,11 @@ pub fn text_input(
     style: &TextInputStyle,
     cursor_position: usize,
     selection_range: Option<(usize, usize)>,
-    measurer: &mut impl astra_gui::ContentMeasurer,
-    event_dispatcher: &mut astra_gui_wgpu::EventDispatcher,
+    measurer: &mut impl ContentMeasurer,
+    event_dispatcher: &mut EventDispatcher,
 ) -> Node {
     let id_string = id.into();
-    let node_id = astra_gui::NodeId::new(&id_string);
+    let node_id = NodeId::new(&id_string);
     let value_str = value.into();
     let placeholder_str = placeholder.into();
 
@@ -180,7 +183,7 @@ pub fn text_input(
     // For centered/right-aligned text, we need to know the total width and starting position
     let total_text_width = if !value_str.is_empty() {
         measurer
-            .measure_text(astra_gui::MeasureTextRequest {
+            .measure_text(MeasureTextRequest {
                 text: &value_str,
                 font_size: style.font_size,
                 h_align: style.text_align,
@@ -205,7 +208,7 @@ pub fn text_input(
     let cursor_x_offset = text_start_x
         + if !text_before_cursor.is_empty() {
             measurer
-                .measure_text(astra_gui::MeasureTextRequest {
+                .measure_text(MeasureTextRequest {
                     text: &text_before_cursor,
                     font_size: style.font_size,
                     h_align: HorizontalAlign::Left, // Always measure from left for positioning
@@ -227,7 +230,7 @@ pub fn text_input(
             let selection_x_offset = text_start_x
                 + if !text_before_selection.is_empty() {
                     measurer
-                        .measure_text(astra_gui::MeasureTextRequest {
+                        .measure_text(MeasureTextRequest {
                             text: &text_before_selection,
                             font_size: style.font_size,
                             h_align: HorizontalAlign::Left, // Always measure from left for positioning
@@ -247,7 +250,7 @@ pub fn text_input(
                 .collect::<String>();
             let selection_width = if !selected_text.is_empty() {
                 measurer
-                    .measure_text(astra_gui::MeasureTextRequest {
+                    .measure_text(MeasureTextRequest {
                         text: &selected_text,
                         font_size: style.font_size,
                         h_align: HorizontalAlign::Left, // Always measure from left for positioning
@@ -317,7 +320,7 @@ pub fn text_input(
                 } else {
                     let char_at_cursor = value_str.chars().nth(cursor_position).unwrap_or(' ');
                     let char_width = measurer
-                        .measure_text(astra_gui::MeasureTextRequest {
+                        .measure_text(MeasureTextRequest {
                             text: &char_at_cursor.to_string(),
                             font_size: style.font_size,
                             h_align: HorizontalAlign::Left,
@@ -341,7 +344,7 @@ pub fn text_input(
                 } else {
                     let char_at_cursor = value_str.chars().nth(cursor_position - 1).unwrap_or(' ');
                     let char_width = measurer
-                        .measure_text(astra_gui::MeasureTextRequest {
+                        .measure_text(MeasureTextRequest {
                             text: &char_at_cursor.to_string(),
                             font_size: style.font_size,
                             h_align: HorizontalAlign::Left,
@@ -368,7 +371,7 @@ pub fn text_input(
     // Add hitbox node to capture all clicks (including on text)
     children.push(
         Node::new()
-            .with_id(astra_gui::NodeId::new(format!("{}_hitbox", id_string)))
+            .with_id(NodeId::new(format!("{}_hitbox", id_string)))
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_disabled(disabled),
@@ -398,8 +401,8 @@ pub fn text_input(
         .with_height(Size::px(style.font_size + style.padding.get_vertical()))
         .with_padding(style.padding)
         .with_layout_direction(Layout::Stack)
-        .with_shape(astra_gui::Shape::rect())
-        .with_overflow(astra_gui::Overflow::Hidden)
+        .with_shape(Shape::rect())
+        .with_overflow(Overflow::Hidden)
         .with_style(Style {
             fill_color: Some(fill_color),
             stroke: Some(Stroke::new(stroke_width, stroke_color)),
@@ -510,10 +513,10 @@ pub fn text_input_update(
     cursor_pos: &mut usize,
     selection_range: &mut Option<(usize, usize)>,
     events: &[TargetedEvent],
-    input_state: &astra_gui_wgpu::InputState,
-    event_dispatcher: &mut astra_gui_wgpu::EventDispatcher,
+    input_state: &InputState,
+    event_dispatcher: &mut EventDispatcher,
 ) -> bool {
-    let node_id = astra_gui::NodeId::new(input_id);
+    let node_id = NodeId::new(input_id);
     let mut changed = false;
 
     // Handle focus on click
@@ -522,16 +525,14 @@ pub fn text_input_update(
     }
 
     // Handle unfocus: clicking outside or pressing ESC
-    use astra_gui_wgpu::MouseButton;
+    use MouseButton;
     let mouse_clicked_outside = input_state.is_button_just_pressed(MouseButton::Left)
         && !text_input_clicked(input_id, events);
 
-    let escape_pressed = input_state.keys_just_pressed.iter().any(|key| {
-        matches!(
-            key,
-            astra_gui_wgpu::Key::Named(astra_gui_wgpu::NamedKey::Escape)
-        )
-    });
+    let escape_pressed = input_state
+        .keys_just_pressed
+        .iter()
+        .any(|key| matches!(key, Key::Named(NamedKey::Escape)));
 
     let currently_focused = event_dispatcher
         .focused_node()

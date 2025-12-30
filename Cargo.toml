@@ -16,7 +16,7 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 # Core wgpu for GPU programming
-wgpu = "27.0"
+wgpu = "28.0"
 # Window creation and event handling
 winit = "0.30"
 # Async runtime for wgpu initialization
@@ -26,7 +26,7 @@ glam = "0.30"
 # Byte conversion for GPU buffers
 bytemuck = { version = "1.24", features = ["derive"] }
 # Text shaping and rendering
-cosmic-text = "0.15"
+cosmic-text = "0.16"
 # Logging
 log = "0.4"
 env_logger = "0.11"

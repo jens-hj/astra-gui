@@ -166,21 +166,10 @@ fn collect_clipped_shapes_with_opacity(
     let effective_clip_rect = match node.overflow() {
         Overflow::Visible => inherited_clip_rect,
         Overflow::Hidden | Overflow::Scroll => {
-            // For Hidden/Scroll, clip to the content area (node rect minus padding)
-            let padding = node.padding();
-            let content_rect = Rect::new(
-                [
-                    node_rect.min[0] + padding.left,
-                    node_rect.min[1] + padding.top,
-                ],
-                [
-                    node_rect.max[0] - padding.right,
-                    node_rect.max[1] - padding.bottom,
-                ],
-            );
-            // Transform the content rect to get its AABB
-            let content_aabb = compute_transformed_aabb(content_rect, &world_transform);
-            intersect_rect(inherited_clip_rect, content_aabb)
+            // For Hidden/Scroll, clip to the node rect (including padding)
+            // Transform the node rect to get its AABB
+            let node_aabb = compute_transformed_aabb(node_rect, &world_transform);
+            intersect_rect(inherited_clip_rect, node_aabb)
         }
     };
 

@@ -121,7 +121,18 @@ impl InputState {
 
                 match event.state {
                     ElementState::Pressed => {
-                        if !event.repeat {
+                        // Allow repeats for navigation and editing keys
+                        let allow_repeat = matches!(
+                            &event.logical_key,
+                            Key::Named(NamedKey::Backspace)
+                                | Key::Named(NamedKey::Delete)
+                                | Key::Named(NamedKey::ArrowLeft)
+                                | Key::Named(NamedKey::ArrowRight)
+                                | Key::Named(NamedKey::ArrowUp)
+                                | Key::Named(NamedKey::ArrowDown)
+                        );
+
+                        if !event.repeat || allow_repeat {
                             self.keys_just_pressed.push(event.logical_key.clone());
                         }
                         // Handle text input from key events
