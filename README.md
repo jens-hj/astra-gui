@@ -35,8 +35,8 @@ Add astra-gui to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-astra-gui = "0.2.0"
-astra-gui-wgpu = "0.2.0"
+astra-gui = "0.3.0"
+astra-gui-wgpu = "0.3.0"
 ```
 
 ## Examples
