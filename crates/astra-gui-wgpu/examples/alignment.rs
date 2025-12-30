@@ -233,81 +233,71 @@ impl App {
         // Helper function to create a colored box
         let create_box = |color: Color, text: &str| {
             Node::new()
-                .with_width(Size::px(100.0))
-                .with_height(Size::px(80.0))
-                .with_shape(Shape::rect())
+                .with_width(Size::fraction(1.0 / 3.0))
+                .with_height(Size::fraction(1.0 / 3.0))
                 .with_style(Style {
                     fill_color: Some(mocha::CRUST),
                     stroke: Some(Stroke::new(2.0, color)),
                     corner_shape: Some(CornerShape::Round(8.0)),
                     ..Default::default()
                 })
-                .with_padding(Spacing::all(4.0))
                 .with_h_align(HorizontalAlign::Center)
                 .with_v_align(VerticalAlign::Center)
-                .with_child(Node::new().with_content(Content::Text(TextContent {
-                    text: text.to_string(),
-                    font_size: 20.0,
-                    color: mocha::TEXT,
-                    h_align: HorizontalAlign::Center,
-                    v_align: VerticalAlign::Center,
-                })))
+                .with_child(
+                    Node::new().with_content(Content::Text(
+                        TextContent::new(text)
+                            .with_font_size(20.0)
+                            .with_color(mocha::TEXT),
+                    )),
+                )
         };
 
         // Helper to create a container with alignment settings
-        let create_container =
-            |h_align: HorizontalAlign, v_align: VerticalAlign, layout: Layout| {
-                let h_label = match h_align {
-                    HorizontalAlign::Left => "Left",
-                    HorizontalAlign::Center => "Center",
-                    HorizontalAlign::Right => "Right",
-                };
-                let v_label = match v_align {
-                    VerticalAlign::Top => "Top",
-                    VerticalAlign::Center => "Center",
-                    VerticalAlign::Bottom => "Bottom",
-                };
-                let layout_label = match layout {
-                    Layout::Horizontal => "Horizontal",
-                    Layout::Vertical => "Vertical",
-                    Layout::Stack => "Stack",
-                };
-
-                Node::new()
-                    .with_width(Size::px(300.0))
-                    .with_height(Size::px(300.0))
-                    .with_layout_direction(Layout::Vertical)
-                    .with_gap(8.0)
-                    .with_children(vec![
-                        // Label
-                        Node::new()
-                            .with_height(Size::px(50.0))
-                            .with_content(Content::Text(TextContent {
-                                text: format!("{} {}\n{}", h_label, v_label, layout_label),
-                                font_size: 16.0,
-                                color: mocha::SUBTEXT0,
-                                h_align: HorizontalAlign::Center,
-                                v_align: VerticalAlign::Center,
-                            })),
-                        // Container with alignment
-                        Node::new()
-                            .with_layout_direction(layout)
-                            .with_width(Size::Fill)
-                            .with_height(Size::Fill)
-                            .with_shape(Shape::rect())
-                            .with_style(Style {
-                                fill_color: Some(mocha::CRUST),
-                                stroke: Some(Stroke::new(2.0, mocha::SURFACE0)),
-                                corner_shape: Some(CornerShape::Round(18.0)),
-                                ..Default::default()
-                            })
-                            .with_padding(Spacing::all(12.0))
-                            .with_gap(8.0)
-                            .with_h_align(h_align)
-                            .with_v_align(v_align)
-                            .with_child(create_box(mocha::BLUE, "Box")),
-                    ])
+        let create_container = |h_align: HorizontalAlign, v_align: VerticalAlign| {
+            let h_label = match h_align {
+                HorizontalAlign::Left => "Left",
+                HorizontalAlign::Center => "Center",
+                HorizontalAlign::Right => "Right",
             };
+            let v_label = match v_align {
+                VerticalAlign::Top => "Top",
+                VerticalAlign::Center => "Center",
+                VerticalAlign::Bottom => "Bottom",
+            };
+
+            Node::new()
+                .with_layout_direction(Layout::Vertical)
+                .with_children(vec![
+                    // Label
+                    Node::new()
+                        // .with_height(Size::px(50.0))
+                        .with_width(Size::Fill)
+                        .with_margin(Spacing::bottom(20.0))
+                        .with_content(Content::Text(TextContent {
+                            text: format!("{} {}", h_label, v_label),
+                            font_size: 24.0,
+                            color: mocha::SUBTEXT0,
+                            h_align: HorizontalAlign::Center,
+                            v_align: VerticalAlign::Center,
+                        })),
+                    // Container with alignment
+                    Node::new()
+                        .with_width(Size::px(300.0))
+                        .with_height(Size::px(300.0))
+                        .with_style(Style {
+                            fill_color: Some(mocha::CRUST),
+                            stroke: Some(Stroke::new(2.0, mocha::SURFACE0)),
+                            corner_shape: Some(CornerShape::Round(18.0)),
+                            ..Default::default()
+                        })
+                        .with_padding(Spacing::all(12.0))
+                        // .with_gap(8.0)
+                        .with_layout_direction(Layout::Horizontal)
+                        .with_h_align(h_align)
+                        .with_v_align(v_align)
+                        .with_child(create_box(mocha::BLUE, "Box")),
+                ])
+        };
 
         Node::new()
             .with_width(Size::Fill)
@@ -348,7 +338,6 @@ impl App {
                 // Main content area
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_height(Size::Fill)
                     .with_layout_direction(Layout::Horizontal)
                     .with_gap(40.0)
                     .with_children(vec![
@@ -357,69 +346,60 @@ impl App {
                         // Content container
                         Node::new()
                             .with_layout_direction(Layout::Vertical)
-                            .with_gap(24.0)
+                            .with_gap(36.0)
                             .with_children(vec![
                                 // Horizontal Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(20.0)
+                                    .with_gap(36.0)
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
                                             VerticalAlign::Top,
-                                            Layout::Horizontal,
                                         ),
                                         create_container(
                                             HorizontalAlign::Center,
                                             VerticalAlign::Top,
-                                            Layout::Horizontal,
                                         ),
                                         create_container(
                                             HorizontalAlign::Right,
                                             VerticalAlign::Top,
-                                            Layout::Horizontal,
                                         ),
                                     ]),
                                 // Vertical Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(20.0)
+                                    .with_gap(36.0)
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
                                             VerticalAlign::Center,
-                                            Layout::Vertical,
                                         ),
                                         create_container(
                                             HorizontalAlign::Center,
                                             VerticalAlign::Center,
-                                            Layout::Vertical,
                                         ),
                                         create_container(
                                             HorizontalAlign::Right,
                                             VerticalAlign::Center,
-                                            Layout::Vertical,
                                         ),
                                     ]),
                                 // Stack Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(20.0)
+                                    .with_gap(36.0)
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
                                             VerticalAlign::Bottom,
-                                            Layout::Stack,
                                         ),
                                         create_container(
                                             HorizontalAlign::Center,
                                             VerticalAlign::Bottom,
-                                            Layout::Stack,
                                         ),
                                         create_container(
                                             HorizontalAlign::Right,
                                             VerticalAlign::Bottom,
-                                            Layout::Stack,
                                         ),
                                     ]),
                             ]),
