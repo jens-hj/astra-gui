@@ -291,7 +291,6 @@ impl App {
                             ..Default::default()
                         })
                         .with_padding(Spacing::all(12.0))
-                        // .with_gap(8.0)
                         .with_layout_direction(Layout::Horizontal)
                         .with_h_align(h_align)
                         .with_v_align(v_align)
@@ -561,5 +560,8 @@ fn main() {
     event_loop.set_control_flow(ControlFlow::Poll);
 
     let mut app = App::new();
+
+    println!("{}", DEBUG_HELP_TEXT);
+
     event_loop.run_app(&mut app).unwrap();
 }
