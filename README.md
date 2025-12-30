@@ -29,6 +29,13 @@ The library is split into several crates:
   - Pre-allocated buffers to minimize allocations
   - Optimized rendering pipeline achieving 60+ FPS even with complex UIs
 
+## Compatibility
+
+| Astra GUI Version | wgpu Version | cosmic-text Version |
+|-------------------|--------------|---------------------|
+| 0.3.x             | 28.x         | 0.16.x              |
+| 0.2.x             | 27.x         | 0.15.x              |
+
 ## Getting Started
 
 Add astra-gui to your `Cargo.toml`:
