@@ -306,6 +306,10 @@ impl Node {
 
     /// Set the base style (always applied)
     pub fn with_style(mut self, style: Style) -> Self {
+        // Default shape to rect if not set
+        if self.shape.is_none() {
+            self.shape = Some(Shape::rect());
+        }
         // Apply the style immediately for nodes without interactive states
         // (nodes with IDs will have styles applied via InteractiveStateManager)
         style.apply_to_node(&mut self);
@@ -782,6 +786,20 @@ impl Node {
         );
     }
 
+    /// Recursively offset this node and all its descendants by the given delta
+    fn offset_layout_recursive(&mut self, x_delta: f32, y_delta: f32) {
+        if let Some(computed) = &mut self.computed {
+            computed.rect.min[0] += x_delta;
+            computed.rect.max[0] += x_delta;
+            computed.rect.min[1] += y_delta;
+            computed.rect.max[1] += y_delta;
+        }
+
+        for child in &mut self.children {
+            child.offset_layout_recursive(x_delta, y_delta);
+        }
+    }
+
     fn compute_layout_with_parent_size_and_measurer(
         &mut self,
         available_rect: Rect,
@@ -1099,11 +1117,11 @@ impl Node {
 
             // Apply cross-axis alignment after computing child layout
             if let Some(child_layout) = self.children[i].computed_layout() {
-                let mut child_rect = child_layout.rect;
+                let child_rect = child_layout.rect;
                 let child_width = child_rect.max[0] - child_rect.min[0];
                 let child_height = child_rect.max[1] - child_rect.min[1];
 
-                match self.layout_direction {
+                let (x_delta, y_delta) = match self.layout_direction {
                     Layout::Horizontal => {
                         // For horizontal layout, v_align controls cross-axis (vertical) alignment
                         let available_height = content_height;
@@ -1113,10 +1131,7 @@ impl Node {
                             VerticalAlign::Bottom => available_height - child_height,
                         };
                         let new_y = content_y + offset_y;
-                        let y_delta = new_y - child_rect.min[1];
-                        child_rect.min[1] += y_delta;
-                        child_rect.max[1] += y_delta;
-                        self.children[i].computed = Some(ComputedLayout::new(child_rect));
+                        (0.0, new_y - child_rect.min[1])
                     }
                     Layout::Vertical => {
                         // For vertical layout, h_align controls cross-axis (horizontal) alignment
@@ -1127,10 +1142,7 @@ impl Node {
                             HorizontalAlign::Right => available_width - child_width,
                         };
                         let new_x = content_x + offset_x;
-                        let x_delta = new_x - child_rect.min[0];
-                        child_rect.min[0] += x_delta;
-                        child_rect.max[0] += x_delta;
-                        self.children[i].computed = Some(ComputedLayout::new(child_rect));
+                        (new_x - child_rect.min[0], 0.0)
                     }
                     Layout::Stack => {
                         // For stack layout, apply both alignments
@@ -1150,15 +1162,15 @@ impl Node {
 
                         let new_x = content_x + offset_x;
                         let new_y = content_y + offset_y;
-                        let x_delta = new_x - child_rect.min[0];
-                        let y_delta = new_y - child_rect.min[1];
-                        child_rect.min[0] += x_delta;
-                        child_rect.max[0] += x_delta;
-                        child_rect.min[1] += y_delta;
-                        child_rect.max[1] += y_delta;
-                        self.children[i].computed = Some(ComputedLayout::new(child_rect));
+                        (new_x - child_rect.min[0], new_y - child_rect.min[1])
                     }
-                }
+                };
+
+                // Recursively offset this child and all its descendants
+                self.children[i].offset_layout_recursive(x_delta, y_delta);
+
+                // Get updated child_rect after offset for position tracking
+                let child_rect = self.children[i].computed_layout().unwrap().rect;
 
                 if i + 1 < num_children {
                     match self.layout_direction {
