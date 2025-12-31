@@ -67,7 +67,7 @@ const INITIAL_TEXT_VERTEX_CAPACITY: usize = 4096;
 const INITIAL_TEXT_INDEX_CAPACITY: usize = 8192;
 
 #[cfg(feature = "text-cosmic")]
-const ATLAS_SIZE_PX: u32 = 2048;
+const ATLAS_SIZE_PX: u32 = 4096;
 #[cfg(feature = "text-cosmic")]
 const ATLAS_PADDING_PX: u32 = 1;
 
