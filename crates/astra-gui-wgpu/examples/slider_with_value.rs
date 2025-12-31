@@ -384,7 +384,7 @@ impl App {
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_layout_direction(Layout::Vertical)
-            .with_gap(Size::lpx(20.0))
+            .with_gap(Size::ppx(20.0))
             .with_children(vec![
                 // Spacer
                 Node::new().with_height(Size::Fill),
@@ -469,7 +469,7 @@ impl App {
                 Node::new()
                     .with_width(Size::Fill)
                     .with_height(Size::lpx(30.0))
-                    .with_padding(Spacing::horizontal(Size::lpx(10.0)))
+                    .with_padding(Spacing::horizontal(Size::ppx(10.0)))
                     .with_shape(Shape::Rect(StyledRect::new(
                         Default::default(),
                         mocha::SURFACE0,
@@ -500,7 +500,7 @@ impl App {
         Node::new()
             .with_width(Size::Fill)
             .with_layout_direction(Layout::Horizontal)
-            .with_gap(Size::lpx(16.0))
+            .with_gap(Size::ppx(16.0))
             .with_children(vec![
                 // Spacer
                 Node::new().with_width(Size::Fill),
