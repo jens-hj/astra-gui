@@ -81,7 +81,7 @@ impl Default for DragValueStyle {
             text_color: mocha::TEXT,
             disabled_text_color: mocha::SUBTEXT0,
 
-            padding: Spacing::symmetric(Size::px(10.0), Size::px(8.0)),
+            padding: Spacing::symmetric(Size::lpx(10.0), Size::lpx(8.0)),
             border_radius: 8.0,
             font_size: 20.0,
             min_width,
@@ -190,15 +190,15 @@ pub fn drag_value(
 
     Node::new()
         .with_id(NodeId::new(format!("{}_container", id_string)))
-        .with_width(Size::px(style.min_width))
-        .with_height(Size::px(style.font_size + style.padding.get_vertical()))
+        .with_width(Size::lpx(style.min_width))
+        .with_height(Size::lpx(style.font_size + style.padding.get_vertical()))
         .with_padding(style.padding)
         .with_layout_direction(Layout::Stack)
         .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(style.idle_color),
             stroke: Some(Stroke::new(
-                Size::px(style.border_width),
+                Size::lpx(style.border_width),
                 style.idle_border_color,
             )),
             corner_shape: Some(CornerShape::Round(style.border_radius)),
@@ -207,7 +207,7 @@ pub fn drag_value(
         .with_hover_style(Style {
             fill_color: Some(style.hover_color),
             stroke: Some(Stroke::new(
-                Size::px(style.border_width),
+                Size::lpx(style.border_width),
                 style.hover_border_color,
             )),
             ..Default::default()
@@ -215,7 +215,7 @@ pub fn drag_value(
         .with_active_style(Style {
             fill_color: Some(style.active_color),
             stroke: Some(Stroke::new(
-                Size::px(style.border_width),
+                Size::lpx(style.border_width),
                 style.active_border_color,
             )),
             ..Default::default()
@@ -223,7 +223,7 @@ pub fn drag_value(
         .with_disabled_style(Style {
             fill_color: Some(style.disabled_color),
             stroke: Some(Stroke::new(
-                Size::px(style.border_width),
+                Size::lpx(style.border_width),
                 style.disabled_border_color,
             )),
             ..Default::default()
@@ -237,7 +237,7 @@ pub fn drag_value(
                 .with_height(Size::Fill)
                 .with_content(Content::Text(TextContent {
                     text: display_text,
-                    font_size: Size::px(style.font_size),
+                    font_size: Size::lpx(style.font_size),
                     color: style.text_color,
                     h_align: HorizontalAlign::Center,
                     v_align: VerticalAlign::Center,

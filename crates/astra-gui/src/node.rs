@@ -144,7 +144,7 @@ impl Node {
             transform_origin: TransformOrigin::center(),
             padding: Spacing::ZERO,
             margin: Spacing::ZERO,
-            gap: Size::Fixed(0.0),
+            gap: Size::Logical(0.0),
             layout_direction: Layout::default(),
             h_align: HorizontalAlign::Left,
             v_align: VerticalAlign::Top,
@@ -205,8 +205,8 @@ impl Node {
 
     /// Set both width and height to fixed pixel values
     pub fn with_size(self, width: f32, height: f32) -> Self {
-        self.with_width(Size::px(width))
-            .with_height(Size::px(height))
+        self.with_width(Size::lpx(width))
+            .with_height(Size::lpx(height))
     }
 
     /// Set the translation (post-layout offset)
@@ -628,13 +628,13 @@ impl Node {
     /// The Size type only matters when the parent is aggregating children for FitContent sizing.
     fn measure_node(&self, measurer: &mut dyn ContentMeasurer, scale_factor: f32) -> IntrinsicSize {
         // Short-circuit: if both dimensions are Fixed, we can return immediately
-        if let (Size::Fixed(w), Size::Fixed(h)) = (self.width, self.height) {
+        if let (Size::Logical(w), Size::Logical(h)) = (self.width, self.height) {
             return IntrinsicSize::new(w, h);
         }
 
         // Measure width - only FitContent measures children
         let width = match self.width {
-            Size::Fixed(w) => w,
+            Size::Logical(w) => w,
             Size::FitContent => {
                 let content_width = if let Some(content) = &self.content {
                     match content {
@@ -669,7 +669,7 @@ impl Node {
 
         // Measure height - only FitContent measures children
         let height = match self.height {
-            Size::Fixed(h) => h,
+            Size::Logical(h) => h,
             Size::FitContent => {
                 let content_height = if let Some(content) = &self.content {
                     match content {
@@ -2060,7 +2060,7 @@ impl Node {
                     content_rect,
                     Shape::Rect(
                         StyledRect::new(Default::default(), Color::transparent()).with_stroke(
-                            Stroke::new(Size::px(1.0), Color::new(1.0, 1.0, 0.0, 0.5)),
+                            Stroke::new(Size::lpx(1.0), Color::new(1.0, 1.0, 0.0, 0.5)),
                         ),
                     ),
                 ));
@@ -2133,7 +2133,7 @@ impl Node {
                     rect,
                     Shape::Rect(
                         StyledRect::new(Default::default(), Color::transparent()).with_stroke(
-                            Stroke::new(Size::px(1.0), Color::new(0.0, 1.0, 0.0, 0.5)),
+                            Stroke::new(Size::lpx(1.0), Color::new(0.0, 1.0, 0.0, 0.5)),
                         ),
                     ),
                 ));

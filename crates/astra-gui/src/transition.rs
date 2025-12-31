@@ -71,7 +71,8 @@ pub fn lerp_color(a: Color, b: Color, t: f32) -> Color {
 pub fn lerp_size(a: crate::layout::Size, b: crate::layout::Size, t: f32) -> crate::layout::Size {
     use crate::layout::Size;
     match (a, b) {
-        (Size::Fixed(v1), Size::Fixed(v2)) => Size::Fixed(lerp_f32(v1, v2, t)),
+        (Size::Logical(v1), Size::Logical(v2)) => Size::Logical(lerp_f32(v1, v2, t)),
+        (Size::Physical(v1), Size::Physical(v2)) => Size::Physical(lerp_f32(v1, v2, t)),
         (Size::Relative(v1), Size::Relative(v2)) => Size::Relative(lerp_f32(v1, v2, t)),
         // For incompatible types or Fill/FitContent, snap to target
         _ => b,

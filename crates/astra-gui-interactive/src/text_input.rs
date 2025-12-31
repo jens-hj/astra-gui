@@ -113,7 +113,7 @@ impl Default for TextInputStyle {
             disabled_text_color: mocha::SUBTEXT0,
             // Other
             selection_color: mocha::LAVENDER.with_alpha(0.3),
-            padding: Spacing::symmetric(Size::px(10.0), Size::px(8.0)),
+            padding: Spacing::symmetric(Size::lpx(10.0), Size::lpx(8.0)),
             border_radius: 8.0,
             font_size: 20.0,
             cursor_style: CursorStyle::default(),
@@ -265,8 +265,8 @@ pub fn text_input(
             // Add selection rectangle
             children.push(
                 Node::new()
-                    .with_width(Size::px(selection_width))
-                    .with_height(Size::px(style.font_size))
+                    .with_width(Size::lpx(selection_width))
+                    .with_height(Size::lpx(style.font_size))
                     .with_translation(Translation::x(selection_x_offset))
                     .with_shape(Shape::rect())
                     .with_style(Style {
@@ -285,7 +285,7 @@ pub fn text_input(
             .with_height(Size::Fill)
             .with_content(Content::Text(TextContent {
                 text: display_text,
-                font_size: Size::px(style.font_size),
+                font_size: Size::lpx(style.font_size),
                 color: text_color,
                 h_align: style.text_align,
                 v_align: VerticalAlign::Center,
@@ -308,8 +308,8 @@ pub fn text_input(
             CursorShape::Line => {
                 // Vertical line cursor
                 Node::new()
-                    .with_width(Size::px(style.cursor_style.thickness))
-                    .with_height(Size::px(style.font_size))
+                    .with_width(Size::lpx(style.cursor_style.thickness))
+                    .with_height(Size::lpx(style.font_size))
                     .with_translation(Translation::x(cursor_x_offset))
                     .with_shape(Shape::Rect(StyledRect::new(Rect::default(), cursor_color)))
             }
@@ -332,8 +332,8 @@ pub fn text_input(
                 };
 
                 Node::new()
-                    .with_width(Size::px(cursor_width))
-                    .with_height(Size::px(style.cursor_style.thickness))
+                    .with_width(Size::lpx(cursor_width))
+                    .with_height(Size::lpx(style.cursor_style.thickness))
                     .with_translation(Translation::new(cursor_x_offset, style.font_size))
                     .with_shape(Shape::Rect(StyledRect::new(Rect::default(), cursor_color)))
             }
@@ -356,8 +356,8 @@ pub fn text_input(
                 };
 
                 Node::new()
-                    .with_width(Size::px(cursor_width))
-                    .with_height(Size::px(style.font_size))
+                    .with_width(Size::lpx(cursor_width))
+                    .with_height(Size::lpx(style.font_size))
                     .with_translation(Translation::x((cursor_x_offset - cursor_width).max(0.0)))
                     .with_shape(Shape::Rect(StyledRect::new(
                         Rect::default(),
@@ -397,22 +397,22 @@ pub fn text_input(
 
     Node::new()
         .with_id(node_id)
-        .with_width(Size::px(style.width))
-        .with_height(Size::px(style.font_size + style.padding.get_vertical()))
+        .with_width(Size::lpx(style.width))
+        .with_height(Size::lpx(style.font_size + style.padding.get_vertical()))
         .with_padding(style.padding)
         .with_layout_direction(Layout::Stack)
         .with_shape(Shape::rect())
         .with_overflow(Overflow::Hidden)
         .with_style(Style {
             fill_color: Some(fill_color),
-            stroke: Some(Stroke::new(Size::px(stroke_width), stroke_color)),
+            stroke: Some(Stroke::new(Size::lpx(stroke_width), stroke_color)),
             corner_shape: Some(CornerShape::Round(style.border_radius)),
             ..Default::default()
         })
         .with_disabled_style(Style {
             fill_color: Some(style.disabled_color),
             stroke: Some(Stroke::new(
-                Size::px(stroke_width),
+                Size::lpx(stroke_width),
                 style.disabled_stroke_color,
             )),
             ..Default::default()

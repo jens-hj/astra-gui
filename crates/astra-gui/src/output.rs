@@ -265,7 +265,7 @@ fn collect_clipped_shapes_with_opacity(
                         .width
                         .try_resolve_with_scale(width, scale_factor)
                         .unwrap_or(1.0);
-                    scaled_rect.stroke = Some(Stroke::new(Size::px(scaled_width), stroke.color));
+                    scaled_rect.stroke = Some(Stroke::new(Size::lpx(scaled_width), stroke.color));
                 }
                 Shape::Rect(scaled_rect)
             }
@@ -292,19 +292,19 @@ fn collect_clipped_shapes_with_opacity(
                 let height = node_rect.max[1] - node_rect.min[1];
                 let padding_left = padding
                     .left
-                    .try_resolve_with_scale(width, 1.0)
+                    .try_resolve_with_scale(width, scale_factor)
                     .unwrap_or(0.0);
                 let padding_right = padding
                     .right
-                    .try_resolve_with_scale(width, 1.0)
+                    .try_resolve_with_scale(width, scale_factor)
                     .unwrap_or(0.0);
                 let padding_top = padding
                     .top
-                    .try_resolve_with_scale(height, 1.0)
+                    .try_resolve_with_scale(height, scale_factor)
                     .unwrap_or(0.0);
                 let padding_bottom = padding
                     .bottom
-                    .try_resolve_with_scale(height, 1.0)
+                    .try_resolve_with_scale(height, scale_factor)
                     .unwrap_or(0.0);
 
                 let content_rect = Rect::new(
@@ -323,7 +323,7 @@ fn collect_clipped_shapes_with_opacity(
                     .font_size
                     .try_resolve_with_scale(width, scale_factor)
                     .unwrap_or(16.0);
-                text_shape.font_size = Size::px(scaled_font_size);
+                text_shape.font_size = Size::lpx(scaled_font_size);
                 // OPTIMIZATION: Store opacity instead of applying it to shape
                 out.push((
                     node_rect,
@@ -584,7 +584,7 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(
                 StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
-                    Size::px(1.0 * scale_factor),
+                    Size::lpx(1.0 * scale_factor),
                     Color::new(1.0, 1.0, 0.0, 0.5),
                 )),
             ),
@@ -679,7 +679,7 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(
                 StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
-                    Size::px(1.0 * scale_factor),
+                    Size::lpx(1.0 * scale_factor),
                     Color::new(0.0, 1.0, 0.0, 0.5),
                 )),
             ),
@@ -696,7 +696,7 @@ fn collect_debug_shapes_clipped(
             clip_rect, // Don't clip the clip rect visualization itself
             Shape::Rect(
                 StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
-                    Size::px(2.0 * scale_factor),
+                    Size::lpx(2.0 * scale_factor),
                     Color::new(1.0, 0.0, 0.0, 0.8),
                 )),
             ),
@@ -778,7 +778,7 @@ fn collect_debug_shapes_clipped(
                 StyledRect::new(circle_rect, Color::transparent())
                     .with_corner_shape(CornerShape::Round(circle_radius * scale_factor))
                     .with_stroke(Stroke::new(
-                        Size::px(2.0 * scale_factor),
+                        Size::lpx(2.0 * scale_factor),
                         Color::new(1.0, 0.5, 0.0, 0.9),
                     )), // Orange stroke
             ),

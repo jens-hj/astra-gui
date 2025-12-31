@@ -285,7 +285,7 @@ fn panel(fill: Color) -> Shape {
     Shape::Rect(
         StyledRect::new(Default::default(), fill)
             .with_corner_shape(CornerShape::Round(14.0))
-            .with_stroke(Stroke::new(Size::px(2.0), mocha::SURFACE1)),
+            .with_stroke(Stroke::new(Size::lpx(2.0), mocha::SURFACE1)),
     )
 }
 
@@ -298,7 +298,7 @@ fn label(
 ) -> Node {
     Node::new().with_content(Content::Text(
         TextContent::new(text)
-            .with_font_size(Size::px(font_size))
+            .with_font_size(Size::lpx(font_size))
             .with_color(color)
             .with_h_align(h)
             .with_v_align(v),
@@ -319,15 +319,15 @@ fn demo_box(title: &str, overflow_mode: Overflow, color: Color) -> Node {
     Node::new()
         .with_width(Size::Fill)
         .with_height(Size::Fill)
-        .with_padding(Spacing::all(Size::px(16.0)))
-        .with_gap(Size::px(14.0))
+        .with_padding(Spacing::all(Size::lpx(16.0)))
+        .with_gap(Size::lpx(14.0))
         .with_layout_direction(Layout::Vertical)
         .with_overflow(overflow_mode)
         .with_shape(panel(color))
         .with_children(vec![
             // Title row
             Node::new()
-                .with_height(Size::px(40.0))
+                .with_height(Size::lpx(40.0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_children(vec![label(
                     title,
@@ -342,7 +342,7 @@ fn demo_box(title: &str, overflow_mode: Overflow, color: Color) -> Node {
             Node::new()
                 .with_height(Size::Fill)
                 .with_width(Size::Fill)
-                .with_padding(Spacing::all(Size::px(14.0)))
+                .with_padding(Spacing::all(Size::lpx(14.0)))
                 .with_shape(panel(mocha::SURFACE0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_overflow(overflow_mode) // Propagate overflow mode
@@ -370,17 +370,17 @@ fn create_demo_ui(
         // Root clips by default (Overflow::Hidden default). Keep it Visible so the
         // "Visible" column can actually show overflow past its own viewport.
         .with_overflow(Overflow::Visible)
-        .with_padding(Spacing::all(Size::px(24.0)))
-        .with_gap(Size::px(18.0))
+        .with_padding(Spacing::all(Size::lpx(24.0)))
+        .with_gap(Size::lpx(18.0))
         .with_layout_direction(Layout::Vertical)
         .with_width(Size::Fill)
         .with_height(Size::Fill)
         .with_children(vec![
             // Header
             Node::new()
-                .with_height(Size::px(120.0))
+                .with_height(Size::lpx(120.0))
                 .with_width(Size::Fill)
-                .with_padding(Spacing::all(Size::px(18.0)))
+                .with_padding(Spacing::all(Size::lpx(18.0)))
                 .with_shape(panel(mocha::SURFACE0))
                 .with_children(vec![
                     label(
@@ -404,12 +404,12 @@ fn create_demo_ui(
             Node::new()
                 .with_width(Size::Fill)
                 .with_height(Size::Fill)
-                .with_gap(Size::px(18.0))
+                .with_gap(Size::lpx(18.0))
                 .with_layout_direction(Layout::Vertical)
                 .with_overflow(Overflow::Visible) // Allow children to overflow
                 .with_children(vec![
                     Node::new()
-                        .with_width(Size::px(400.0))
+                        .with_width(Size::lpx(400.0))
                         .with_height(Size::Fill)
                         .with_children(vec![demo_box(
                             "Overflow: Hidden (default)",
@@ -417,7 +417,7 @@ fn create_demo_ui(
                             mocha::CRUST,
                         )]),
                     Node::new()
-                        .with_width(Size::px(400.0))
+                        .with_width(Size::lpx(400.0))
                         .with_height(Size::Fill)
                         .with_overflow(Overflow::Visible) // Allow child to overflow
                         .with_children(vec![demo_box(
@@ -426,7 +426,7 @@ fn create_demo_ui(
                             mocha::MANTLE,
                         )]),
                     Node::new()
-                        .with_width(Size::px(400.0))
+                        .with_width(Size::lpx(400.0))
                         .with_height(Size::Fill)
                         .with_children(vec![demo_box(
                             "Overflow: Scroll (placeholder)",
@@ -436,13 +436,13 @@ fn create_demo_ui(
                 ]),
             // Help bar
             Node::new()
-                .with_height(Size::px(30.0))
+                .with_height(Size::lpx(30.0))
                 .with_width(Size::Fill)
-                .with_padding(Spacing::horizontal(Size::px(10.0)))
+                .with_padding(Spacing::horizontal(Size::lpx(10.0)))
                 .with_shape(panel(mocha::SURFACE0))
                 .with_content(Content::Text(
                     TextContent::new(DEBUG_HELP_TEXT_ONELINE)
-                        .with_font_size(Size::px(16.0))
+                        .with_font_size(Size::lpx(16.0))
                         .with_color(mocha::TEXT)
                         .with_h_align(HorizontalAlign::Left)
                         .with_v_align(VerticalAlign::Center),

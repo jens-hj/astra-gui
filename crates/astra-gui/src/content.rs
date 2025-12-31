@@ -30,7 +30,7 @@ impl TextContent {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
-            font_size: crate::layout::Size::px(16.0),
+            font_size: crate::layout::Size::lpx(16.0),
             color: Color::new(1.0, 1.0, 1.0, 1.0),
             h_align: HorizontalAlign::Left,
             v_align: VerticalAlign::Top,

@@ -91,14 +91,14 @@ pub fn slider(
     // Create a wrapper that just handles the sizing
     // We'll use a single interactive container that captures all events
     Node::new()
-        .with_width(Size::px(style.track_width))
-        .with_height(Size::px(style.thumb_size.max(style.track_height)))
+        .with_width(Size::lpx(style.track_width))
+        .with_height(Size::lpx(style.thumb_size.max(style.track_height)))
         .with_layout_direction(Layout::Stack) // Stack the visual elements
         // Track background (unfilled) - no ID so events go to container
         .with_children(vec![
             Node::new()
-                .with_width(Size::px(style.track_width))
-                .with_height(Size::px(style.track_height))
+                .with_width(Size::lpx(style.track_width))
+                .with_height(Size::lpx(style.track_height))
                 .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.track_color),
@@ -109,8 +109,8 @@ pub fn slider(
                 .with_transition(Transition::quick()),
             // Filled portion of track
             Node::new()
-                .with_width(Size::px(filled_width))
-                .with_height(Size::px(style.track_height))
+                .with_width(Size::lpx(filled_width))
+                .with_height(Size::lpx(style.track_height))
                 .with_shape(astra_gui::Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.filled_color),
@@ -124,8 +124,8 @@ pub fn slider(
                 .with_disabled(disabled)
                 .with_transition(Transition::quick()),
             Node::new()
-                .with_width(Size::px(style.thumb_size))
-                .with_height(Size::px(style.thumb_size))
+                .with_width(Size::lpx(style.thumb_size))
+                .with_height(Size::lpx(style.thumb_size))
                 .with_translation(Translation::new(thumb_offset_x, thumb_inset))
                 .with_shape(Shape::rect())
                 .with_style(Style {

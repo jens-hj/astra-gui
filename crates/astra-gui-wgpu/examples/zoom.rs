@@ -256,16 +256,16 @@ impl App {
     fn build_ui(&self, _window_width: f32, _window_height: f32) -> Node {
         // Debug info panel (not affected by content zoom, positioned absolutely)
         let debug_panel = Node::new()
-            .with_width(Size::px(250.0))
-            .with_height(Size::px(120.0))
+            .with_width(Size::lpx(115.0))
+            .with_height(Size::lpx(40.0))
             .with_shape(Shape::rect())
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::SURFACE0),
-                stroke: Some(Stroke::new(Size::px(2.0), mocha::OVERLAY0)),
+                stroke: Some(Stroke::new(Size::lpx(2.0), mocha::OVERLAY0)),
                 corner_shape: Some(CornerShape::Round(8.0)),
                 ..Default::default()
             })
-            .with_padding(Spacing::all(Size::px(15.0)))
+            .with_padding(Spacing::all(Size::lpx(15.0)))
             .with_content(astra_gui::Content::Text(TextContent {
                 text: format!(
                     "Zoom: {:.0}%\nPan: ({:.0}, {:.0})\n\nWheel: Zoom\nArrows: Pan\nR: Reset",
@@ -273,10 +273,10 @@ impl App {
                     self.pan_offset.0,
                     self.pan_offset.1
                 ),
-                font_size: Size::px(14.0),
+                font_size: Size::lpx(14.0),
                 color: mocha::TEXT,
                 h_align: HorizontalAlign::Left,
-                v_align: VerticalAlign::Top,
+                v_align: VerticalAlign::Center,
             }));
 
         // Create a colorful grid of boxes to demonstrate zoom
@@ -300,19 +300,19 @@ impl App {
 
                 row_children.push(
                     Node::new()
-                        .with_width(Size::px(150.0))
-                        .with_height(Size::px(150.0))
+                        .with_width(Size::Fill)
+                        .with_height(Size::Fill)
                         .with_shape(Shape::rect())
                         .with_style(astra_gui::Style {
-                            fill_color: Some(color),
-                            stroke: Some(Stroke::new(Size::px(2.0), mocha::SURFACE0)),
+                            fill_color: Some(mocha::CRUST),
+                            stroke: Some(Stroke::new(Size::lpx(2.0), color)),
                             corner_shape: Some(CornerShape::Round(12.0)),
                             ..Default::default()
                         })
-                        .with_padding(Spacing::all(Size::px(20.0)))
+                        .with_padding(Spacing::all(Size::lpx(20.0)))
                         .with_content(astra_gui::Content::Text(TextContent {
                             text: format!("{},{}", row + 1, col + 1),
-                            font_size: Size::px(24.0),
+                            font_size: Size::lpx(24.0),
                             color: mocha::TEXT,
                             h_align: HorizontalAlign::Center,
                             v_align: VerticalAlign::Center,
@@ -324,20 +324,21 @@ impl App {
                 Node::new()
                     .with_layout_direction(Layout::Horizontal)
                     .with_height(Size::Fill)
-                    .with_gap(Size::px(20.0))
+                    .with_gap(Size::ppx(20.0))
                     .with_children(row_children),
             );
         }
 
         let content_grid = Node::new()
             .with_layout_direction(Layout::Vertical)
-            .with_gap(Size::px(20.0))
-            .with_padding(Spacing::all(Size::px(50.0)))
+            .with_gap(Size::ppx(20.0))
+            .with_padding(Spacing::all(Size::ppx(50.0)))
             .with_children(grid_rows);
 
         // Root: Stack layout with debug panel on top
         Node::new()
             .with_layout_direction(Layout::Stack)
+            .with_padding(Spacing::top(Size::lpx(1.0)) + Spacing::bottom(Size::lpx(1.0)))
             .with_children(vec![content_grid, debug_panel])
     }
 }

@@ -150,7 +150,7 @@ impl Style {
                     }
                     if let Some(width) = self.stroke_width {
                         if let Some(ref mut stroke) = rect.stroke {
-                            stroke.width = crate::layout::Size::px(width);
+                            stroke.width = crate::layout::Size::lpx(width);
                         }
                     }
                 }

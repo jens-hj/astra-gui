@@ -1,1 +1,2 @@
 - Always keep the README.md up to date.
+- Debug visualisations: padding (blue), margin (red), border (green), gap (purple), clip rect (red), content-area (yellow)

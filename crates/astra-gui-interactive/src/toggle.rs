@@ -64,10 +64,10 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
     // Track (background)
     Node::new()
         .with_id(NodeId::new(id_str.clone()))
-        .with_width(Size::px(style.track_width))
-        .with_height(Size::px(style.track_height))
+        .with_width(Size::lpx(style.track_width))
+        .with_height(Size::lpx(style.track_height))
         .with_layout_direction(Layout::Horizontal)
-        .with_padding(Spacing::all(Size::px(style.knob_margin)))
+        .with_padding(Spacing::all(Size::lpx(style.knob_margin)))
         .with_shape(astra_gui::Shape::rect())
         .with_style(Style {
             fill_color: Some(if value {
@@ -101,7 +101,7 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
             // The knob needs an ID so InteractiveStateManager can track its transitions
             Node::new()
                 .with_id(NodeId::new(format!("{}_knob", id_str)))
-                .with_width(Size::px(style.knob_width))
+                .with_width(Size::lpx(style.knob_width))
                 .with_height(Size::Fill)
                 .with_shape(astra_gui::Shape::rect())
                 .with_style(Style {

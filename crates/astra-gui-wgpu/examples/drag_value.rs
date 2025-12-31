@@ -404,7 +404,7 @@ impl App {
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_layout_direction(Layout::Vertical)
-            .with_gap(Size::px(20.0))
+            .with_gap(Size::lpx(20.0))
             .with_children(vec![
                 // Spacer
                 Node::new().with_height(Size::Fill),
@@ -413,7 +413,7 @@ impl App {
                     .with_width(Size::Fill)
                     .with_content(Content::Text(TextContent {
                         text: "Drag Value Widget Example".to_string(),
-                        font_size: Size::px(32.0),
+                        font_size: Size::lpx(32.0),
                         color: mocha::TEXT,
                         h_align: HorizontalAlign::Center,
                         v_align: VerticalAlign::Center,
@@ -425,12 +425,12 @@ impl App {
                         text:
                             "Drag left/right to adjust • Click to type • Shift=precise, Ctrl=fast"
                                 .to_string(),
-                        font_size: Size::px(16.0),
+                        font_size: Size::lpx(16.0),
                         color: mocha::SUBTEXT0,
                         h_align: HorizontalAlign::Center,
                         v_align: VerticalAlign::Center,
                     })),
-                Node::new().with_height(Size::px(20.0)),
+                Node::new().with_height(Size::lpx(20.0)),
                 // Basic drag value
                 self.create_drag_row(
                     "Basic (no limits):",
@@ -496,15 +496,15 @@ impl App {
                 // Help bar
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_height(Size::px(30.0))
-                    .with_padding(Spacing::horizontal(Size::px(10.0)))
+                    .with_height(Size::lpx(30.0))
+                    .with_padding(Spacing::horizontal(Size::lpx(10.0)))
                     .with_shape(Shape::Rect(StyledRect::new(
                         Default::default(),
                         mocha::SURFACE0,
                     )))
                     .with_content(Content::Text(
                         TextContent::new(DEBUG_HELP_TEXT_ONELINE)
-                            .with_font_size(Size::px(16.0))
+                            .with_font_size(Size::lpx(16.0))
                             .with_color(mocha::TEXT)
                             .with_h_align(HorizontalAlign::Left)
                             .with_v_align(VerticalAlign::Center),
@@ -527,17 +527,17 @@ impl App {
         Node::new()
             .with_width(Size::Fill)
             .with_layout_direction(Layout::Horizontal)
-            .with_gap(Size::px(16.0))
+            .with_gap(Size::lpx(16.0))
             .with_children(vec![
                 // Spacer
                 Node::new().with_width(Size::Fill),
                 // Label
                 Node::new()
-                    .with_width(Size::px(200.0))
+                    .with_width(Size::lpx(200.0))
                     .with_height(Size::Fill)
                     .with_content(Content::Text(TextContent {
                         text: label.to_string(),
-                        font_size: Size::px(20.0),
+                        font_size: Size::lpx(20.0),
                         color: mocha::TEXT,
                         h_align: HorizontalAlign::Right,
                         v_align: VerticalAlign::Center,

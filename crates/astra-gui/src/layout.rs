@@ -3,8 +3,10 @@ use crate::primitives::Rect;
 /// Size specification that can be fixed, relative to parent, or derived from content.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Size {
-    /// Fixed size in pixels
-    Fixed(f32),
+    /// Fixed size in logical pixels (scales with zoom)
+    Logical(f32),
+    /// Fixed size in physical pixels (does not scale with zoom)
+    Physical(f32),
     /// Relative size as a fraction of parent (0.0 to 1.0)
     Relative(f32),
     /// Fill all remaining available space
@@ -42,9 +44,14 @@ impl Default for ScrollDirection {
 }
 
 impl Size {
-    /// Create a fixed size in pixels
-    pub const fn px(pixels: f32) -> Self {
-        Self::Fixed(pixels)
+    /// Create a fixed size in logical pixels (scales with zoom)
+    pub const fn lpx(pixels: f32) -> Self {
+        Self::Logical(pixels)
+    }
+
+    /// Create a fixed size in physical pixels (does not scale with zoom)
+    pub const fn ppx(pixels: f32) -> Self {
+        Self::Physical(pixels)
     }
 
     /// Create a relative size as a percentage (0.0 to 1.0)
@@ -59,7 +66,7 @@ impl Size {
 
     /// Resolve the size given the parent's dimension
     ///
-    /// This only works for `Fixed` and `Relative` sizes. For `Fill` and `FitContent`,
+    /// This only works for `Fixed`, `Physical`, and `Relative` sizes. For `Fill` and `FitContent`,
     /// the layout algorithm must compute the size differently:
     /// - `Fill`: Computed based on remaining space after other siblings
     /// - `FitContent`: Computed via intrinsic measurement of content/children
@@ -68,7 +75,8 @@ impl Size {
     /// Panics if called on `Fill` or `FitContent` - these must be handled by the layout algorithm.
     pub fn resolve(&self, parent_size: f32) -> f32 {
         match self {
-            Size::Fixed(px) => *px,
+            Size::Logical(px) => *px,
+            Size::Physical(px) => *px,
             Size::Relative(fraction) => parent_size * fraction,
             Size::Fill => panic!("Cannot resolve Size::Fill - must be computed by layout algorithm based on remaining space"),
             Size::FitContent => panic!("Cannot resolve Size::FitContent - must be computed via intrinsic measurement"),
@@ -86,11 +94,13 @@ impl Size {
     /// Try to resolve the size with a scale factor applied to Fixed sizes
     ///
     /// The `scale_factor` converts logical pixels to physical pixels for Fixed sizes.
+    /// Physical sizes are not affected by the scale factor (already in physical pixels).
     /// Relative sizes are not affected by the scale factor as they are already
     /// proportional to the parent size.
     pub fn try_resolve_with_scale(&self, parent_size: f32, scale_factor: f32) -> Option<f32> {
         match self {
-            Size::Fixed(px) => Some(*px * scale_factor),
+            Size::Logical(px) => Some(*px * scale_factor),
+            Size::Physical(px) => Some(*px),
             Size::Relative(fraction) => Some(parent_size * fraction),
             Size::Fill | Size::FitContent => None,
         }
@@ -106,12 +116,12 @@ impl Size {
         matches!(self, Size::FitContent)
     }
 
-    /// Check if this size is zero (Fixed(0.0))
+    /// Check if this size is zero (Fixed(0.0) or Physical(0.0))
     pub fn is_zero(&self) -> bool {
-        matches!(self, Size::Fixed(v) if *v == 0.0)
+        matches!(self, Size::Logical(v) | Size::Physical(v) if *v == 0.0)
     }
 
-    /// Check if this size is non-zero (any non-zero Fixed value, or Relative/Fill/FitContent)
+    /// Check if this size is non-zero (any non-zero Fixed/Physical value, or Relative/Fill/FitContent)
     pub fn is_non_zero(&self) -> bool {
         !self.is_zero()
     }
@@ -410,10 +420,10 @@ pub struct Spacing {
 impl Spacing {
     /// Zero spacing constant
     pub const ZERO: Self = Self {
-        top: Size::Fixed(0.0),
-        right: Size::Fixed(0.0),
-        bottom: Size::Fixed(0.0),
-        left: Size::Fixed(0.0),
+        top: Size::Logical(0.0),
+        right: Size::Logical(0.0),
+        bottom: Size::Logical(0.0),
+        left: Size::Logical(0.0),
     };
 
     /// Create spacing with all sides equal
@@ -463,9 +473,9 @@ impl Spacing {
 
     pub const fn horizontal(horizontal: Size) -> Self {
         Self {
-            top: Size::Fixed(0.0),
+            top: Size::Physical(0.0),
             right: horizontal,
-            bottom: Size::Fixed(0.0),
+            bottom: Size::Physical(0.0),
             left: horizontal,
         }
     }
@@ -473,44 +483,44 @@ impl Spacing {
     pub const fn vertical(vertical: Size) -> Self {
         Self {
             top: vertical,
-            right: Size::Fixed(0.0),
+            right: Size::Physical(0.0),
             bottom: vertical,
-            left: Size::Fixed(0.0),
+            left: Size::Physical(0.0),
         }
     }
 
     pub const fn top(top: Size) -> Self {
         Self {
             top,
-            right: Size::Fixed(0.0),
-            bottom: Size::Fixed(0.0),
-            left: Size::Fixed(0.0),
+            right: Size::Physical(0.0),
+            bottom: Size::Physical(0.0),
+            left: Size::Physical(0.0),
         }
     }
 
     pub const fn right(right: Size) -> Self {
         Self {
-            top: Size::Fixed(0.0),
+            top: Size::Physical(0.0),
             right,
-            bottom: Size::Fixed(0.0),
-            left: Size::Fixed(0.0),
+            bottom: Size::Physical(0.0),
+            left: Size::Physical(0.0),
         }
     }
 
     pub const fn bottom(bottom: Size) -> Self {
         Self {
-            top: Size::Fixed(0.0),
-            right: Size::Fixed(0.0),
+            top: Size::Physical(0.0),
+            right: Size::Physical(0.0),
             bottom,
-            left: Size::Fixed(0.0),
+            left: Size::Physical(0.0),
         }
     }
 
     pub const fn left(left: Size) -> Self {
         Self {
-            top: Size::Fixed(0.0),
-            right: Size::Fixed(0.0),
-            bottom: Size::Fixed(0.0),
+            top: Size::Physical(0.0),
+            right: Size::Physical(0.0),
+            bottom: Size::Physical(0.0),
             left,
         }
     }
@@ -527,5 +537,34 @@ impl Spacing {
     /// Resolves Size values to f32. For Fill or FitContent, returns 0.0.
     pub fn get_vertical(&self) -> f32 {
         self.top.try_resolve(1.0).unwrap_or(0.0) + self.bottom.try_resolve(1.0).unwrap_or(0.0)
+    }
+}
+
+impl std::ops::Add for Spacing {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            top: add_sizes(self.top, rhs.top),
+            right: add_sizes(self.right, rhs.right),
+            bottom: add_sizes(self.bottom, rhs.bottom),
+            left: add_sizes(self.left, rhs.left),
+        }
+    }
+}
+
+/// Helper function to add two Size values
+/// Only adds if both are the same variant (Logical or Physical)
+/// Otherwise returns the first non-zero value
+fn add_sizes(a: Size, b: Size) -> Size {
+    match (a, b) {
+        (Size::Logical(v1), Size::Logical(v2)) => Size::Logical(v1 + v2),
+        (Size::Physical(v1), Size::Physical(v2)) => Size::Physical(v1 + v2),
+        (Size::Relative(v1), Size::Relative(v2)) => Size::Relative(v1 + v2),
+        // If one is zero, return the other
+        (a, b) if b.is_zero() => a,
+        (a, b) if a.is_zero() => b,
+        // For incompatible types, prefer the right side (rhs)
+        (_, b) => b,
     }
 }

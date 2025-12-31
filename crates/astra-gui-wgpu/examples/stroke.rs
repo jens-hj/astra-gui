@@ -264,7 +264,7 @@ fn rect_with_stroke(
     Shape::Rect(
         StyledRect::new(Default::default(), fill_color)
             .with_corner_shape(corner_shape)
-            .with_stroke(Stroke::new(Size::px(stroke_width), stroke_color)),
+            .with_stroke(Stroke::new(Size::lpx(stroke_width), stroke_color)),
     )
 }
 
@@ -303,7 +303,7 @@ fn create_stroke_test_ui(width: f32, height: f32, debug_options: &DebugOptions) 
             cells.push(
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_height(Size::px(100.0))
+                    .with_height(Size::lpx(100.0))
                     .with_shape(rect_with_stroke(
                         mocha::SURFACE0,
                         *corner_color,
@@ -315,8 +315,8 @@ fn create_stroke_test_ui(width: f32, height: f32, debug_options: &DebugOptions) 
 
         rows.push(
             Node::new()
-                .with_height(Size::px(120.0))
-                .with_gap(Size::px(60.0))
+                .with_height(Size::lpx(120.0))
+                .with_gap(Size::lpx(60.0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_children(cells),
         );
@@ -324,23 +324,23 @@ fn create_stroke_test_ui(width: f32, height: f32, debug_options: &DebugOptions) 
 
     // Create help bar at the bottom
     let help_text = Node::new()
-        .with_height(Size::px(30.0))
-        .with_padding(Spacing::horizontal(Size::px(10.0)))
+        .with_height(Size::lpx(30.0))
+        .with_padding(Spacing::horizontal(Size::lpx(10.0)))
         .with_shape(Shape::Rect(StyledRect::new(
             Default::default(),
             mocha::SURFACE0,
         )))
         .with_content(Content::Text(
             TextContent::new(DEBUG_HELP_TEXT_ONELINE)
-                .with_font_size(Size::px(16.0))
+                .with_font_size(Size::lpx(16.0))
                 .with_color(mocha::TEXT)
                 .with_h_align(HorizontalAlign::Left)
                 .with_v_align(VerticalAlign::Center),
         ));
 
     let content = Node::new()
-        .with_padding(Spacing::all(Size::px(60.0)))
-        .with_gap(Size::px(60.0))
+        .with_padding(Spacing::all(Size::lpx(60.0)))
+        .with_gap(Size::lpx(60.0))
         .with_width(Size::Fill)
         .with_height(Size::Fill)
         .with_layout_direction(Layout::Vertical)

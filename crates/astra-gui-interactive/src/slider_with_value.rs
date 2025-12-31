@@ -46,7 +46,7 @@ pub fn slider_with_value(
 ) -> Node {
     Node::new()
         .with_layout_direction(Layout::Horizontal)
-        .with_gap(Size::px(8.0))
+        .with_gap(Size::lpx(8.0))
         .with_children(vec![
             slider(slider_id, value, range.clone(), disabled, slider_style),
             drag_value(
