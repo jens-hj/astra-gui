@@ -187,17 +187,19 @@ impl App {
             return;
         };
 
-        // Build UI (before mutable borrow)
-        let ui = self.build_ui(actual_width, actual_height);
-
-        // Browser-style zoom: use scale_factor to convert logical pixels to physical pixels
+        // Build UI with zoom_level set on the root node
+        // Browser-style zoom: zoom_level converts logical pixels to physical pixels
         // At 1.0x zoom, 10 logical pixels = 10 physical pixels
         // At 2.0x zoom, 10 logical pixels = 20 physical pixels (everything twice as big)
+        let ui = self
+            .build_ui(actual_width, actual_height)
+            .with_zoom_level(self.zoom_level);
+
         let output_data = FullOutput::from_node_with_debug_and_scale_factor(
             ui,
             (actual_width, actual_height),
             Some(self.debug_options),
-            self.zoom_level,
+            1.0, // Default scale_factor (will be overridden by root's zoom_level)
         );
 
         let Some(gpu_state) = &mut self.gpu_state else {

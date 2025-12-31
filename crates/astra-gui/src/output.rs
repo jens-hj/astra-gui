@@ -102,13 +102,20 @@ impl FullOutput {
         measurer: Option<&mut dyn ContentMeasurer>,
         scale_factor: f32,
     ) -> Self {
+        // Get the effective scale factor: use root's zoom_level if set, otherwise the provided scale_factor
+        let effective_scale_factor = root.zoom_level().unwrap_or(scale_factor);
+
         // Compute layout starting from the full window
         let window_rect = Rect::new([0.0, 0.0], [window_size.0, window_size.1]);
 
         if let Some(m) = measurer {
-            root.compute_layout_with_measurer_and_scale_factor(window_rect, m, scale_factor);
+            root.compute_layout_with_measurer_and_scale_factor(
+                window_rect,
+                m,
+                effective_scale_factor,
+            );
         } else {
-            root.compute_layout_with_scale_factor(window_rect, scale_factor);
+            root.compute_layout_with_scale_factor(window_rect, effective_scale_factor);
         }
 
         // Convert to ClippedShapes (including optional debug shapes), with overflow-aware clip rects.
@@ -135,7 +142,7 @@ impl FullOutput {
             initial_transform, // Start with pan offset applied
             debug_options,
             &mut raw_shapes,
-            scale_factor,
+            effective_scale_factor,
         );
 
         let shapes = raw_shapes
