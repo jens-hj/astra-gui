@@ -67,7 +67,7 @@ const INITIAL_TEXT_VERTEX_CAPACITY: usize = 4096;
 const INITIAL_TEXT_INDEX_CAPACITY: usize = 8192;
 
 #[cfg(feature = "text-cosmic")]
-const ATLAS_SIZE_PX: u32 = 1024;
+const ATLAS_SIZE_PX: u32 = 2048;
 #[cfg(feature = "text-cosmic")]
 const ATLAS_PADDING_PX: u32 = 1;
 
@@ -973,66 +973,75 @@ impl Renderer {
                     );
 
                     // OPTIMIZATION: Check metrics cache first (includes placement)
-                    let (glyph_bearing, glyph_size, placed) =
-                        if let Some(&(bearing, size, placement)) =
-                            self.glyph_metrics_cache.get(&atlas_key)
-                        {
-                            // Cache hit - use cached metrics and placement (no atlas lookup!)
-                            (bearing, size, placement)
-                        } else {
-                            // Cache miss - need to rasterize and upload
-                            let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
-                                continue;
-                            };
-
-                            // Insert into atlas
-                            let placed = match self.atlas.insert(atlas_key.clone(), bitmap.size_px)
-                            {
-                                text::atlas::AtlasInsert::AlreadyPresent => {
-                                    // Already in atlas, get placement
-                                    self.atlas.get(&atlas_key)
-                                }
-                                text::atlas::AtlasInsert::Placed(p) => {
-                                    // Newly placed - upload texture
-                                    let rect_px = text::atlas::GlyphAtlas::upload_rect_px(p);
-                                    let pad = p.padding_px;
-                                    queue.write_texture(
-                                        wgpu::TexelCopyTextureInfo {
-                                            texture: &self.atlas_texture,
-                                            mip_level: 0,
-                                            origin: wgpu::Origin3d {
-                                                x: rect_px.min.x + pad,
-                                                y: rect_px.min.y + pad,
-                                                z: 0,
-                                            },
-                                            aspect: wgpu::TextureAspect::All,
-                                        },
-                                        &bitmap.pixels,
-                                        wgpu::TexelCopyBufferLayout {
-                                            offset: 0,
-                                            bytes_per_row: Some(bitmap.size_px[0]),
-                                            rows_per_image: Some(bitmap.size_px[1]),
-                                        },
-                                        wgpu::Extent3d {
-                                            width: bitmap.size_px[0],
-                                            height: bitmap.size_px[1],
-                                            depth_or_array_layers: 1,
-                                        },
-                                    );
-                                    Some(p)
-                                }
-                                text::atlas::AtlasInsert::Full => None,
-                            };
-
-                            let Some(p) = placed else {
-                                continue;
-                            };
-
-                            // Cache metrics AND placement for future frames
-                            let metrics = (bitmap.bearing_px, bitmap.size_px, p);
-                            self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
-                            (bitmap.bearing_px, bitmap.size_px, p)
+                    let (glyph_bearing, glyph_size, placed) = if let Some(&(
+                        bearing,
+                        size,
+                        placement,
+                    )) =
+                        self.glyph_metrics_cache.get(&atlas_key)
+                    {
+                        // Cache hit - use cached metrics and placement (no atlas lookup!)
+                        (bearing, size, placement)
+                    } else {
+                        // Cache miss - need to rasterize and upload
+                        let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
+                            continue;
                         };
+
+                        // Insert into atlas
+                        let placed = match self.atlas.insert(atlas_key.clone(), bitmap.size_px) {
+                            text::atlas::AtlasInsert::AlreadyPresent => {
+                                // Already in atlas, get placement
+                                self.atlas.get(&atlas_key)
+                            }
+                            text::atlas::AtlasInsert::Placed(p) => {
+                                // Newly placed - upload texture
+                                let rect_px = text::atlas::GlyphAtlas::upload_rect_px(p);
+                                let pad = p.padding_px;
+                                queue.write_texture(
+                                    wgpu::TexelCopyTextureInfo {
+                                        texture: &self.atlas_texture,
+                                        mip_level: 0,
+                                        origin: wgpu::Origin3d {
+                                            x: rect_px.min.x + pad,
+                                            y: rect_px.min.y + pad,
+                                            z: 0,
+                                        },
+                                        aspect: wgpu::TextureAspect::All,
+                                    },
+                                    &bitmap.pixels,
+                                    wgpu::TexelCopyBufferLayout {
+                                        offset: 0,
+                                        bytes_per_row: Some(bitmap.size_px[0]),
+                                        rows_per_image: Some(bitmap.size_px[1]),
+                                    },
+                                    wgpu::Extent3d {
+                                        width: bitmap.size_px[0],
+                                        height: bitmap.size_px[1],
+                                        depth_or_array_layers: 1,
+                                    },
+                                );
+                                Some(p)
+                            }
+                            text::atlas::AtlasInsert::Full => {
+                                eprintln!(
+                                        "WARNING: Glyph atlas full! Cannot fit glyph (font_id={}, glyph_id={}, size={}px). \
+                                         Consider increasing ATLAS_SIZE_PX or implementing atlas eviction.",
+                                        atlas_key.font_id, atlas_key.glyph_id, atlas_key.font_px
+                                    );
+                                None
+                            }
+                        };
+
+                        let Some(p) = placed else {
+                            continue;
+                        };
+
+                        // Cache metrics AND placement for future frames
+                        let metrics = (bitmap.bearing_px, bitmap.size_px, p);
+                        self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
+                        (bitmap.bearing_px, bitmap.size_px, p)
+                    };
 
                     let x0 = placement.origin_px[0] + g.x_px + glyph_bearing[0] as f32;
                     let y0 = placement.origin_px[1] + g.y_px + glyph_bearing[1] as f32;

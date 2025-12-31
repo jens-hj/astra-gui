@@ -58,7 +58,7 @@ pub struct Node {
     scale: f32,
     /// Zoom level for browser-style zoom (scales logical pixels to physical pixels)
     /// None means inherit from parent. 1.0 = 100%, 2.0 = 200%, etc.
-    zoom_level: Option<f32>,
+    zoom: Option<f32>,
     /// Pan offset for camera-style zoom (typically applied at root node)
     pan_offset: Translation,
     /// Transform origin for rotation and scale
@@ -143,7 +143,7 @@ impl Node {
             translation: Translation::ZERO,
             rotation: 0.0,
             scale: 1.0,
-            zoom_level: None,
+            zoom: None,
             pan_offset: Translation::ZERO,
             transform_origin: TransformOrigin::center(),
             padding: Spacing::ZERO,
@@ -241,8 +241,8 @@ impl Node {
     /// Set the zoom level for browser-style zoom (scales logical pixels)
     /// 1.0 = 100%, 2.0 = 200%, 0.5 = 50%, etc.
     /// If set, overrides parent's zoom level. If None, inherits from parent.
-    pub fn with_zoom_level(mut self, zoom_level: f32) -> Self {
-        self.zoom_level = Some(zoom_level);
+    pub fn with_zoom(mut self, zoom: f32) -> Self {
+        self.zoom = Some(zoom);
         self
     }
 
@@ -446,7 +446,7 @@ impl Node {
 
     /// Get the zoom level (if set on this node)
     pub(crate) fn zoom_level(&self) -> Option<f32> {
-        self.zoom_level
+        self.zoom
     }
 
     /// Get the transform origin
@@ -942,7 +942,7 @@ impl Node {
         scale_factor: f32,
     ) {
         // Use this node's zoom_level if set, otherwise inherit parent's scale_factor
-        let effective_scale_factor = self.zoom_level.unwrap_or(scale_factor);
+        let effective_scale_factor = self.zoom.unwrap_or(scale_factor);
 
         // Account for this node's margins when calculating available space
         // Resolve margin values with effective_scale_factor (logical -> physical pixels)

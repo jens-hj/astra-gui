@@ -193,7 +193,7 @@ impl App {
         // At 2.0x zoom, 10 logical pixels = 20 physical pixels (everything twice as big)
         let ui = self
             .build_ui(actual_width, actual_height)
-            .with_zoom_level(self.zoom_level);
+            .with_zoom(self.zoom_level);
 
         let output_data = FullOutput::from_node_with_debug_and_scale_factor(
             ui,
