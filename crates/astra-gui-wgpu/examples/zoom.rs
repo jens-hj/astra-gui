@@ -468,9 +468,8 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        if let Some(gpu_state) = &self.gpu_state {
-            gpu_state.window.request_redraw();
-        }
+        // Don't request redraw here - only redraw when state actually changes
+        // This prevents infinite redraw loop that can overwhelm the GPU
     }
 }
 
