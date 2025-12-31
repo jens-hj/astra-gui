@@ -294,6 +294,50 @@ impl GlyphAtlas {
         placed.rect_px
     }
 
+    /// Get current atlas utilization (0.0 to 1.0).
+    ///
+    /// This represents how much vertical space has been allocated by shelves.
+    pub fn utilization(&self) -> f32 {
+        if self.height == 0 {
+            return 0.0;
+        }
+        (self.next_shelf_y as f32) / (self.height as f32)
+    }
+
+    /// Get number of cached glyphs.
+    pub fn glyph_count(&self) -> usize {
+        self.cache.len()
+    }
+
+    /// Get current atlas dimensions.
+    pub fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    /// Get iterator over all cached glyphs (for migration during resize).
+    pub fn cached_glyphs(&self) -> impl Iterator<Item = (&GlyphKey, &PlacedGlyph)> {
+        self.cache.iter()
+    }
+
+    /// Resize atlas to new dimensions and clear all placements.
+    ///
+    /// This clears the internal shelf allocator and glyph cache.
+    /// The caller is responsible for re-inserting glyphs and updating the GPU texture.
+    ///
+    /// Returns true if resize was performed (dimensions changed).
+    pub fn resize_to(&mut self, new_width: u32, new_height: u32) -> bool {
+        if self.width == new_width && self.height == new_height {
+            return false;
+        }
+
+        self.width = new_width;
+        self.height = new_height;
+        self.shelves.clear();
+        self.next_shelf_y = 0;
+        self.cache.clear();
+        true
+    }
+
     fn try_place_in_shelf(
         &self,
         shelf: &mut Shelf,

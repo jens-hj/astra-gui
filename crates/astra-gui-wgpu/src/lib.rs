@@ -131,6 +131,10 @@ pub struct Renderer {
     #[cfg(feature = "text-cosmic")]
     atlas_bind_group: wgpu::BindGroup,
     #[cfg(feature = "text-cosmic")]
+    atlas_bind_group_layout: wgpu::BindGroupLayout,
+    #[cfg(feature = "text-cosmic")]
+    atlas_sampler: wgpu::Sampler,
+    #[cfg(feature = "text-cosmic")]
     atlas: text::atlas::GlyphAtlas,
 
     // Backend-agnostic text shaping/raster engine (Inter via astra-gui-fonts).
@@ -150,6 +154,22 @@ pub struct Renderer {
         text::atlas::GlyphKey,
         ([i32; 2], [u32; 2], text::atlas::PlacedGlyph), // (bearing_px, size_px, placement)
     >,
+
+    // Atlas resize tracking
+    #[cfg(feature = "text-cosmic")]
+    atlas_needs_resize: bool,
+
+    // For proactive estimation of atlas space needs
+    #[cfg(feature = "text-cosmic")]
+    avg_glyph_size_estimate_px: u32,
+
+    // GPU texture size limit
+    #[cfg(feature = "text-cosmic")]
+    max_texture_dimension_2d: u32,
+
+    // Track if we've hit the GPU limit to avoid spamming warnings
+    #[cfg(feature = "text-cosmic")]
+    atlas_at_gpu_limit: bool,
 }
 
 impl Renderer {
@@ -362,6 +382,8 @@ impl Renderer {
             text_index_buffer,
             atlas_texture,
             atlas_bind_group,
+            atlas_bind_group_layout,
+            atlas_sampler,
             atlas,
         ) = {
             // Load text shader
@@ -505,6 +527,8 @@ impl Renderer {
                 text_index_buffer,
                 atlas_texture,
                 atlas_bind_group,
+                atlas_bind_group_layout,
+                atlas_sampler,
                 atlas,
             )
         };
@@ -561,6 +585,10 @@ impl Renderer {
             #[cfg(feature = "text-cosmic")]
             atlas_bind_group,
             #[cfg(feature = "text-cosmic")]
+            atlas_bind_group_layout,
+            #[cfg(feature = "text-cosmic")]
+            atlas_sampler,
+            #[cfg(feature = "text-cosmic")]
             atlas,
             #[cfg(feature = "text-cosmic")]
             text_engine: gui_text::Engine::new_default(),
@@ -568,6 +596,14 @@ impl Renderer {
             shape_cache: std::collections::HashMap::new(),
             #[cfg(feature = "text-cosmic")]
             glyph_metrics_cache: std::collections::HashMap::new(),
+            #[cfg(feature = "text-cosmic")]
+            atlas_needs_resize: false,
+            #[cfg(feature = "text-cosmic")]
+            avg_glyph_size_estimate_px: 32, // Conservative initial estimate
+            #[cfg(feature = "text-cosmic")]
+            max_texture_dimension_2d: device.limits().max_texture_dimension_2d,
+            #[cfg(feature = "text-cosmic")]
+            atlas_at_gpu_limit: false,
         }
     }
 
@@ -581,6 +617,182 @@ impl Renderer {
         self.render_mode = mode;
     }
 
+    #[cfg(feature = "text-cosmic")]
+    fn resize_atlas(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        // Collect all cached glyphs before resize (we need to preserve them)
+        let old_glyphs: Vec<(text::atlas::GlyphKey, text::atlas::PlacedGlyph)> = self
+            .atlas
+            .cached_glyphs()
+            .map(|(k, p)| (k.clone(), *p))
+            .collect();
+
+        let (old_width, old_height) = self.atlas.dimensions();
+
+        // Exponential growth pattern matching buffer growth in codebase
+        let new_size = (old_width.max(old_height) * 2).next_power_of_two();
+        let new_size = new_size.min(self.max_texture_dimension_2d);
+
+        // Check if we've hit the GPU limit
+        if new_size == old_width && new_size == old_height {
+            if !self.atlas_at_gpu_limit {
+                eprintln!(
+                    "WARNING: Atlas at GPU limit of {}x{}. {} glyphs cached. \
+                     Further zoom may cause text to disappear.",
+                    new_size,
+                    new_size,
+                    old_glyphs.len()
+                );
+                self.atlas_at_gpu_limit = true;
+            }
+            self.atlas_needs_resize = false;
+            return;
+        }
+
+        eprintln!(
+            "Resizing glyph atlas: {}x{} -> {}x{} ({} cached glyphs, GPU limit: {})",
+            old_width,
+            old_height,
+            new_size,
+            new_size,
+            old_glyphs.len(),
+            self.max_texture_dimension_2d
+        );
+
+        // Reset GPU limit flag since we're successfully resizing
+        self.atlas_at_gpu_limit = false;
+
+        // Create new larger atlas texture
+        self.atlas_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Astra UI Glyph Atlas"),
+            size: wgpu::Extent3d {
+                width: new_size,
+                height: new_size,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        // Resize atlas allocator (clears internal state)
+        self.atlas.resize_to(new_size, new_size);
+
+        // Re-insert all glyphs (they get new UV coordinates based on new atlas size)
+        for (key, old_placed) in &old_glyphs {
+            // Get original bitmap dimensions (excluding padding)
+            let bitmap_width = ((old_placed.rect_px.width() as i32)
+                - (old_placed.padding_px as i32 * 2))
+                .max(0) as u32;
+            let bitmap_height = ((old_placed.rect_px.height() as i32)
+                - (old_placed.padding_px as i32 * 2))
+                .max(0) as u32;
+
+            // Re-insert into atlas (gets new placement with corrected UVs)
+            match self
+                .atlas
+                .insert(key.clone(), [bitmap_width, bitmap_height])
+            {
+                text::atlas::AtlasInsert::Placed(_) => {
+                    // Success - will re-rasterize and upload below
+                }
+                text::atlas::AtlasInsert::AlreadyPresent => {
+                    // Shouldn't happen since we cleared, but OK
+                }
+                text::atlas::AtlasInsert::Full => {
+                    eprintln!("ERROR: Glyph still doesn't fit after resize! key={:?}", key);
+                    // This is serious - atlas is still too small even after doubling
+                    continue;
+                }
+            }
+        }
+
+        // Re-rasterize and upload all glyphs at their new positions
+        for (key, _) in &old_glyphs {
+            // Get the new placement
+            let Some(new_placed) = self.atlas.get(key) else {
+                continue;
+            };
+
+            // Convert atlas key back to text engine key for rasterization
+            let text_key = gui_text::GlyphKey::new(
+                gui_text::FontId(key.font_id),
+                key.glyph_id,
+                key.font_px,
+                key.variant as i16,
+            );
+
+            // Re-rasterize the glyph
+            let Some(bitmap) = self.text_engine.rasterize_glyph(text_key) else {
+                continue;
+            };
+
+            if bitmap.pixels.is_empty() {
+                continue;
+            }
+
+            // Upload to new atlas position
+            let rect_px = new_placed.rect_px;
+            let pad = new_placed.padding_px;
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &self.atlas_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d {
+                        x: rect_px.min.x + pad,
+                        y: rect_px.min.y + pad,
+                        z: 0,
+                    },
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &bitmap.pixels,
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bitmap.size_px[0]),
+                    rows_per_image: Some(bitmap.size_px[1]),
+                },
+                wgpu::Extent3d {
+                    width: bitmap.size_px[0],
+                    height: bitmap.size_px[1],
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
+
+        // Update metrics cache with new placements
+        // (Keep bearing and size, update placement)
+        let mut updated_cache = std::mem::take(&mut self.glyph_metrics_cache);
+        for (atlas_key, (_bearing, _size, old_placed)) in updated_cache.iter_mut() {
+            if let Some(new_placed) = self.atlas.get(atlas_key) {
+                *old_placed = new_placed;
+            }
+        }
+        self.glyph_metrics_cache = updated_cache;
+
+        // Recreate bind group with new texture
+        let atlas_view = self
+            .atlas_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        self.atlas_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Astra UI Atlas Bind Group"),
+            layout: &self.atlas_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&atlas_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.atlas_sampler),
+                },
+            ],
+        });
+
+        self.atlas_needs_resize = false;
+    }
+
     pub fn render(
         &mut self,
         device: &wgpu::Device,
@@ -591,6 +803,47 @@ impl Renderer {
         screen_height: f32,
         output: &FullOutput,
     ) {
+        // STAGE 2: Reactive resize from previous frame
+        #[cfg(feature = "text-cosmic")]
+        if self.atlas_needs_resize {
+            self.resize_atlas(device, queue);
+        }
+
+        // STAGE 1: Proactive estimation
+        #[cfg(feature = "text-cosmic")]
+        {
+            let text_shape_count = output
+                .shapes
+                .iter()
+                .filter(|s| matches!(s.shape, Shape::Text(_)))
+                .count();
+
+            if text_shape_count > 0 {
+                // Estimate: assume ~10 unique glyphs per text shape (conservative)
+                let estimated_new_glyphs = text_shape_count * 10;
+                let estimated_space_px = estimated_new_glyphs as u32
+                    * self.avg_glyph_size_estimate_px
+                    * self.avg_glyph_size_estimate_px;
+
+                let (atlas_w, atlas_h) = self.atlas.dimensions();
+                let total_atlas_space = atlas_w * atlas_h;
+                let current_utilization = self.atlas.utilization();
+
+                // If we'd exceed 70% utilization with new glyphs, resize proactively
+                let estimated_utilization =
+                    current_utilization + (estimated_space_px as f32 / total_atlas_space as f32);
+
+                if estimated_utilization > 0.7 {
+                    eprintln!(
+                        "Proactive atlas resize: current={:.1}%, estimated={:.1}%",
+                        current_utilization * 100.0,
+                        estimated_utilization * 100.0
+                    );
+                    self.resize_atlas(device, queue);
+                }
+            }
+        }
+
         // Separate shapes into SDF-renderable and tessellated.
         // SDF rendering is used for simple shapes (currently: all fills, simple strokes).
         // OPTIMIZATION: Pre-allocate based on previous frame to reduce allocations
@@ -1021,14 +1274,31 @@ impl Renderer {
                                         depth_or_array_layers: 1,
                                     },
                                 );
+
+                                // Update size estimate for better future predictions (smooth average)
+                                let glyph_area = bitmap.size_px[0] * bitmap.size_px[1];
+                                let glyph_size = (glyph_area as f32).sqrt() as u32;
+                                self.avg_glyph_size_estimate_px =
+                                    (self.avg_glyph_size_estimate_px * 7 + glyph_size) / 8;
+
                                 Some(p)
                             }
                             text::atlas::AtlasInsert::Full => {
                                 eprintln!(
-                                        "WARNING: Glyph atlas full! Cannot fit glyph (font_id={}, glyph_id={}, size={}px). \
-                                         Consider increasing ATLAS_SIZE_PX or implementing atlas eviction.",
-                                        atlas_key.font_id, atlas_key.glyph_id, atlas_key.font_px
-                                    );
+                                    "WARNING: Glyph atlas full during render! Will resize next frame. \
+                                     (font_id={}, glyph_id={}, size={}px)",
+                                    atlas_key.font_id, atlas_key.glyph_id, atlas_key.font_px
+                                );
+
+                                // Mark for resize before next frame
+                                self.atlas_needs_resize = true;
+
+                                // Update size estimate for better future predictions
+                                let glyph_area = bitmap.size_px[0] * bitmap.size_px[1];
+                                let glyph_size = (glyph_area as f32).sqrt() as u32;
+                                self.avg_glyph_size_estimate_px =
+                                    (self.avg_glyph_size_estimate_px + glyph_size) / 2;
+
                                 None
                             }
                         };

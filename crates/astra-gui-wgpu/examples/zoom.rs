@@ -168,7 +168,7 @@ impl App {
 
                 // Browser-style zoom with mouse wheel
                 self.zoom_level *= 1.0 + scroll_delta * 0.1;
-                self.zoom_level = self.zoom_level.clamp(0.25, 4.0);
+                self.zoom_level = self.zoom_level.clamp(0.25, 10.0);
                 println!("Zoom: {:.0}%", self.zoom_level * 100.0);
                 true
             }
