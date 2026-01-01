@@ -1014,7 +1014,7 @@ impl Node {
             }
         } else {
             self.width
-                .try_resolve(available_width)
+                .try_resolve_with_scale(available_width, effective_scale_factor)
                 .unwrap_or(available_width)
         };
 
@@ -1030,7 +1030,7 @@ impl Node {
             }
         } else {
             self.height
-                .try_resolve(available_height)
+                .try_resolve_with_scale(available_height, effective_scale_factor)
                 .unwrap_or(available_height)
         };
 
@@ -1186,7 +1186,10 @@ impl Node {
                         used_width += child.measure_node(measurer, effective_scale_factor).width;
                     } else {
                         // Must be Fixed or Relative
-                        used_width += child.width.try_resolve(available_width).unwrap();
+                        used_width += child
+                            .width
+                            .try_resolve_with_scale(available_width, effective_scale_factor)
+                            .unwrap();
                     }
                 }
 
@@ -1210,7 +1213,10 @@ impl Node {
                         used_height += child.measure_node(measurer, effective_scale_factor).height;
                     } else {
                         // Must be Fixed or Relative
-                        used_height += child.height.try_resolve(available_height).unwrap();
+                        used_height += child
+                            .height
+                            .try_resolve_with_scale(available_height, effective_scale_factor)
+                            .unwrap();
                     }
                 }
 
@@ -1239,7 +1245,10 @@ impl Node {
                     } else if child.width.is_fit_content() {
                         total_width += child.measure_node(measurer, effective_scale_factor).width;
                     } else {
-                        total_width += child.width.try_resolve(available_width).unwrap_or(0.0);
+                        total_width += child
+                            .width
+                            .try_resolve_with_scale(available_width, effective_scale_factor)
+                            .unwrap_or(0.0);
                     }
                 }
                 (total_width, content_height)
@@ -1252,7 +1261,10 @@ impl Node {
                     } else if child.height.is_fit_content() {
                         total_height += child.measure_node(measurer, effective_scale_factor).height;
                     } else {
-                        total_height += child.height.try_resolve(available_height).unwrap_or(0.0);
+                        total_height += child
+                            .height
+                            .try_resolve_with_scale(available_height, effective_scale_factor)
+                            .unwrap_or(0.0);
                     }
                 }
                 (content_width, total_height)
@@ -1504,27 +1516,30 @@ impl Node {
         parent_height: f32,
         scale_factor: f32,
     ) {
+        // Use this node's zoom_level if set, otherwise inherit parent's scale_factor
+        let effective_scale_factor = self.zoom.unwrap_or(scale_factor);
+
         // Account for this node's margins when calculating available space
-        // Resolve margin values with scale_factor (logical -> physical pixels)
+        // Resolve margin values with effective_scale_factor (logical -> physical pixels)
         let margin_left = self
             .margin
             .left
-            .try_resolve_with_scale(parent_width, scale_factor)
+            .try_resolve_with_scale(parent_width, effective_scale_factor)
             .unwrap_or(0.0);
         let margin_right = self
             .margin
             .right
-            .try_resolve_with_scale(parent_width, scale_factor)
+            .try_resolve_with_scale(parent_width, effective_scale_factor)
             .unwrap_or(0.0);
         let margin_top = self
             .margin
             .top
-            .try_resolve_with_scale(parent_height, scale_factor)
+            .try_resolve_with_scale(parent_height, effective_scale_factor)
             .unwrap_or(0.0);
         let margin_bottom = self
             .margin
             .bottom
-            .try_resolve_with_scale(parent_height, scale_factor)
+            .try_resolve_with_scale(parent_height, effective_scale_factor)
             .unwrap_or(0.0);
 
         let available_width = (parent_width - margin_left - margin_right).max(0.0);
@@ -1532,14 +1547,14 @@ impl Node {
 
         // Resolve width and height from available space (after margins)
         // NOTE: Without a measurer, FitContent falls back to available size
-        // Apply scale_factor to Fixed sizes (logical -> physical pixels)
+        // Apply effective_scale_factor to Fixed sizes (logical -> physical pixels)
         let width = self
             .width
-            .try_resolve_with_scale(available_width, scale_factor)
+            .try_resolve_with_scale(available_width, effective_scale_factor)
             .unwrap_or(available_width);
         let height = self
             .height
-            .try_resolve_with_scale(available_height, scale_factor)
+            .try_resolve_with_scale(available_height, effective_scale_factor)
             .unwrap_or(available_height);
 
         // Position is already adjusted for margins by parent, don't add them again
@@ -1547,26 +1562,26 @@ impl Node {
         let outer_y = available_rect.min[1];
 
         // Content area (after subtracting padding)
-        // Resolve padding values with scale_factor (logical -> physical pixels)
+        // Resolve padding values with effective_scale_factor (logical -> physical pixels)
         let padding_left = self
             .padding
             .left
-            .try_resolve_with_scale(width, scale_factor)
+            .try_resolve_with_scale(width, effective_scale_factor)
             .unwrap_or(0.0);
         let padding_right = self
             .padding
             .right
-            .try_resolve_with_scale(width, scale_factor)
+            .try_resolve_with_scale(width, effective_scale_factor)
             .unwrap_or(0.0);
         let padding_top = self
             .padding
             .top
-            .try_resolve_with_scale(height, scale_factor)
+            .try_resolve_with_scale(height, effective_scale_factor)
             .unwrap_or(0.0);
         let padding_bottom = self
             .padding
             .bottom
-            .try_resolve_with_scale(height, scale_factor)
+            .try_resolve_with_scale(height, effective_scale_factor)
             .unwrap_or(0.0);
 
         let content_x = outer_x + padding_left;
@@ -1585,10 +1600,10 @@ impl Node {
         let mut current_y = content_y;
 
         // Calculate total spacing in the layout direction (margins + gaps)
-        // Resolve gap and child margins with scale_factor (logical -> physical pixels)
+        // Resolve gap and child margins with effective_scale_factor (logical -> physical pixels)
         let scaled_gap = self
             .gap
-            .try_resolve_with_scale(content_width.max(content_height), scale_factor)
+            .try_resolve_with_scale(content_width.max(content_height), effective_scale_factor)
             .unwrap_or(0.0);
         let (total_horizontal_spacing, total_vertical_spacing) = match self.layout_direction {
             Layout::Horizontal => {
@@ -1599,7 +1614,7 @@ impl Node {
                         total += child
                             .margin
                             .left
-                            .try_resolve_with_scale(content_width, scale_factor)
+                            .try_resolve_with_scale(content_width, effective_scale_factor)
                             .unwrap_or(0.0);
                     }
 
@@ -1610,12 +1625,12 @@ impl Node {
                         let child_right = child
                             .margin
                             .right
-                            .try_resolve_with_scale(content_width, scale_factor)
+                            .try_resolve_with_scale(content_width, effective_scale_factor)
                             .unwrap_or(0.0);
                         let next_left = next_child
                             .margin
                             .left
-                            .try_resolve_with_scale(content_width, scale_factor)
+                            .try_resolve_with_scale(content_width, effective_scale_factor)
                             .unwrap_or(0.0);
                         let collapsed_margin = child_right.max(next_left);
                         // Collapse gap with margin - use the larger of gap or collapsed margin
@@ -1625,7 +1640,7 @@ impl Node {
                         total += child
                             .margin
                             .right
-                            .try_resolve_with_scale(content_width, scale_factor)
+                            .try_resolve_with_scale(content_width, effective_scale_factor)
                             .unwrap_or(0.0);
                     }
                 }
@@ -1639,7 +1654,7 @@ impl Node {
                         total += child
                             .margin
                             .top
-                            .try_resolve_with_scale(content_height, scale_factor)
+                            .try_resolve_with_scale(content_height, effective_scale_factor)
                             .unwrap_or(0.0);
                     }
 
@@ -1650,12 +1665,12 @@ impl Node {
                         let child_bottom = child
                             .margin
                             .bottom
-                            .try_resolve_with_scale(content_height, scale_factor)
+                            .try_resolve_with_scale(content_height, effective_scale_factor)
                             .unwrap_or(0.0);
                         let next_top = next_child
                             .margin
                             .top
-                            .try_resolve_with_scale(content_height, scale_factor)
+                            .try_resolve_with_scale(content_height, effective_scale_factor)
                             .unwrap_or(0.0);
                         let collapsed_margin = child_bottom.max(next_top);
                         // Collapse gap with margin - use the larger of gap or collapsed margin
@@ -1665,7 +1680,7 @@ impl Node {
                         total += child
                             .margin
                             .bottom
-                            .try_resolve_with_scale(content_height, scale_factor)
+                            .try_resolve_with_scale(content_height, effective_scale_factor)
                             .unwrap_or(0.0);
                     }
                 }
@@ -1693,10 +1708,10 @@ impl Node {
                         fill_count += 1;
                     } else {
                         // For FitContent without measurer, fall back to available width
-                        // Apply scale_factor to Fixed sizes
+                        // Apply effective_scale_factor to Fixed sizes
                         used_width += child
                             .width
-                            .try_resolve_with_scale(available_width, scale_factor)
+                            .try_resolve_with_scale(available_width, effective_scale_factor)
                             .unwrap_or(available_width);
                     }
                 }
@@ -1721,10 +1736,10 @@ impl Node {
                         fill_count += 1;
                     } else {
                         // For FitContent without measurer, fall back to available height
-                        // Apply scale_factor to Fixed sizes
+                        // Apply effective_scale_factor to Fixed sizes
                         used_height += child
                             .height
-                            .try_resolve_with_scale(available_height, scale_factor)
+                            .try_resolve_with_scale(available_height, effective_scale_factor)
                             .unwrap_or(available_height);
                     }
                 }
@@ -1754,14 +1769,14 @@ impl Node {
                         current_x += self.children[i]
                             .margin
                             .left
-                            .try_resolve_with_scale(content_width, scale_factor)
+                            .try_resolve_with_scale(content_width, effective_scale_factor)
                             .unwrap_or(0.0);
                     }
                     Layout::Vertical => {
                         current_y += self.children[i]
                             .margin
                             .top
-                            .try_resolve_with_scale(content_height, scale_factor)
+                            .try_resolve_with_scale(content_height, effective_scale_factor)
                             .unwrap_or(0.0);
                     }
                     Layout::Stack => {
@@ -1799,22 +1814,22 @@ impl Node {
             let child_margin_left = self.children[i]
                 .margin
                 .left
-                .try_resolve_with_scale(content_width, scale_factor)
+                .try_resolve_with_scale(content_width, effective_scale_factor)
                 .unwrap_or(0.0);
             let child_margin_right = self.children[i]
                 .margin
                 .right
-                .try_resolve_with_scale(content_width, scale_factor)
+                .try_resolve_with_scale(content_width, effective_scale_factor)
                 .unwrap_or(0.0);
             let child_margin_top = self.children[i]
                 .margin
                 .top
-                .try_resolve_with_scale(content_height, scale_factor)
+                .try_resolve_with_scale(content_height, effective_scale_factor)
                 .unwrap_or(0.0);
             let child_margin_bottom = self.children[i]
                 .margin
                 .bottom
-                .try_resolve_with_scale(content_height, scale_factor)
+                .try_resolve_with_scale(content_height, effective_scale_factor)
                 .unwrap_or(0.0);
 
             let child_parent_width = if self.children[i].width.is_fill() {
@@ -1832,7 +1847,7 @@ impl Node {
                 child_available_rect,
                 child_parent_width,
                 child_parent_height,
-                scale_factor,
+                effective_scale_factor,
             );
 
             // Advance position for next child with collapsed spacing (gap collapsed with margins)
@@ -1846,12 +1861,12 @@ impl Node {
                             let child_right = self.children[i]
                                 .margin
                                 .right
-                                .try_resolve_with_scale(content_width, scale_factor)
+                                .try_resolve_with_scale(content_width, effective_scale_factor)
                                 .unwrap_or(0.0);
                             let next_left = self.children[i + 1]
                                 .margin
                                 .left
-                                .try_resolve_with_scale(content_width, scale_factor)
+                                .try_resolve_with_scale(content_width, effective_scale_factor)
                                 .unwrap_or(0.0);
                             let collapsed_margin = child_right.max(next_left);
                             // Collapse gap with margin - use the larger value
@@ -1863,12 +1878,12 @@ impl Node {
                             let child_bottom = self.children[i]
                                 .margin
                                 .bottom
-                                .try_resolve_with_scale(content_height, scale_factor)
+                                .try_resolve_with_scale(content_height, effective_scale_factor)
                                 .unwrap_or(0.0);
                             let next_top = self.children[i + 1]
                                 .margin
                                 .top
-                                .try_resolve_with_scale(content_height, scale_factor)
+                                .try_resolve_with_scale(content_height, effective_scale_factor)
                                 .unwrap_or(0.0);
                             let collapsed_margin = child_bottom.max(next_top);
                             // Collapse gap with margin - use the larger value
