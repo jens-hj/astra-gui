@@ -1,6 +1,7 @@
 use crate::content::{Content, HorizontalAlign, VerticalAlign};
 use crate::layout::{
     ComputedLayout, Layout, Overflow, ScrollDirection, Size, Spacing, TransformOrigin, Translation,
+    ZIndex,
 };
 use crate::measure::{ContentMeasurer, IntrinsicSize, MeasureTextRequest};
 use crate::primitives::{Rect, Shape};
@@ -131,6 +132,10 @@ pub struct Node {
     disabled: bool,
     /// Transition configuration for style changes
     transition: Option<Transition>,
+    /// Z-index for controlling rendering order (None = inherit from parent)
+    ///
+    /// Higher values render on top. Default: None (inherits parent's z-index or 0)
+    z_index: Option<ZIndex>,
 }
 
 impl Node {
@@ -168,6 +173,7 @@ impl Node {
             disabled_style: None,
             disabled: false,
             transition: None,
+            z_index: None,
         }
     }
 
@@ -255,6 +261,15 @@ impl Node {
     /// Set the transform origin for rotation and scale
     pub fn with_transform_origin(mut self, origin: TransformOrigin) -> Self {
         self.transform_origin = origin;
+        self
+    }
+
+    /// Set the z-index for controlling layering order
+    ///
+    /// Higher values render on top of lower values. If not set, inherits parent's z-index.
+    /// Nodes with the same z-index are rendered in tree order.
+    pub fn with_z_index(mut self, z_index: ZIndex) -> Self {
+        self.z_index = Some(z_index);
         self
     }
 
@@ -462,6 +477,11 @@ impl Node {
     /// Get the overflow policy
     pub fn overflow(&self) -> Overflow {
         self.overflow
+    }
+
+    /// Get the z-index for controlling layering order
+    pub fn z_index(&self) -> Option<ZIndex> {
+        self.z_index
     }
 
     /// Get the scroll offset (horizontal, vertical)

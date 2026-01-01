@@ -1,16 +1,21 @@
-//! Demonstrates zoom functionality - both browser-style zoom and pan.
+//! Demonstrates z-index layering control.
+//!
+//! Shows how z-index can override tree order to control which elements render on top.
+//! - Red box (z-index: -10) - Forced to bottom despite being last in tree
+//! - Green box (z-index: 0 default) - Middle layer, first in tree
+//! - Blue box (z-index: 0 default) - Middle layer, second in tree
+//! - Yellow box (z-index: 100) - Forced to top despite being first in tree
 //!
 //! Controls:
-//! - Mouse wheel: Browser-style zoom (scales everything with layout reflow)
-//! - Arrow keys: Pan camera
+//! - Mouse wheel: Zoom
+//! - Arrow keys: Pan
 //! - R: Reset zoom and pan
-//! - M/P/B/C/G/D: Debug visualizations (Margins/Padding/Borders/Content/Gaps/All)
-//! - S: Toggle render mode (SDF/Mesh)
+//! - M/P/B/C/G/D: Debug visualizations
 //! - ESC: Exit
 
 use astra_gui::{
     catppuccin::mocha, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Shape,
-    Size, Spacing, Stroke, TextContent, VerticalAlign, ZIndex,
+    Size, Spacing, Stroke, TextContent, Translation, VerticalAlign, ZIndex,
 };
 use astra_gui_wgpu::{RenderMode, Renderer};
 use std::sync::Arc;
@@ -95,13 +100,6 @@ fn handle_debug_keybinds(
     }
 }
 
-struct App {
-    gpu_state: Option<GpuState>,
-    zoom_level: f32, // 1.0 = 100%, 2.0 = 200%, etc.
-    pan_offset: (f32, f32),
-    debug_options: DebugOptions,
-}
-
 struct GpuState {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -109,6 +107,13 @@ struct GpuState {
     config: wgpu::SurfaceConfiguration,
     window: Arc<Window>,
     renderer: Renderer,
+}
+
+struct App {
+    gpu_state: Option<GpuState>,
+    zoom_level: f32,
+    pan_offset: (f32, f32),
+    debug_options: DebugOptions,
 }
 
 impl App {
@@ -166,7 +171,6 @@ impl App {
                     MouseScrollDelta::PixelDelta(pos) => (pos.y / 20.0) as f32,
                 };
 
-                // Browser-style zoom with mouse wheel
                 self.zoom_level *= 1.0 + scroll_delta * 0.1;
                 self.zoom_level = self.zoom_level.clamp(0.25, 10.0);
                 println!("Zoom: {:.0}%", self.zoom_level * 100.0);
@@ -177,7 +181,6 @@ impl App {
     }
 
     fn render(&mut self) {
-        // Get window size first
         let (actual_width, actual_height) = if let Some(gpu_state) = &self.gpu_state {
             (
                 gpu_state.config.width as f32,
@@ -187,19 +190,16 @@ impl App {
             return;
         };
 
-        // Build UI with zoom_level set on the root node
-        // Browser-style zoom: zoom_level converts logical pixels to physical pixels
-        // At 1.0x zoom, 10 logical pixels = 10 physical pixels
-        // At 2.0x zoom, 10 logical pixels = 20 physical pixels (everything twice as big)
         let ui = self
             .build_ui(actual_width, actual_height)
-            .with_zoom(self.zoom_level);
+            .with_zoom(self.zoom_level)
+            .with_pan_offset(Translation::new(self.pan_offset.0, self.pan_offset.1));
 
         let output_data = FullOutput::from_node_with_debug_and_scale_factor(
             ui,
             (actual_width, actual_height),
             Some(self.debug_options),
-            1.0, // Default scale_factor (will be overridden by root's zoom_level)
+            1.0,
         );
 
         let Some(gpu_state) = &mut self.gpu_state else {
@@ -240,7 +240,6 @@ impl App {
             multiview_mask: None,
         });
 
-        // Render with zoom scale applied
         gpu_state.renderer.render(
             &gpu_state.device,
             &gpu_state.queue,
@@ -256,93 +255,118 @@ impl App {
     }
 
     fn build_ui(&self, _window_width: f32, _window_height: f32) -> Node {
-        // Debug info panel (not affected by content zoom, positioned absolutely)
-        let debug_panel = Node::new()
-            .with_width(Size::lpx(115.0))
-            .with_height(Size::lpx(40.0))
+        // Create overlapping boxes to demonstrate z-index layering
+        // Using Stack layout so boxes overlap at the same position
+
+        // Yellow box: First in tree order, but z-index: 100 forces it to TOP
+        let yellow_box = Node::new()
+            .with_width(Size::lpx(200.0))
+            .with_height(Size::lpx(200.0))
             .with_shape(Shape::rect())
             .with_style(astra_gui::Style {
-                fill_color: Some(mocha::SURFACE0),
-                stroke: Some(Stroke::new(Size::lpx(2.0), mocha::OVERLAY0)),
-                corner_shape: Some(CornerShape::Round(8.0)),
+                fill_color: Some(mocha::CRUST),
+                stroke: Some(Stroke::new(Size::lpx(4.0), mocha::YELLOW)),
+                corner_shape: Some(CornerShape::Round(16.0)),
                 ..Default::default()
             })
-            .with_padding(Spacing::all(Size::lpx(15.0)))
-            .with_z_index(ZIndex::OVERLAY) // Ensure panel renders on top of grid
-            .with_content(astra_gui::Content::Text(TextContent {
-                text: format!(
-                    "Zoom: {:.0}%\nPan: ({:.0}, {:.0})\n\nWheel: Zoom\nArrows: Pan\nR: Reset",
-                    self.zoom_level * 100.0,
-                    self.pan_offset.0,
-                    self.pan_offset.1
-                ),
-                font_size: Size::lpx(14.0),
-                color: mocha::TEXT,
-                h_align: HorizontalAlign::Left,
-                v_align: VerticalAlign::Center,
-            }));
-
-        // Create a colorful grid of boxes to demonstrate zoom
-        let mut grid_rows = Vec::new();
-
-        for row in 0..3 {
-            let mut row_children = Vec::new();
-            for col in 0..3 {
-                let colors = [
-                    mocha::RED,
-                    mocha::GREEN,
-                    mocha::BLUE,
-                    mocha::YELLOW,
-                    mocha::PEACH,
-                    mocha::MAUVE,
-                    mocha::SKY,
-                    mocha::TEAL,
-                    mocha::PINK,
-                ];
-                let color = colors[row * 3 + col];
-
-                row_children.push(
-                    Node::new()
-                        .with_width(Size::Fill)
-                        .with_height(Size::Fill)
-                        .with_shape(Shape::rect())
-                        .with_style(astra_gui::Style {
-                            fill_color: Some(mocha::CRUST),
-                            stroke: Some(Stroke::new(Size::lpx(2.0), color)),
-                            corner_shape: Some(CornerShape::Round(12.0)),
-                            ..Default::default()
-                        })
-                        .with_padding(Spacing::all(Size::lpx(20.0)))
-                        .with_content(astra_gui::Content::Text(TextContent {
-                            text: format!("{},{}", row + 1, col + 1),
-                            font_size: Size::lpx(24.0),
-                            color: mocha::TEXT,
-                            h_align: HorizontalAlign::Center,
-                            v_align: VerticalAlign::Center,
-                        })),
-                );
-            }
-
-            grid_rows.push(
-                Node::new()
-                    .with_layout_direction(Layout::Horizontal)
-                    .with_height(Size::Fill)
-                    .with_gap(Size::ppx(20.0))
-                    .with_children(row_children),
+            .with_padding(Spacing::all(Size::lpx(20.0)))
+            .with_z_index(ZIndex::OVERLAY) // z-index: 100 - Forced to TOP
+            .with_translation(Translation::new(50.0, 50.0))
+            .with_child(
+                Node::new().with_content(astra_gui::Content::Text(TextContent {
+                    text: "z-index: 100\nYELLOW\n(OVERLAY)\n\nFirst in tree,\nFORCED TO TOP"
+                        .to_string(),
+                    font_size: Size::lpx(16.0),
+                    color: mocha::YELLOW,
+                    h_align: HorizontalAlign::Center,
+                    v_align: VerticalAlign::Center,
+                })),
             );
-        }
 
-        let content_grid = Node::new()
-            .with_layout_direction(Layout::Vertical)
-            .with_gap(Size::ppx(20.0))
-            .with_padding(Spacing::all(Size::ppx(50.0)))
-            .with_children(grid_rows);
+        // Green box: Second in tree order, z-index: 0 (default)
+        let green_box = Node::new()
+            .with_width(Size::lpx(200.0))
+            .with_height(Size::lpx(200.0))
+            .with_shape(Shape::rect())
+            .with_style(astra_gui::Style {
+                fill_color: Some(mocha::CRUST),
+                stroke: Some(Stroke::new(Size::lpx(4.0), mocha::GREEN)),
+                corner_shape: Some(CornerShape::Round(16.0)),
+                ..Default::default()
+            })
+            .with_padding(Spacing::all(Size::lpx(20.0)))
+            // No z-index set, defaults to 0
+            .with_translation(Translation::new(70.0, 180.0))
+            .with_child(
+                Node::new().with_content(astra_gui::Content::Text(TextContent {
+                    text: "z-index: 0\nGREEN\n(DEFAULT)\n\nSecond in tree,\nmiddle layer"
+                        .to_string(),
+                    font_size: Size::lpx(16.0),
+                    color: mocha::GREEN,
+                    h_align: HorizontalAlign::Center,
+                    v_align: VerticalAlign::Center,
+                })),
+            );
 
-        // Root: Stack layout with debug panel on top
+        // Blue box: Third in tree order, z-index: 0 (default)
+        // Should render on top of green (later in tree) but below yellow (higher z-index)
+        let blue_box = Node::new()
+            .with_width(Size::lpx(200.0))
+            .with_height(Size::lpx(200.0))
+            .with_shape(Shape::rect())
+            .with_style(astra_gui::Style {
+                fill_color: Some(mocha::CRUST),
+                stroke: Some(Stroke::new(Size::lpx(4.0), mocha::BLUE)),
+                corner_shape: Some(CornerShape::Round(16.0)),
+                ..Default::default()
+            })
+            .with_padding(Spacing::all(Size::lpx(20.0)))
+            // No z-index set, defaults to 0
+            .with_translation(Translation::new(210.0, 210.0))
+            .with_child(
+                Node::new().with_content(astra_gui::Content::Text(TextContent {
+                    text: "z-index: 0\nBLUE\n(DEFAULT)\n\nThird in tree,\nmiddle layer".to_string(),
+                    font_size: Size::lpx(16.0),
+                    color: mocha::BLUE,
+                    h_align: HorizontalAlign::Center,
+                    v_align: VerticalAlign::Center,
+                })),
+            );
+
+        // Red box: Fourth/last in tree order, but z-index: -10 forces it to BOTTOM
+        let red_box = Node::new()
+            .with_width(Size::lpx(200.0))
+            .with_height(Size::lpx(200.0))
+            .with_shape(Shape::rect())
+            .with_style(astra_gui::Style {
+                fill_color: Some(mocha::CRUST),
+                stroke: Some(Stroke::new(Size::lpx(4.0), mocha::RED)),
+                corner_shape: Some(CornerShape::Round(16.0)),
+                ..Default::default()
+            })
+            .with_padding(Spacing::all(Size::lpx(20.0)))
+            .with_z_index(ZIndex::BACKGROUND) // z-index: -100 - Forced to BOTTOM
+            .with_translation(Translation::new(180.0, 70.0))
+            .with_child(
+                Node::new().with_content(astra_gui::Content::Text(TextContent {
+                    text: "z-index: -100\nRED\n(BACKGROUND)\n\nLast in tree,\nFORCED TO BOTTOM"
+                        .to_string(),
+                    font_size: Size::lpx(16.0),
+                    color: mocha::RED,
+                    h_align: HorizontalAlign::Center,
+                    v_align: VerticalAlign::Center,
+                })),
+            );
+
+        // Stack layout to make boxes overlap
         Node::new()
             .with_layout_direction(Layout::Stack)
-            .with_padding(Spacing::top(Size::lpx(1.0)) + Spacing::bottom(Size::lpx(1.0)))
-            .with_children(vec![content_grid, debug_panel])
+            .with_children(vec![
+                yellow_box, // First in tree, but z-index: 100
+                green_box,  // Second in tree, z-index: 0
+                blue_box,   // Third in tree, z-index: 0
+                red_box,    // Last in tree, but z-index: -100
+            ])
     }
 }
 
@@ -353,8 +377,8 @@ impl ApplicationHandler for App {
         }
 
         let window_attributes = Window::default_attributes()
-            .with_title("Zoom Example - Mouse Wheel: Zoom | Arrows: Pan | R: Reset")
-            .with_inner_size(winit::dpi::PhysicalSize::new(800, 700));
+            .with_title("Z-Index Example - Layering Control")
+            .with_inner_size(winit::dpi::PhysicalSize::new(900, 600));
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
@@ -409,11 +433,18 @@ impl ApplicationHandler for App {
             renderer,
         });
 
-        println!("\nZoom Example");
-        println!("Controls:");
-        println!("  Mouse Wheel - Browser-style zoom");
-        println!("  Arrow Keys  - Pan camera");
-        println!("  R           - Reset zoom and pan");
+        println!("\nZ-Index Layering Example");
+        println!("========================");
+        println!("Demonstrates how z-index overrides tree order for rendering.");
+        println!("\nExpected order (bottom to top):");
+        println!("  1. RED box (z: -100 BACKGROUND) - last in tree, forced to bottom");
+        println!("  2. GREEN box (z: 0 DEFAULT) - second in tree");
+        println!("  3. BLUE box (z: 0 DEFAULT) - third in tree");
+        println!("  4. YELLOW box (z: 100 OVERLAY) - first in tree, forced to top");
+        println!("\nControls:");
+        println!("  Mouse Wheel - Zoom");
+        println!("  Arrow Keys  - Pan");
+        println!("  R           - Reset");
         println!("  {}", DEBUG_HELP_TEXT);
         println!("  ESC         - Exit\n");
     }
@@ -451,17 +482,14 @@ impl ApplicationHandler for App {
                 self.render();
             }
             _ => {
-                // Handle debug keybinds first
                 let renderer = self.gpu_state.as_mut().map(|s| &mut s.renderer);
                 let handled = handle_debug_keybinds(&event, &mut self.debug_options, renderer);
 
-                // Then handle app input if not handled by debug
                 if !handled && self.handle_input(&event) {
                     if let Some(gpu_state) = &self.gpu_state {
                         gpu_state.window.request_redraw();
                     }
                 } else if handled {
-                    // Redraw if debug state changed
                     if let Some(gpu_state) = &self.gpu_state {
                         gpu_state.window.request_redraw();
                     }
@@ -471,8 +499,10 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        // Don't request redraw here - only redraw when state actually changes
-        // This prevents infinite redraw loop that can overwhelm the GPU
+        // Request redraw on every frame for smooth interaction
+        if let Some(gpu_state) = &self.gpu_state {
+            gpu_state.window.request_redraw();
+        }
     }
 }
 

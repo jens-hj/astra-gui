@@ -568,3 +568,43 @@ fn add_sizes(a: Size, b: Size) -> Size {
         (_, b) => b,
     }
 }
+
+/// Z-index for controlling layering order in rendering.
+///
+/// Higher values render on top of lower values. Nodes with the same z-index
+/// are rendered in tree traversal order (depth-first, pre-order).
+///
+/// # Examples
+///
+/// ```
+/// use astra_gui::ZIndex;
+///
+/// let background = ZIndex::BACKGROUND; // -100
+/// let default = ZIndex::DEFAULT;       // 0
+/// let overlay = ZIndex::OVERLAY;       // 100
+/// let tooltip = ZIndex::TOOLTIP;       // 1000
+///
+/// let custom = ZIndex(50); // Custom value between default and overlay
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ZIndex(pub i32);
+
+impl ZIndex {
+    /// Background layer (bottom-most)
+    pub const BACKGROUND: ZIndex = ZIndex(-100);
+
+    /// Default layer (middle)
+    pub const DEFAULT: ZIndex = ZIndex(0);
+
+    /// Overlay layer (above default content)
+    pub const OVERLAY: ZIndex = ZIndex(100);
+
+    /// Tooltip layer (top-most)
+    pub const TOOLTIP: ZIndex = ZIndex(1000);
+}
+
+impl Default for ZIndex {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}

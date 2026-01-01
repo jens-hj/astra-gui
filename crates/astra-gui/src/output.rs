@@ -135,6 +135,7 @@ impl FullOutput {
         };
 
         let mut raw_shapes = Vec::new();
+        let mut tree_index = 0;
         collect_clipped_shapes(
             &root,
             window_rect,
@@ -142,25 +143,38 @@ impl FullOutput {
             initial_transform, // Start with pan offset applied
             debug_options,
             &mut raw_shapes,
+            crate::layout::ZIndex::DEFAULT, // Initial z_index
+            &mut tree_index,                // Track tree order
             effective_scale_factor,
         );
 
+        // Sort shapes by (z_index, tree_index) for correct layering
+        // Lower z_index renders first (bottom), higher z_index renders last (top)
+        // Within same z_index, tree order is preserved (stable sort)
+        raw_shapes.sort_by_key(|(_, _, _, _, _, z_index, tree_idx)| (*z_index, *tree_idx));
+
         let shapes = raw_shapes
             .into_iter()
-            .map(|(rect, clip_rect, shape, transform, opacity)| {
-                // Apply the rect to the shape if it's a StyledRect.
-                // Text already carries its own bounding rect internally (TextShape::rect).
-                let shape_with_rect = match shape {
-                    Shape::Rect(mut styled_rect) => {
-                        styled_rect.rect = rect;
-                        Shape::Rect(styled_rect)
-                    }
-                    Shape::Text(text_shape) => Shape::Text(text_shape),
-                };
+            .map(
+                |(rect, clip_rect, shape, transform, opacity, z_index, tree_idx)| {
+                    // Apply the rect to the shape if it's a StyledRect.
+                    // Text already carries its own bounding rect internally (TextShape::rect).
+                    let shape_with_rect = match shape {
+                        Shape::Rect(mut styled_rect) => {
+                            styled_rect.rect = rect;
+                            Shape::Rect(styled_rect)
+                        }
+                        Shape::Text(text_shape) => Shape::Text(text_shape),
+                    };
 
-                ClippedShape::with_transform(clip_rect, rect, shape_with_rect, transform)
-                    .with_opacity(opacity)
-            })
+                    let mut clipped =
+                        ClippedShape::with_transform(clip_rect, rect, shape_with_rect, transform)
+                            .with_opacity(opacity);
+                    clipped.z_index = z_index;
+                    clipped.tree_index = tree_idx;
+                    clipped
+                },
+            )
             .collect();
 
         Self { shapes }
@@ -174,7 +188,17 @@ fn collect_clipped_shapes(
     inherited_clip_rect: Rect,
     parent_transform: Transform2D,
     debug_options: Option<crate::debug::DebugOptions>,
-    out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
+    out: &mut Vec<(
+        Rect,
+        Rect,
+        Shape,
+        Transform2D,
+        f32,
+        crate::layout::ZIndex,
+        usize,
+    )>,
+    parent_z_index: crate::layout::ZIndex,
+    tree_index: &mut usize,
     scale_factor: f32,
 ) {
     collect_clipped_shapes_with_opacity(
@@ -185,6 +209,8 @@ fn collect_clipped_shapes(
         debug_options,
         out,
         1.0,
+        parent_z_index,
+        tree_index,
         scale_factor,
     );
 }
@@ -196,11 +222,24 @@ fn collect_clipped_shapes_with_opacity(
     inherited_clip_rect: Rect,
     parent_transform: Transform2D,
     debug_options: Option<crate::debug::DebugOptions>,
-    out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
+    out: &mut Vec<(
+        Rect,
+        Rect,
+        Shape,
+        Transform2D,
+        f32,
+        crate::layout::ZIndex,
+        usize,
+    )>,
     parent_opacity: f32,
+    parent_z_index: crate::layout::ZIndex,
+    tree_index: &mut usize,
     scale_factor: f32,
 ) {
     let combined_opacity = parent_opacity * node.opacity();
+
+    // Determine this node's z_index (inherit from parent if not set)
+    let current_z_index = node.z_index().unwrap_or(parent_z_index);
 
     // Skip rendering if fully transparent
     if combined_opacity <= 0.0 {
@@ -285,7 +324,10 @@ fn collect_clipped_shapes_with_opacity(
             scaled_shape,
             world_transform,
             combined_opacity,
+            current_z_index,
+            *tree_index,
         ));
+        *tree_index += 1;
     }
 
     // Content (if any)
@@ -338,7 +380,10 @@ fn collect_clipped_shapes_with_opacity(
                     Shape::Text(text_shape),
                     world_transform,
                     combined_opacity,
+                    current_z_index,
+                    *tree_index,
                 ));
+                *tree_index += 1;
             }
         }
     }
@@ -354,6 +399,8 @@ fn collect_clipped_shapes_with_opacity(
                 &world_transform,
                 out,
                 scale_factor,
+                current_z_index,
+                tree_index,
             );
         }
     }
@@ -368,6 +415,8 @@ fn collect_clipped_shapes_with_opacity(
                 &world_transform,
                 out,
                 scale_factor,
+                current_z_index,
+                tree_index,
             );
         }
     }
@@ -392,6 +441,8 @@ fn collect_clipped_shapes_with_opacity(
             debug_options,
             out,
             combined_opacity,
+            current_z_index, // Pass down current z_index
+            tree_index,      // Pass through tree_index counter
             scale_factor,
         );
     }
@@ -443,8 +494,18 @@ fn collect_debug_shapes_clipped(
     clip_rect: Rect,
     options: &crate::debug::DebugOptions,
     transform: &Transform2D,
-    out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
+    out: &mut Vec<(
+        Rect,
+        Rect,
+        Shape,
+        Transform2D,
+        f32,
+        crate::layout::ZIndex,
+        usize,
+    )>,
     scale_factor: f32,
+    current_z_index: crate::layout::ZIndex,
+    tree_index: &mut usize,
 ) {
     use crate::color::Color;
     use crate::primitives::StyledRect;
@@ -497,7 +558,10 @@ fn collect_debug_shapes_clipped(
                 )),
                 *transform,
                 1.0,
+                current_z_index,
+                *tree_index,
             ));
+            *tree_index += 1;
         }
         // Draw right margin (excluding top and bottom corners)
         if margin.right.is_non_zero() {
@@ -513,7 +577,10 @@ fn collect_debug_shapes_clipped(
                 )),
                 *transform,
                 1.0,
+                current_z_index,
+                *tree_index,
             ));
+            *tree_index += 1;
         }
         // Draw bottom margin (full width including corners)
         if margin.bottom.is_non_zero() {
@@ -532,7 +599,10 @@ fn collect_debug_shapes_clipped(
                 )),
                 *transform,
                 1.0,
+                current_z_index,
+                *tree_index,
             ));
+            *tree_index += 1;
         }
         // Draw left margin (excluding top and bottom corners)
         if margin.left.is_non_zero() {
@@ -548,7 +618,10 @@ fn collect_debug_shapes_clipped(
                 )),
                 *transform,
                 1.0,
+                current_z_index,
+                *tree_index,
             ));
+            *tree_index += 1;
         }
     }
 
@@ -597,7 +670,10 @@ fn collect_debug_shapes_clipped(
             ),
             *transform,
             1.0,
+            current_z_index,
+            *tree_index,
         ));
+        *tree_index += 1;
     }
 
     // Draw padding area (semi-transparent blue showing the padding inset)
@@ -621,7 +697,10 @@ fn collect_debug_shapes_clipped(
                 )),
                 *transform,
                 1.0,
+                current_z_index,
+                *tree_index,
             ));
+            *tree_index += 1;
         }
         // Draw right padding (excluding top and bottom corners)
         if padding.right.is_non_zero() {
@@ -640,7 +719,10 @@ fn collect_debug_shapes_clipped(
                 )),
                 *transform,
                 1.0,
+                current_z_index,
+                *tree_index,
             ));
+            *tree_index += 1;
         }
         // Draw bottom padding (full width)
         if padding.bottom.is_non_zero() {
@@ -656,7 +738,10 @@ fn collect_debug_shapes_clipped(
                 )),
                 *transform,
                 1.0,
+                current_z_index,
+                *tree_index,
             ));
+            *tree_index += 1;
         }
         // Draw left padding (excluding top and bottom corners)
         if padding.left.is_non_zero() {
@@ -675,7 +760,10 @@ fn collect_debug_shapes_clipped(
                 )),
                 *transform,
                 1.0,
+                current_z_index,
+                *tree_index,
             ));
+            *tree_index += 1;
         }
     }
 
@@ -692,7 +780,10 @@ fn collect_debug_shapes_clipped(
             ),
             *transform,
             1.0,
+            current_z_index,
+            *tree_index,
         ));
+        *tree_index += 1;
     }
 
     // Draw clip rectangle (red outline showing the clipping boundary)
@@ -709,7 +800,10 @@ fn collect_debug_shapes_clipped(
             ),
             Transform2D::IDENTITY, // Clip rects are already in world space
             1.0,
+            current_z_index,
+            *tree_index,
         ));
+        *tree_index += 1;
     }
 
     // Draw transform origin crosshair
@@ -742,7 +836,10 @@ fn collect_debug_shapes_clipped(
             )),
             *transform,
             1.0,
+            current_z_index,
+            *tree_index,
         ));
+        *tree_index += 1;
 
         // Vertical line
         out.push((
@@ -763,7 +860,10 @@ fn collect_debug_shapes_clipped(
             )),
             *transform,
             1.0,
+            current_z_index,
+            *tree_index,
         ));
+        *tree_index += 1;
 
         // Circle at center (hollow with stroke)
         use crate::primitives::CornerShape;
@@ -791,7 +891,10 @@ fn collect_debug_shapes_clipped(
             ),
             *transform,
             1.0,
+            current_z_index,
+            *tree_index,
         ));
+        *tree_index += 1;
     }
 }
 
@@ -800,8 +903,18 @@ fn collect_gap_debug_shapes(
     clip_rect: Rect,
     _options: &crate::debug::DebugOptions,
     transform: &Transform2D,
-    out: &mut Vec<(Rect, Rect, Shape, Transform2D, f32)>,
+    out: &mut Vec<(
+        Rect,
+        Rect,
+        Shape,
+        Transform2D,
+        f32,
+        crate::layout::ZIndex,
+        usize,
+    )>,
     _scale_factor: f32,
+    current_z_index: crate::layout::ZIndex,
+    tree_index: &mut usize,
 ) {
     use crate::color::Color;
     use crate::layout::Layout;
@@ -862,6 +975,9 @@ fn collect_gap_debug_shapes(
             )),
             *transform,
             1.0,
+            current_z_index,
+            *tree_index,
         ));
+        *tree_index += 1;
     }
 }

@@ -58,6 +58,13 @@ struct SdfDraw {
     instance_count: u32,
 }
 
+/// A rendering layer containing shapes at a specific z-index with rendering ranges.
+#[derive(Debug)]
+struct RenderLayer<'a> {
+    z_index: astra_gui::ZIndex,
+    shapes: Vec<&'a astra_gui::ClippedShape>,
+}
+
 const INITIAL_VERTEX_CAPACITY: usize = 1024;
 const INITIAL_INDEX_CAPACITY: usize = 2048;
 
@@ -793,6 +800,41 @@ impl Renderer {
         self.atlas_needs_resize = false;
     }
 
+    /// Group shapes into rendering layers by z-index, with shapes separated by type within each layer.
+    fn group_into_layers<'a>(shapes: &'a [astra_gui::ClippedShape]) -> Vec<RenderLayer<'a>> {
+        if shapes.is_empty() {
+            return Vec::new();
+        }
+
+        let mut layers: Vec<RenderLayer> = Vec::new();
+        let mut current_z_index = shapes[0].z_index;
+        let mut current_shapes = Vec::new();
+
+        for shape in shapes {
+            if shape.z_index != current_z_index {
+                // Save current layer and start new one
+                layers.push(RenderLayer {
+                    z_index: current_z_index,
+                    shapes: current_shapes,
+                });
+                current_shapes = Vec::new();
+                current_z_index = shape.z_index;
+            }
+
+            current_shapes.push(shape);
+        }
+
+        // Push final layer
+        if !current_shapes.is_empty() {
+            layers.push(RenderLayer {
+                z_index: current_z_index,
+                shapes: current_shapes,
+            });
+        }
+
+        layers
+    }
+
     pub fn render(
         &mut self,
         device: &wgpu::Device,
@@ -844,6 +886,10 @@ impl Renderer {
             }
         }
 
+        // Group shapes by z-index into rendering layers
+        // This ensures correct z-ordering where text respects z-index
+        let layers = Self::group_into_layers(&output.shapes);
+
         // Separate shapes into SDF-renderable and tessellated.
         // SDF rendering is used for simple shapes (currently: all fills, simple strokes).
         // OPTIMIZATION: Pre-allocate based on previous frame to reduce allocations
@@ -860,65 +906,451 @@ impl Renderer {
 
         self.frame_geometry_draws.clear();
 
-        for clipped in &output.shapes {
-            let Shape::Rect(_rect) = &clipped.shape else {
-                continue;
-            };
+        // Text buffers
+        self.text_vertices.clear();
+        self.text_vertices
+            .reserve(self.last_frame_text_vertex_count);
 
-            // Decide whether to use SDF or mesh rendering based on render_mode
-            let use_sdf = match self.render_mode {
-                RenderMode::Sdf => true,
-                RenderMode::Mesh => false,
-                RenderMode::Auto => true, // Default to SDF for best quality
-            };
+        self.text_indices.clear();
+        self.text_indices.reserve(self.last_frame_text_index_count);
 
-            if use_sdf {
-                // Use SDF rendering (analytical anti-aliasing)
-                // Compute scissor rect for this shape
-                let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
-                let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
-                let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
-                let sc_max_y = clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
+        let mut text_draws: Vec<ClippedDraw> = Vec::with_capacity(self.last_frame_text_draw_count);
 
-                let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
-                let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
+        // Track draw commands for each layer to enable interleaved rendering
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        enum DrawCommand {
+            Sdf(usize),  // Index into sdf_draws
+            Text(usize), // Index into text_draws
+        }
 
-                // Skip if fully clipped
-                if sc_w > 0 && sc_h > 0 {
-                    let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
-                    let instance_index = self.sdf_instances.len() as u32;
+        let mut layer_draw_commands: Vec<Vec<DrawCommand>> = Vec::with_capacity(layers.len());
 
-                    self.sdf_instances.push(RectInstance::from(clipped));
+        // Process shapes layer by layer to respect z-index ordering
+        for layer in &layers {
+            let mut current_layer_commands = Vec::new();
 
-                    // Try to batch with previous draw if same scissor
-                    if let Some(last_draw) = self.sdf_draws.last_mut() {
-                        if last_draw.scissor == scissor
-                            && last_draw.instance_start + last_draw.instance_count == instance_index
-                        {
-                            // Extend existing batch
-                            last_draw.instance_count += 1;
+            for clipped in &layer.shapes {
+                match &clipped.shape {
+                    Shape::Rect(_rect) => {
+                        // Decide whether to use SDF or mesh rendering based on render_mode
+                        let use_sdf = match self.render_mode {
+                            RenderMode::Sdf => true,
+                            RenderMode::Mesh => false,
+                            RenderMode::Auto => true, // Default to SDF for best quality
+                        };
+
+                        if use_sdf {
+                            // Use SDF rendering (analytical anti-aliasing)
+                            // Compute scissor rect for this shape
+                            let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
+                            let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
+                            let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
+                            let sc_max_y =
+                                clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
+
+                            let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
+                            let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
+
+                            // Skip if fully clipped
+                            if sc_w > 0 && sc_h > 0 {
+                                let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
+                                let instance_index = self.sdf_instances.len() as u32;
+
+                                self.sdf_instances.push(RectInstance::from(*clipped));
+
+                                // Try to batch with previous draw if same scissor
+                                // IMPORTANT: Only batch if the previous command was also SDF and from this layer
+                                let can_batch = if let Some(DrawCommand::Sdf(last_idx)) =
+                                    current_layer_commands.last()
+                                {
+                                    *last_idx == self.sdf_draws.len() - 1
+                                } else {
+                                    false
+                                };
+
+                                if can_batch {
+                                    if let Some(last_draw) = self.sdf_draws.last_mut() {
+                                        if last_draw.scissor == scissor
+                                            && last_draw.instance_start + last_draw.instance_count
+                                                == instance_index
+                                        {
+                                            // Extend existing batch
+                                            last_draw.instance_count += 1;
+                                        } else {
+                                            // Start new batch (different scissor or non-consecutive)
+                                            self.sdf_draws.push(SdfDraw {
+                                                scissor,
+                                                instance_start: instance_index,
+                                                instance_count: 1,
+                                            });
+                                            current_layer_commands
+                                                .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
+                                        }
+                                    }
+                                } else {
+                                    // First draw in this layer or switched from Text
+                                    self.sdf_draws.push(SdfDraw {
+                                        scissor,
+                                        instance_start: instance_index,
+                                        instance_count: 1,
+                                    });
+                                    current_layer_commands
+                                        .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
+                                }
+                            }
                         } else {
-                            // Start new batch
-                            self.sdf_draws.push(SdfDraw {
-                                scissor,
-                                instance_start: instance_index,
-                                instance_count: 1,
-                            });
+                            // Use mesh tessellation - collect for batch processing
+                            // (Tessellator processes all shapes at once)
                         }
-                    } else {
-                        // First draw
-                        self.sdf_draws.push(SdfDraw {
-                            scissor,
-                            instance_start: instance_index,
-                            instance_count: 1,
-                        });
+                    }
+                    Shape::Text(text_shape) => {
+                        #[cfg(feature = "text-cosmic")]
+                        {
+                            // Use untransformed rect for shaping - transforms will be applied to vertices
+                            let rect = text_shape.rect;
+                            let text = text_shape.text.as_str();
+
+                            if text.is_empty() {
+                                continue;
+                            }
+
+                            // Compute the scissor rect for this shape, clamped to framebuffer bounds.
+                            let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
+                            let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
+                            let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
+                            let sc_max_y =
+                                clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
+
+                            let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
+                            let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
+
+                            if sc_w == 0 || sc_h == 0 {
+                                continue;
+                            }
+
+                            let scissor_for_shape = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
+
+                            // Start of this shape's indices in the final index buffer.
+                            let index_start = self.text_indices.len() as u32;
+
+                            // Shape + placement (backend-agnostic) with caching
+                            // Resolve font size to f32 (should already be in physical pixels)
+                            let width = rect.max[0] - rect.min[0];
+                            let font_size_px = text_shape
+                                .font_size
+                                .try_resolve_with_scale(width, 1.0)
+                                .unwrap_or(16.0);
+
+                            // Create cache key from text + font size + rect dimensions
+                            let cache_key = (
+                                text.to_string(),
+                                font_size_px as u32,
+                                (rect.max[0] - rect.min[0]) as u32,
+                                (rect.max[1] - rect.min[1]) as u32,
+                            );
+
+                            let shaped = if let Some(cached) = self.shape_cache.get(&cache_key) {
+                                // Cache hit - reuse shaped text
+                                cached.clone()
+                            } else {
+                                // Cache miss - shape the text
+                                let (shaped_line, _placement) =
+                                    self.text_engine.shape_line(gui_text::ShapeLineRequest {
+                                        text,
+                                        rect,
+                                        font_px: font_size_px,
+                                        h_align: text_shape.h_align,
+                                        v_align: text_shape.v_align,
+                                        family: None,
+                                    });
+                                self.shape_cache.insert(cache_key, shaped_line.clone());
+                                shaped_line
+                            };
+
+                            // Always recalculate placement for this specific rect position
+                            // (placement contains absolute screen positions, so it can't be cached)
+                            let line_w = shaped.metrics.width_px;
+                            let line_h = shaped.metrics.height_px;
+                            let origin_px = {
+                                let x = match text_shape.h_align {
+                                    HorizontalAlign::Left => rect.min[0],
+                                    HorizontalAlign::Center => {
+                                        rect.min[0] + ((rect.max[0] - rect.min[0]) - line_w) * 0.5
+                                    }
+                                    HorizontalAlign::Right => rect.max[0] - line_w,
+                                };
+                                let y = match text_shape.v_align {
+                                    VerticalAlign::Top => rect.min[1],
+                                    VerticalAlign::Center => {
+                                        rect.min[1] + ((rect.max[1] - rect.min[1]) - line_h) * 0.5
+                                    }
+                                    VerticalAlign::Bottom => rect.max[1] - line_h,
+                                };
+                                [x, y]
+                            };
+                            let placement = gui_text::LinePlacement { origin_px };
+
+                            // Pre-calculate rotation trig functions outside the glyph loop
+                            let rotation = clipped.transform.rotation;
+                            let (cos_r, sin_r) = if rotation.abs() > 0.0001 {
+                                (rotation.cos(), rotation.sin())
+                            } else {
+                                (1.0, 0.0) // Identity rotation
+                            };
+                            let has_rotation = rotation.abs() > 0.0001;
+
+                            for g in &shaped.glyphs {
+                                // Map glyph key to atlas key
+                                let atlas_key = text::atlas::GlyphKey::new(
+                                    g.key.font_id.0,
+                                    g.key.glyph_id,
+                                    g.key.px_size,
+                                    g.key.subpixel_x_64 as u16,
+                                );
+
+                                // OPTIMIZATION: Check metrics cache first (includes placement)
+                                let (glyph_bearing, glyph_size, placed) = if let Some(&(
+                                    bearing,
+                                    size,
+                                    placement,
+                                )) =
+                                    self.glyph_metrics_cache.get(&atlas_key)
+                                {
+                                    // Cache hit - use cached metrics and placement (no atlas lookup!)
+                                    (bearing, size, placement)
+                                } else {
+                                    // Cache miss - need to rasterize and upload
+                                    let Some(bitmap) = self.text_engine.rasterize_glyph(g.key)
+                                    else {
+                                        continue;
+                                    };
+
+                                    // Insert into atlas
+                                    let placed = match self
+                                        .atlas
+                                        .insert(atlas_key.clone(), bitmap.size_px)
+                                    {
+                                        text::atlas::AtlasInsert::AlreadyPresent => {
+                                            // Already in atlas, get placement
+                                            self.atlas.get(&atlas_key)
+                                        }
+                                        text::atlas::AtlasInsert::Placed(p) => {
+                                            // Newly placed - upload texture
+                                            let rect_px =
+                                                text::atlas::GlyphAtlas::upload_rect_px(p);
+                                            let pad = p.padding_px;
+                                            queue.write_texture(
+                                                wgpu::TexelCopyTextureInfo {
+                                                    texture: &self.atlas_texture,
+                                                    mip_level: 0,
+                                                    origin: wgpu::Origin3d {
+                                                        x: rect_px.min.x + pad,
+                                                        y: rect_px.min.y + pad,
+                                                        z: 0,
+                                                    },
+                                                    aspect: wgpu::TextureAspect::All,
+                                                },
+                                                &bitmap.pixels,
+                                                wgpu::TexelCopyBufferLayout {
+                                                    offset: 0,
+                                                    bytes_per_row: Some(bitmap.size_px[0]),
+                                                    rows_per_image: Some(bitmap.size_px[1]),
+                                                },
+                                                wgpu::Extent3d {
+                                                    width: bitmap.size_px[0],
+                                                    height: bitmap.size_px[1],
+                                                    depth_or_array_layers: 1,
+                                                },
+                                            );
+
+                                            // Update size estimate for better future predictions (smooth average)
+                                            let glyph_area = bitmap.size_px[0] * bitmap.size_px[1];
+                                            let glyph_size = (glyph_area as f32).sqrt() as u32;
+                                            self.avg_glyph_size_estimate_px =
+                                                (self.avg_glyph_size_estimate_px * 7 + glyph_size)
+                                                    / 8;
+
+                                            Some(p)
+                                        }
+                                        text::atlas::AtlasInsert::Full => {
+                                            eprintln!(
+                                    "WARNING: Glyph atlas full during render! Will resize next frame. \
+                                     (font_id={}, glyph_id={}, size={}px)",
+                                    atlas_key.font_id, atlas_key.glyph_id, atlas_key.font_px
+                                );
+
+                                            // Mark for resize before next frame
+                                            self.atlas_needs_resize = true;
+
+                                            // Update size estimate for better future predictions
+                                            let glyph_area = bitmap.size_px[0] * bitmap.size_px[1];
+                                            let glyph_size = (glyph_area as f32).sqrt() as u32;
+                                            self.avg_glyph_size_estimate_px =
+                                                (self.avg_glyph_size_estimate_px + glyph_size) / 2;
+
+                                            None
+                                        }
+                                    };
+
+                                    let Some(p) = placed else {
+                                        continue;
+                                    };
+
+                                    // Cache metrics AND placement for future frames
+                                    let metrics = (bitmap.bearing_px, bitmap.size_px, p);
+                                    self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
+                                    (bitmap.bearing_px, bitmap.size_px, p)
+                                };
+
+                                let x0 = placement.origin_px[0] + g.x_px + glyph_bearing[0] as f32;
+                                let y0 = placement.origin_px[1] + g.y_px + glyph_bearing[1] as f32;
+                                let x1 = x0 + glyph_size[0] as f32;
+                                let y1 = y0 + glyph_size[1] as f32;
+
+                                // Apply full transform (translation + rotation) to the glyph quad vertices
+                                let translation = clipped.transform.translation;
+                                let transform_origin = if let Some(abs_origin) =
+                                    clipped.transform.absolute_origin
+                                {
+                                    abs_origin
+                                } else {
+                                    // Fallback: resolve origin relative to the node rect
+                                    let node_width =
+                                        clipped.node_rect.max[0] - clipped.node_rect.min[0];
+                                    let node_height =
+                                        clipped.node_rect.max[1] - clipped.node_rect.min[1];
+                                    let (origin_x, origin_y) =
+                                        clipped.transform.origin.resolve(node_width, node_height);
+                                    [
+                                        clipped.node_rect.min[0] + origin_x,
+                                        clipped.node_rect.min[1] + origin_y,
+                                    ]
+                                };
+
+                                // Helper to apply translation first, then rotation around the transform origin
+                                // Uses pre-calculated cos_r and sin_r from outside the loop
+                                let apply_transform = |pos: [f32; 2]| -> [f32; 2] {
+                                    // 1. Apply translation first
+                                    let mut x = pos[0] + translation.x;
+                                    let mut y = pos[1] + translation.y;
+
+                                    // 2. Apply rotation if present (use pre-calculated trig values)
+                                    if has_rotation {
+                                        // Translate to origin
+                                        x -= transform_origin[0];
+                                        y -= transform_origin[1];
+
+                                        // Rotate (clockwise positive) - uses pre-calculated cos_r and sin_r
+                                        let rx = x * cos_r + y * sin_r;
+                                        let ry = -x * sin_r + y * cos_r;
+
+                                        x = rx;
+                                        y = ry;
+
+                                        // Translate back from origin
+                                        x += transform_origin[0];
+                                        y += transform_origin[1];
+                                    }
+
+                                    [x, y]
+                                };
+
+                                let p0 = apply_transform([x0, y0]);
+                                let p1 = apply_transform([x1, y0]);
+                                let p2 = apply_transform([x1, y1]);
+                                let p3 = apply_transform([x0, y1]);
+
+                                // Apply opacity from ClippedShape to text color
+                                let color = [
+                                    text_shape.color.r,
+                                    text_shape.color.g,
+                                    text_shape.color.b,
+                                    text_shape.color.a * clipped.opacity,
+                                ];
+                                let uv = placed.uv;
+
+                                let base = self.text_vertices.len() as u32;
+                                self.text_vertices.push(text::vertex::TextVertex::new(
+                                    p0,
+                                    [uv.min[0], uv.min[1]],
+                                    color,
+                                ));
+                                self.text_vertices.push(text::vertex::TextVertex::new(
+                                    p1,
+                                    [uv.max[0], uv.min[1]],
+                                    color,
+                                ));
+                                self.text_vertices.push(text::vertex::TextVertex::new(
+                                    p2,
+                                    [uv.max[0], uv.max[1]],
+                                    color,
+                                ));
+                                self.text_vertices.push(text::vertex::TextVertex::new(
+                                    p3,
+                                    [uv.min[0], uv.max[1]],
+                                    color,
+                                ));
+
+                                self.text_indices.extend_from_slice(&[
+                                    base,
+                                    base + 1,
+                                    base + 2,
+                                    base,
+                                    base + 2,
+                                    base + 3,
+                                ]);
+                            }
+                            let index_end = self.text_indices.len() as u32;
+                            if index_end > index_start {
+                                // Try to batch with previous draw if same scissor
+                                // IMPORTANT: Only batch if the previous command was also Text and from this layer
+                                let can_batch = if let Some(DrawCommand::Text(last_idx)) =
+                                    current_layer_commands.last()
+                                {
+                                    *last_idx == text_draws.len() - 1
+                                } else {
+                                    false
+                                };
+
+                                if can_batch {
+                                    if let Some(last_draw) = text_draws.last_mut() {
+                                        if last_draw.scissor == scissor_for_shape
+                                            && last_draw.index_end == index_start
+                                        {
+                                            // Extend existing batch
+                                            last_draw.index_end = index_end;
+                                        } else {
+                                            // Start new batch
+                                            text_draws.push(ClippedDraw {
+                                                scissor: scissor_for_shape,
+                                                index_start,
+                                                index_end,
+                                            });
+                                            current_layer_commands
+                                                .push(DrawCommand::Text(text_draws.len() - 1));
+                                        }
+                                    }
+                                } else {
+                                    // First draw in this layer or switched from SDF
+                                    text_draws.push(ClippedDraw {
+                                        scissor: scissor_for_shape,
+                                        index_start,
+                                        index_end,
+                                    });
+                                    current_layer_commands
+                                        .push(DrawCommand::Text(text_draws.len() - 1));
+                                }
+                            }
+                        }
                     }
                 }
-            } else {
-                // Use mesh tessellation - collect for batch processing
-                // (Tessellator processes all shapes at once)
-            }
-        }
+            } // End for clipped in layer.shapes
+
+            layer_draw_commands.push(current_layer_commands);
+        } // End for layer in layers
+
+        // Store layer count for later use in render pass
+        let layer_count = layers.len();
 
         // Process mesh shapes if using Mesh render mode
         if self.render_mode == RenderMode::Mesh {
@@ -1023,6 +1455,48 @@ impl Renderer {
                 bytemuck::cast_slice(&self.sdf_instances),
             );
         }
+
+        // Upload text buffers before render pass
+        if !text_draws.is_empty() {
+            if self.text_vertices.len() > self.text_vertex_capacity {
+                self.text_vertex_capacity = (self.text_vertices.len() * 2).next_power_of_two();
+                self.text_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Astra UI Text Vertex Buffer"),
+                    size: (self.text_vertex_capacity
+                        * std::mem::size_of::<text::vertex::TextVertex>())
+                        as u64,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+            }
+
+            if self.text_indices.len() > self.text_index_capacity {
+                self.text_index_capacity = (self.text_indices.len() * 2).next_power_of_two();
+                self.text_index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Astra UI Text Index Buffer"),
+                    size: (self.text_index_capacity * std::mem::size_of::<u32>()) as u64,
+                    usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+            }
+
+            queue.write_buffer(
+                &self.text_vertex_buffer,
+                0,
+                bytemuck::cast_slice(&self.text_vertices),
+            );
+            queue.write_buffer(
+                &self.text_index_buffer,
+                0,
+                bytemuck::cast_slice(&self.text_indices),
+            );
+        }
+
+        // Update frame tracking for next frame's pre-allocation
+        self.last_frame_text_vertex_count = self.text_vertices.len();
+        self.last_frame_text_index_count = self.text_indices.len();
+        self.last_frame_text_draw_count = text_draws.len();
+
         // Render pass
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Astra UI Render Pass"),
@@ -1041,28 +1515,71 @@ impl Renderer {
             multiview_mask: None,
         });
 
-        // Draw SDF instances with batched scissor clipping (analytic anti-aliasing)
-        if !self.sdf_draws.is_empty() {
-            render_pass.set_pipeline(&self.sdf_pipeline);
-            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.sdf_quad_vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.sdf_instance_buffer.slice(..));
-            render_pass.set_index_buffer(
-                self.sdf_quad_index_buffer.slice(..),
-                wgpu::IndexFormat::Uint32,
-            );
+        // Layer-based rendering: Render each z-index layer completely before moving to the next
+        // This ensures text respects z-index and doesn't always render on top
 
-            // Draw each batch with its scissor rect
-            for draw in &self.sdf_draws {
-                let (x, y, w, h) = draw.scissor;
-                render_pass.set_scissor_rect(x, y, w, h);
-                render_pass.draw_indexed(
-                    0..6,
-                    0,
-                    draw.instance_start..(draw.instance_start + draw.instance_count),
-                );
-            }
+        // Track current pipeline state to avoid redundant switches
+        #[derive(PartialEq)]
+        enum PipelineState {
+            None,
+            Sdf,
+            Text,
         }
+        let mut current_pipeline = PipelineState::None;
+
+        for layer_idx in 0..layer_count {
+            let commands = &layer_draw_commands[layer_idx];
+
+            for command in commands {
+                match command {
+                    DrawCommand::Sdf(idx) => {
+                        let draw = &self.sdf_draws[*idx];
+
+                        if current_pipeline != PipelineState::Sdf {
+                            render_pass.set_pipeline(&self.sdf_pipeline);
+                            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                            render_pass.set_vertex_buffer(0, self.sdf_quad_vertex_buffer.slice(..));
+                            render_pass.set_vertex_buffer(1, self.sdf_instance_buffer.slice(..));
+                            render_pass.set_index_buffer(
+                                self.sdf_quad_index_buffer.slice(..),
+                                wgpu::IndexFormat::Uint32,
+                            );
+                            current_pipeline = PipelineState::Sdf;
+                        }
+
+                        let (x, y, w, h) = draw.scissor;
+                        render_pass.set_scissor_rect(x, y, w, h);
+                        render_pass.draw_indexed(
+                            0..6,
+                            0,
+                            draw.instance_start..(draw.instance_start + draw.instance_count),
+                        );
+                    }
+                    DrawCommand::Text(idx) => {
+                        #[cfg(feature = "text-cosmic")]
+                        {
+                            let draw = &text_draws[*idx];
+
+                            if current_pipeline != PipelineState::Text {
+                                render_pass.set_pipeline(&self.text_pipeline);
+                                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                                render_pass.set_bind_group(1, &self.atlas_bind_group, &[]);
+                                render_pass.set_vertex_buffer(0, self.text_vertex_buffer.slice(..));
+                                render_pass.set_index_buffer(
+                                    self.text_index_buffer.slice(..),
+                                    wgpu::IndexFormat::Uint32,
+                                );
+                                current_pipeline = PipelineState::Text;
+                            }
+
+                            let (x, y, w, h) = draw.scissor;
+                            render_pass.set_scissor_rect(x, y, w, h);
+                            render_pass.draw_indexed(draw.index_start..draw.index_end, 0, 0..1);
+                        }
+                    }
+                }
+            }
+        } // End layer loop
 
         // Draw geometry with batched scissor clipping
         // OPTIMIZATION: Batch consecutive draws with the same scissor rect to reduce draw calls
@@ -1101,398 +1618,6 @@ impl Renderer {
 
             // Reset scissor to full screen
             render_pass.set_scissor_rect(0, 0, screen_width as u32, screen_height as u32);
-        }
-
-        // Draw text: shape (backend-agnostic) + rasterize (backend-agnostic) + atlas upload + quads.
-        //
-        // IMPORTANT: scissor/clipping is render-pass state. To respect `ClippedShape::clip_rect`,
-        // we must issue separate draw calls for distinct clip rect ranges.
-        #[cfg(feature = "text-cosmic")]
-        {
-            // OPTIMIZATION: Pre-allocate based on previous frame to reduce allocations
-            self.text_vertices.clear();
-            self.text_vertices
-                .reserve(self.last_frame_text_vertex_count);
-
-            self.text_indices.clear();
-            self.text_indices.reserve(self.last_frame_text_index_count);
-
-            let mut draws: Vec<ClippedDraw> = Vec::with_capacity(self.last_frame_text_draw_count);
-
-            for clipped in &output.shapes {
-                let Shape::Text(text_shape) = &clipped.shape else {
-                    continue;
-                };
-
-                // Use untransformed rect for shaping - transforms will be applied to vertices
-                let rect = text_shape.rect;
-                let text = text_shape.text.as_str();
-
-                if text.is_empty() {
-                    continue;
-                }
-
-                // Compute the scissor rect for this shape, clamped to framebuffer bounds.
-                let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
-                let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
-                let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
-                let sc_max_y = clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
-
-                let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
-                let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
-
-                if sc_w == 0 || sc_h == 0 {
-                    continue;
-                }
-
-                let scissor_for_shape = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
-
-                // Start of this shape's indices in the final index buffer.
-                let index_start = self.text_indices.len() as u32;
-
-                // Shape + placement (backend-agnostic) with caching
-                // Resolve font size to f32 (should already be in physical pixels)
-                let width = rect.max[0] - rect.min[0];
-                let font_size_px = text_shape
-                    .font_size
-                    .try_resolve_with_scale(width, 1.0)
-                    .unwrap_or(16.0);
-
-                // Create cache key from text + font size + rect dimensions
-                let cache_key = (
-                    text.to_string(),
-                    font_size_px as u32,
-                    (rect.max[0] - rect.min[0]) as u32,
-                    (rect.max[1] - rect.min[1]) as u32,
-                );
-
-                let shaped = if let Some(cached) = self.shape_cache.get(&cache_key) {
-                    // Cache hit - reuse shaped text
-                    cached.clone()
-                } else {
-                    // Cache miss - shape the text
-                    let (shaped_line, _placement) =
-                        self.text_engine.shape_line(gui_text::ShapeLineRequest {
-                            text,
-                            rect,
-                            font_px: font_size_px,
-                            h_align: text_shape.h_align,
-                            v_align: text_shape.v_align,
-                            family: None,
-                        });
-                    self.shape_cache.insert(cache_key, shaped_line.clone());
-                    shaped_line
-                };
-
-                // Always recalculate placement for this specific rect position
-                // (placement contains absolute screen positions, so it can't be cached)
-                let line_w = shaped.metrics.width_px;
-                let line_h = shaped.metrics.height_px;
-                let origin_px = {
-                    let x = match text_shape.h_align {
-                        HorizontalAlign::Left => rect.min[0],
-                        HorizontalAlign::Center => {
-                            rect.min[0] + ((rect.max[0] - rect.min[0]) - line_w) * 0.5
-                        }
-                        HorizontalAlign::Right => rect.max[0] - line_w,
-                    };
-                    let y = match text_shape.v_align {
-                        VerticalAlign::Top => rect.min[1],
-                        VerticalAlign::Center => {
-                            rect.min[1] + ((rect.max[1] - rect.min[1]) - line_h) * 0.5
-                        }
-                        VerticalAlign::Bottom => rect.max[1] - line_h,
-                    };
-                    [x, y]
-                };
-                let placement = gui_text::LinePlacement { origin_px };
-
-                // Pre-calculate rotation trig functions outside the glyph loop
-                let rotation = clipped.transform.rotation;
-                let (cos_r, sin_r) = if rotation.abs() > 0.0001 {
-                    (rotation.cos(), rotation.sin())
-                } else {
-                    (1.0, 0.0) // Identity rotation
-                };
-                let has_rotation = rotation.abs() > 0.0001;
-
-                for g in &shaped.glyphs {
-                    // Map glyph key to atlas key
-                    let atlas_key = text::atlas::GlyphKey::new(
-                        g.key.font_id.0,
-                        g.key.glyph_id,
-                        g.key.px_size,
-                        g.key.subpixel_x_64 as u16,
-                    );
-
-                    // OPTIMIZATION: Check metrics cache first (includes placement)
-                    let (glyph_bearing, glyph_size, placed) = if let Some(&(
-                        bearing,
-                        size,
-                        placement,
-                    )) =
-                        self.glyph_metrics_cache.get(&atlas_key)
-                    {
-                        // Cache hit - use cached metrics and placement (no atlas lookup!)
-                        (bearing, size, placement)
-                    } else {
-                        // Cache miss - need to rasterize and upload
-                        let Some(bitmap) = self.text_engine.rasterize_glyph(g.key) else {
-                            continue;
-                        };
-
-                        // Insert into atlas
-                        let placed = match self.atlas.insert(atlas_key.clone(), bitmap.size_px) {
-                            text::atlas::AtlasInsert::AlreadyPresent => {
-                                // Already in atlas, get placement
-                                self.atlas.get(&atlas_key)
-                            }
-                            text::atlas::AtlasInsert::Placed(p) => {
-                                // Newly placed - upload texture
-                                let rect_px = text::atlas::GlyphAtlas::upload_rect_px(p);
-                                let pad = p.padding_px;
-                                queue.write_texture(
-                                    wgpu::TexelCopyTextureInfo {
-                                        texture: &self.atlas_texture,
-                                        mip_level: 0,
-                                        origin: wgpu::Origin3d {
-                                            x: rect_px.min.x + pad,
-                                            y: rect_px.min.y + pad,
-                                            z: 0,
-                                        },
-                                        aspect: wgpu::TextureAspect::All,
-                                    },
-                                    &bitmap.pixels,
-                                    wgpu::TexelCopyBufferLayout {
-                                        offset: 0,
-                                        bytes_per_row: Some(bitmap.size_px[0]),
-                                        rows_per_image: Some(bitmap.size_px[1]),
-                                    },
-                                    wgpu::Extent3d {
-                                        width: bitmap.size_px[0],
-                                        height: bitmap.size_px[1],
-                                        depth_or_array_layers: 1,
-                                    },
-                                );
-
-                                // Update size estimate for better future predictions (smooth average)
-                                let glyph_area = bitmap.size_px[0] * bitmap.size_px[1];
-                                let glyph_size = (glyph_area as f32).sqrt() as u32;
-                                self.avg_glyph_size_estimate_px =
-                                    (self.avg_glyph_size_estimate_px * 7 + glyph_size) / 8;
-
-                                Some(p)
-                            }
-                            text::atlas::AtlasInsert::Full => {
-                                eprintln!(
-                                    "WARNING: Glyph atlas full during render! Will resize next frame. \
-                                     (font_id={}, glyph_id={}, size={}px)",
-                                    atlas_key.font_id, atlas_key.glyph_id, atlas_key.font_px
-                                );
-
-                                // Mark for resize before next frame
-                                self.atlas_needs_resize = true;
-
-                                // Update size estimate for better future predictions
-                                let glyph_area = bitmap.size_px[0] * bitmap.size_px[1];
-                                let glyph_size = (glyph_area as f32).sqrt() as u32;
-                                self.avg_glyph_size_estimate_px =
-                                    (self.avg_glyph_size_estimate_px + glyph_size) / 2;
-
-                                None
-                            }
-                        };
-
-                        let Some(p) = placed else {
-                            continue;
-                        };
-
-                        // Cache metrics AND placement for future frames
-                        let metrics = (bitmap.bearing_px, bitmap.size_px, p);
-                        self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
-                        (bitmap.bearing_px, bitmap.size_px, p)
-                    };
-
-                    let x0 = placement.origin_px[0] + g.x_px + glyph_bearing[0] as f32;
-                    let y0 = placement.origin_px[1] + g.y_px + glyph_bearing[1] as f32;
-                    let x1 = x0 + glyph_size[0] as f32;
-                    let y1 = y0 + glyph_size[1] as f32;
-
-                    // Apply full transform (translation + rotation) to the glyph quad vertices
-                    let translation = clipped.transform.translation;
-                    let transform_origin =
-                        if let Some(abs_origin) = clipped.transform.absolute_origin {
-                            abs_origin
-                        } else {
-                            // Fallback: resolve origin relative to the node rect
-                            let node_width = clipped.node_rect.max[0] - clipped.node_rect.min[0];
-                            let node_height = clipped.node_rect.max[1] - clipped.node_rect.min[1];
-                            let (origin_x, origin_y) =
-                                clipped.transform.origin.resolve(node_width, node_height);
-                            [
-                                clipped.node_rect.min[0] + origin_x,
-                                clipped.node_rect.min[1] + origin_y,
-                            ]
-                        };
-
-                    // Helper to apply translation first, then rotation around the transform origin
-                    // Uses pre-calculated cos_r and sin_r from outside the loop
-                    let apply_transform = |pos: [f32; 2]| -> [f32; 2] {
-                        // 1. Apply translation first
-                        let mut x = pos[0] + translation.x;
-                        let mut y = pos[1] + translation.y;
-
-                        // 2. Apply rotation if present (use pre-calculated trig values)
-                        if has_rotation {
-                            // Translate to origin
-                            x -= transform_origin[0];
-                            y -= transform_origin[1];
-
-                            // Rotate (clockwise positive) - uses pre-calculated cos_r and sin_r
-                            let rx = x * cos_r + y * sin_r;
-                            let ry = -x * sin_r + y * cos_r;
-
-                            x = rx;
-                            y = ry;
-
-                            // Translate back from origin
-                            x += transform_origin[0];
-                            y += transform_origin[1];
-                        }
-
-                        [x, y]
-                    };
-
-                    let p0 = apply_transform([x0, y0]);
-                    let p1 = apply_transform([x1, y0]);
-                    let p2 = apply_transform([x1, y1]);
-                    let p3 = apply_transform([x0, y1]);
-
-                    // Apply opacity from ClippedShape to text color
-                    let color = [
-                        text_shape.color.r,
-                        text_shape.color.g,
-                        text_shape.color.b,
-                        text_shape.color.a * clipped.opacity,
-                    ];
-                    let uv = placed.uv;
-
-                    let base = self.text_vertices.len() as u32;
-                    self.text_vertices.push(text::vertex::TextVertex::new(
-                        p0,
-                        [uv.min[0], uv.min[1]],
-                        color,
-                    ));
-                    self.text_vertices.push(text::vertex::TextVertex::new(
-                        p1,
-                        [uv.max[0], uv.min[1]],
-                        color,
-                    ));
-                    self.text_vertices.push(text::vertex::TextVertex::new(
-                        p2,
-                        [uv.max[0], uv.max[1]],
-                        color,
-                    ));
-                    self.text_vertices.push(text::vertex::TextVertex::new(
-                        p3,
-                        [uv.min[0], uv.max[1]],
-                        color,
-                    ));
-
-                    self.text_indices.extend_from_slice(&[
-                        base,
-                        base + 1,
-                        base + 2,
-                        base,
-                        base + 2,
-                        base + 3,
-                    ]);
-                }
-                let index_end = self.text_indices.len() as u32;
-                if index_end > index_start {
-                    draws.push(ClippedDraw {
-                        scissor: scissor_for_shape,
-                        index_start,
-                        index_end,
-                    });
-                }
-            }
-
-            if !draws.is_empty() {
-                if self.text_vertices.len() > self.text_vertex_capacity {
-                    self.text_vertex_capacity = (self.text_vertices.len() * 2).next_power_of_two();
-                    self.text_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                        label: Some("Astra UI Text Vertex Buffer"),
-                        size: (self.text_vertex_capacity
-                            * std::mem::size_of::<text::vertex::TextVertex>())
-                            as u64,
-                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                        mapped_at_creation: false,
-                    });
-                }
-
-                if self.text_indices.len() > self.text_index_capacity {
-                    self.text_index_capacity = (self.text_indices.len() * 2).next_power_of_two();
-                    self.text_index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                        label: Some("Astra UI Text Index Buffer"),
-                        size: (self.text_index_capacity * std::mem::size_of::<u32>()) as u64,
-                        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-                        mapped_at_creation: false,
-                    });
-                }
-
-                queue.write_buffer(
-                    &self.text_vertex_buffer,
-                    0,
-                    bytemuck::cast_slice(&self.text_vertices),
-                );
-                queue.write_buffer(
-                    &self.text_index_buffer,
-                    0,
-                    bytemuck::cast_slice(&self.text_indices),
-                );
-
-                render_pass.set_pipeline(&self.text_pipeline);
-                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                render_pass.set_bind_group(1, &self.atlas_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, self.text_vertex_buffer.slice(..));
-                render_pass
-                    .set_index_buffer(self.text_index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-
-                // OPTIMIZATION: Batch consecutive draws with the same scissor rect
-                let mut current_scissor = draws[0].scissor;
-                let mut batch_start = draws[0].index_start;
-                let mut batch_end = draws[0].index_end;
-
-                for draw in &draws[1..] {
-                    if draw.scissor == current_scissor && draw.index_start == batch_end {
-                        // Extend current batch
-                        batch_end = draw.index_end;
-                    } else {
-                        // Flush current batch
-                        let (x, y, w, h) = current_scissor;
-                        render_pass.set_scissor_rect(x, y, w, h);
-                        render_pass.draw_indexed(batch_start..batch_end, 0, 0..1);
-
-                        // Start new batch
-                        current_scissor = draw.scissor;
-                        batch_start = draw.index_start;
-                        batch_end = draw.index_end;
-                    }
-                }
-
-                // Flush final batch
-                let (x, y, w, h) = current_scissor;
-                render_pass.set_scissor_rect(x, y, w, h);
-                render_pass.draw_indexed(batch_start..batch_end, 0, 0..1);
-
-                render_pass.set_scissor_rect(0, 0, screen_width as u32, screen_height as u32);
-            }
-
-            // Update frame tracking for next frame's pre-allocation
-            self.last_frame_text_vertex_count = self.text_vertices.len();
-            self.last_frame_text_index_count = self.text_indices.len();
-            self.last_frame_text_draw_count = draws.len();
         }
 
         // Update frame tracking for geometry buffers

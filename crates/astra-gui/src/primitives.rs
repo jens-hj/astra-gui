@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::content::{HorizontalAlign, TextContent, VerticalAlign};
-use crate::layout::Transform2D;
+use crate::layout::{Transform2D, ZIndex};
 
 /// A 2D point in screen space
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -254,6 +254,8 @@ pub struct ClippedShape {
     pub shape: Shape,
     pub transform: Transform2D, // Accumulated transform from hierarchy
     pub opacity: f32,           // Combined opacity from node hierarchy
+    pub z_index: ZIndex,        // Z-index for layering (higher = on top)
+    pub tree_index: usize,      // Position in tree traversal (for stable sort)
 }
 
 impl ClippedShape {
@@ -270,6 +272,8 @@ impl ClippedShape {
             shape,
             transform: Transform2D::IDENTITY,
             opacity: 1.0,
+            z_index: ZIndex::DEFAULT,
+            tree_index: 0,
         }
     }
 
@@ -285,6 +289,8 @@ impl ClippedShape {
             shape,
             transform,
             opacity: 1.0,
+            z_index: ZIndex::DEFAULT,
+            tree_index: 0,
         }
     }
 
