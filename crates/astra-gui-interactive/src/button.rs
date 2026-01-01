@@ -142,7 +142,9 @@ pub fn button(
         .with_style(Style {
             fill_color: Some(style.idle_color),
             text_color: Some(style.text_color),
-            corner_shape: Some(CornerShape::Round(style.border_radius)),
+            corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                style.border_radius,
+            ))),
             stroke: Some(Stroke::new(Size::lpx(2.0), style.idle_stroke_color)),
             ..Default::default()
         })

@@ -32,8 +32,18 @@ pub struct HitTestResult {
 /// Vector of hit test results, ordered from shallowest (root) to deepest (leaf)
 pub fn hit_test_point(root: &Node, point: Point) -> Vec<HitTestResult> {
     // Apply pan offset from root node for camera-style zoom
+    // We use the root node's computed size for resolving relative pan offsets.
+    let (root_w, root_h) = if let Some(layout) = root.computed_layout() {
+        (
+            layout.rect.max[0] - layout.rect.min[0],
+            layout.rect.max[1] - layout.rect.min[1],
+        )
+    } else {
+        (0.0, 0.0)
+    };
+
     let initial_transform = Transform2D {
-        translation: root.pan_offset(),
+        translation: root.pan_offset().resolve(root_w, root_h, 1.0),
         rotation: 0.0,
         scale: 1.0,
         origin: crate::layout::TransformOrigin::center(),
@@ -82,20 +92,20 @@ fn hit_test_recursive(
 
     let node_rect = computed.rect;
 
-    // Build local transform from node properties
-    let local_transform = Transform2D {
-        translation: node.translation(),
-        rotation: node.rotation(),
-        scale: node.scale(),
-        origin: node.transform_origin(),
-        absolute_origin: None,
-    };
-
     // Compute rect size for transform operations
     let rect_size = [
         node_rect.max[0] - node_rect.min[0],
         node_rect.max[1] - node_rect.min[1],
     ];
+
+    // Build local transform from node properties
+    let local_transform = Transform2D {
+        translation: node.translation().resolve(rect_size[0], rect_size[1], 1.0),
+        rotation: node.rotation(),
+        scale: node.scale(),
+        origin: node.transform_origin(),
+        absolute_origin: None,
+    };
 
     // Accumulate transforms: parent → local
     let mut world_transform = parent_transform.then(&local_transform, rect_size);

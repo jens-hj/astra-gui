@@ -267,11 +267,11 @@ pub fn text_input(
                 Node::new()
                     .with_width(Size::lpx(selection_width))
                     .with_height(Size::lpx(style.font_size))
-                    .with_translation(Translation::x(selection_x_offset))
+                    .with_translation(Translation::x(astra_gui::Size::Logical(selection_x_offset)))
                     .with_shape(Shape::rect())
                     .with_style(Style {
                         fill_color: Some(style.selection_color),
-                        corner_shape: Some(CornerShape::Round(5.0)),
+                        corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(5.0))),
                         ..Default::default()
                     }),
             );
@@ -310,7 +310,7 @@ pub fn text_input(
                 Node::new()
                     .with_width(Size::lpx(style.cursor_style.thickness))
                     .with_height(Size::lpx(style.font_size))
-                    .with_translation(Translation::x(cursor_x_offset))
+                    .with_translation(Translation::x(astra_gui::Size::Logical(cursor_x_offset)))
                     .with_shape(Shape::Rect(StyledRect::new(Rect::default(), cursor_color)))
             }
             CursorShape::Underline => {
@@ -334,7 +334,10 @@ pub fn text_input(
                 Node::new()
                     .with_width(Size::lpx(cursor_width))
                     .with_height(Size::lpx(style.cursor_style.thickness))
-                    .with_translation(Translation::new(cursor_x_offset, style.font_size))
+                    .with_translation(Translation::new(
+                        astra_gui::Size::Logical(cursor_x_offset),
+                        astra_gui::Size::Logical(style.font_size),
+                    ))
                     .with_shape(Shape::Rect(StyledRect::new(Rect::default(), cursor_color)))
             }
             CursorShape::Block => {
@@ -358,7 +361,9 @@ pub fn text_input(
                 Node::new()
                     .with_width(Size::lpx(cursor_width))
                     .with_height(Size::lpx(style.font_size))
-                    .with_translation(Translation::x((cursor_x_offset - cursor_width).max(0.0)))
+                    .with_translation(Translation::x(astra_gui::Size::Logical(
+                        (cursor_x_offset - cursor_width).max(0.0),
+                    )))
                     .with_shape(Shape::Rect(StyledRect::new(
                         Rect::default(),
                         cursor_color.with_alpha(0.3), // Semi-transparent
@@ -406,7 +411,9 @@ pub fn text_input(
         .with_style(Style {
             fill_color: Some(fill_color),
             stroke: Some(Stroke::new(Size::lpx(stroke_width), stroke_color)),
-            corner_shape: Some(CornerShape::Round(style.border_radius)),
+            corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                style.border_radius,
+            ))),
             ..Default::default()
         })
         .with_disabled_style(Style {

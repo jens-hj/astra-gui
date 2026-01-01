@@ -1,7 +1,7 @@
 use crate::primitives::Rect;
 
 /// Size specification that can be fixed, relative to parent, or derived from content.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Size {
     /// Fixed size in logical pixels (scales with zoom)
     Logical(f32),
@@ -106,6 +106,15 @@ impl Size {
         }
     }
 
+    /// Resolve to physical pixels if possible, otherwise return 0.0
+    pub fn resolve_physical_or_zero(&self, scale_factor: f32) -> f32 {
+        match self {
+            Size::Logical(px) => *px * scale_factor,
+            Size::Physical(px) => *px,
+            _ => 0.0,
+        }
+    }
+
     /// Check if this size is Fill
     pub const fn is_fill(&self) -> bool {
         matches!(self, Size::Fill)
@@ -159,14 +168,17 @@ impl Default for Layout {
 /// 2D translation offset
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Translation {
-    pub x: f32,
-    pub y: f32,
+    pub x: Size,
+    pub y: Size,
 }
 
 impl Translation {
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
+    pub const ZERO: Self = Self {
+        x: Size::Logical(0.0),
+        y: Size::Logical(0.0),
+    };
 
-    pub const fn new(x: f32, y: f32) -> Self {
+    pub const fn new(x: Size, y: Size) -> Self {
         Self { x, y }
     }
 
@@ -174,12 +186,47 @@ impl Translation {
         Self::ZERO
     }
 
-    pub const fn x(x: f32) -> Self {
-        Self { x, y: 0.0 }
+    pub const fn x(x: Size) -> Self {
+        Self {
+            x,
+            y: Size::Logical(0.0),
+        }
     }
 
-    pub const fn y(y: f32) -> Self {
-        Self { x: 0.0, y }
+    pub const fn y(y: Size) -> Self {
+        Self {
+            x: Size::Logical(0.0),
+            y,
+        }
+    }
+
+    /// Resolve translation to physical pixels
+    pub fn resolve(&self, parent_width: f32, parent_height: f32, scale_factor: f32) -> Vector2 {
+        Vector2 {
+            x: self
+                .x
+                .try_resolve_with_scale(parent_width, scale_factor)
+                .unwrap_or(0.0),
+            y: self
+                .y
+                .try_resolve_with_scale(parent_height, scale_factor)
+                .unwrap_or(0.0),
+        }
+    }
+}
+
+/// 2D vector in physical pixels
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Vector2 {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Vector2 {
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
+
+    pub const fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
     }
 }
 
@@ -264,7 +311,7 @@ impl Default for TransformOrigin {
 /// 2D transform combining translation, rotation, scale, and origin
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Transform2D {
-    pub translation: Translation,
+    pub translation: Vector2,
     pub rotation: f32, // Radians, clockwise positive (CSS convention)
     pub scale: f32,    // Uniform scale factor (1.0 = no scale)
     pub origin: TransformOrigin,
@@ -275,7 +322,7 @@ pub struct Transform2D {
 
 impl Transform2D {
     pub const IDENTITY: Self = Self {
-        translation: Translation::ZERO,
+        translation: Vector2::ZERO,
         rotation: 0.0,
         scale: 1.0,
         origin: TransformOrigin {
@@ -368,7 +415,7 @@ impl Transform2D {
             };
 
         Transform2D {
-            translation: Translation {
+            translation: Vector2 {
                 x: self.translation.x + other.translation.x,
                 y: self.translation.y + other.translation.y,
             },

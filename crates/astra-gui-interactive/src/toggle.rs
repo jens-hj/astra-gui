@@ -75,7 +75,9 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
             } else {
                 style.off_color
             }),
-            corner_shape: Some(CornerShape::Round(style.track_height / 2.0)),
+            corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                style.track_height / 2.0,
+            ))),
             opacity: Some(1.0),
             ..Default::default()
         })
@@ -106,8 +108,10 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
                 .with_shape(astra_gui::Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.knob_color),
-                    corner_shape: Some(CornerShape::Round(style.knob_width / 2.0)),
-                    translation_x: Some(knob_offset_x),
+                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                        style.knob_width / 2.0,
+                    ))),
+                    translation_x: Some(astra_gui::Size::Logical(knob_offset_x)),
                     ..Default::default()
                 })
                 .with_transition(Transition::quick()),

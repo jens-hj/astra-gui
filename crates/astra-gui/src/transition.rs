@@ -94,10 +94,12 @@ pub fn lerp_stroke(a: Stroke, b: Stroke, t: f32) -> Stroke {
 pub fn lerp_corner_shape(a: CornerShape, b: CornerShape, t: f32) -> CornerShape {
     match (a, b) {
         (CornerShape::None, CornerShape::None) => CornerShape::None,
-        (CornerShape::Round(r1), CornerShape::Round(r2)) => CornerShape::Round(lerp_f32(r1, r2, t)),
-        (CornerShape::Cut(d1), CornerShape::Cut(d2)) => CornerShape::Cut(lerp_f32(d1, d2, t)),
+        (CornerShape::Round(r1), CornerShape::Round(r2)) => {
+            CornerShape::Round(lerp_size(r1, r2, t))
+        }
+        (CornerShape::Cut(d1), CornerShape::Cut(d2)) => CornerShape::Cut(lerp_size(d1, d2, t)),
         (CornerShape::InverseRound(r1), CornerShape::InverseRound(r2)) => {
-            CornerShape::InverseRound(lerp_f32(r1, r2, t))
+            CornerShape::InverseRound(lerp_size(r1, r2, t))
         }
         (
             CornerShape::Squircle {
@@ -109,7 +111,7 @@ pub fn lerp_corner_shape(a: CornerShape, b: CornerShape, t: f32) -> CornerShape 
                 smoothness: s2,
             },
         ) => CornerShape::Squircle {
-            radius: lerp_f32(r1, r2, t),
+            radius: lerp_size(r1, r2, t),
             smoothness: lerp_f32(s1, s2, t),
         },
         // Different variants: snap at halfway point
@@ -180,13 +182,13 @@ pub fn lerp_style(from: &Style, to: &Style, t: f32) -> Style {
             (None, None) => None,
         },
         translation_x: match (from.translation_x, to.translation_x) {
-            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
+            (Some(a), Some(b)) => Some(lerp_size(a, b, t)),
             (None, Some(b)) => Some(b),
             (Some(a), None) => Some(a),
             (None, None) => None,
         },
         translation_y: match (from.translation_y, to.translation_y) {
-            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
+            (Some(a), Some(b)) => Some(lerp_size(a, b, t)),
             (None, Some(b)) => Some(b),
             (Some(a), None) => Some(a),
             (None, None) => None,

@@ -127,7 +127,11 @@ impl FullOutput {
 
         // Apply pan offset from root node for camera-style zoom
         let initial_transform = Transform2D {
-            translation: root.pan_offset(),
+            translation: root.pan_offset().resolve(
+                window_size.0,
+                window_size.1,
+                effective_scale_factor,
+            ),
             rotation: 0.0,
             scale: 1.0,
             origin: crate::layout::TransformOrigin::center(),
@@ -252,20 +256,22 @@ fn collect_clipped_shapes_with_opacity(
 
     let node_rect = layout.rect;
 
-    // Build local transform from node properties
-    let local_transform = Transform2D {
-        translation: node.translation(),
-        rotation: node.rotation(),
-        scale: node.scale(),
-        origin: node.transform_origin(),
-        absolute_origin: None, // Will be set during composition if needed
-    };
-
     // Compute rect size for transform operations
     let rect_size = [
         node_rect.max[0] - node_rect.min[0],
         node_rect.max[1] - node_rect.min[1],
     ];
+
+    // Build local transform from node properties
+    let local_transform = Transform2D {
+        translation: node
+            .translation()
+            .resolve(rect_size[0], rect_size[1], scale_factor),
+        rotation: node.rotation(),
+        scale: node.scale(),
+        origin: node.transform_origin(),
+        absolute_origin: None, // Will be set during composition if needed
+    };
 
     // Accumulate transforms: parent → local
     let mut world_transform = parent_transform.then(&local_transform, rect_size);
@@ -304,15 +310,48 @@ fn collect_clipped_shapes_with_opacity(
         let scaled_shape = match shape {
             Shape::Rect(styled_rect) => {
                 let mut scaled_rect = styled_rect.clone();
+                let width = node_rect.max[0] - node_rect.min[0];
+                let height = node_rect.max[1] - node_rect.min[1];
+                let min_dim = width.min(height);
+
                 if let Some(ref stroke) = scaled_rect.stroke {
                     // Resolve stroke width with scale_factor
-                    let width = node_rect.max[0] - node_rect.min[0];
                     let scaled_width = stroke
                         .width
                         .try_resolve_with_scale(width, scale_factor)
                         .unwrap_or(1.0);
-                    scaled_rect.stroke = Some(Stroke::new(Size::lpx(scaled_width), stroke.color));
+                    scaled_rect.stroke = Some(Stroke::new(Size::ppx(scaled_width), stroke.color));
                 }
+
+                // Resolve corner shape
+                scaled_rect.corner_shape = match scaled_rect.corner_shape {
+                    crate::CornerShape::Round(size) => crate::CornerShape::Round(Size::ppx(
+                        size.try_resolve_with_scale(min_dim, scale_factor)
+                            .unwrap_or(0.0),
+                    )),
+                    crate::CornerShape::Cut(size) => crate::CornerShape::Cut(Size::ppx(
+                        size.try_resolve_with_scale(min_dim, scale_factor)
+                            .unwrap_or(0.0),
+                    )),
+                    crate::CornerShape::InverseRound(size) => {
+                        crate::CornerShape::InverseRound(Size::ppx(
+                            size.try_resolve_with_scale(min_dim, scale_factor)
+                                .unwrap_or(0.0),
+                        ))
+                    }
+                    crate::CornerShape::Squircle { radius, smoothness } => {
+                        crate::CornerShape::Squircle {
+                            radius: Size::ppx(
+                                radius
+                                    .try_resolve_with_scale(min_dim, scale_factor)
+                                    .unwrap_or(0.0),
+                            ),
+                            smoothness,
+                        }
+                    }
+                    crate::CornerShape::None => crate::CornerShape::None,
+                };
+
                 Shape::Rect(scaled_rect)
             }
             Shape::Text(_) => shape.clone(),
@@ -883,7 +922,7 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(
                 StyledRect::new(circle_rect, Color::transparent())
-                    .with_corner_shape(CornerShape::Round(circle_radius * scale_factor))
+                    .with_corner_shape(CornerShape::Round(Size::ppx(circle_radius * scale_factor)))
                     .with_stroke(Stroke::new(
                         Size::lpx(2.0 * scale_factor),
                         Color::new(1.0, 0.5, 0.0, 0.9),

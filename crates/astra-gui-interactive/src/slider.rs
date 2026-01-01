@@ -102,7 +102,9 @@ pub fn slider(
                 .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.track_color),
-                    corner_shape: Some(CornerShape::Round(style.track_height / 2.0)),
+                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                        style.track_height / 2.0,
+                    ))),
                     ..Default::default()
                 })
                 .with_disabled(disabled)
@@ -114,7 +116,9 @@ pub fn slider(
                 .with_shape(astra_gui::Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.filled_color),
-                    corner_shape: Some(CornerShape::Round(style.track_height / 2.0)),
+                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                        style.track_height / 2.0,
+                    ))),
                     ..Default::default()
                 })
                 .with_disabled_style(Style {
@@ -126,12 +130,17 @@ pub fn slider(
             Node::new()
                 .with_width(Size::lpx(style.thumb_size))
                 .with_height(Size::lpx(style.thumb_size))
-                .with_translation(Translation::new(thumb_offset_x, thumb_inset))
+                .with_translation(Translation::new(
+                    astra_gui::Size::Logical(thumb_offset_x),
+                    astra_gui::Size::Logical(thumb_inset),
+                ))
                 .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.thumb_color),
                     opacity: Some(1.0),
-                    corner_shape: Some(CornerShape::Round(style.thumb_size / 2.0)),
+                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                        style.thumb_size / 2.0,
+                    ))),
                     ..Default::default()
                 })
                 .with_hover_style(Style {

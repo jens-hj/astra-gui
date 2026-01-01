@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::content::{HorizontalAlign, TextContent, VerticalAlign};
-use crate::layout::{Transform2D, ZIndex};
+use crate::layout::{Size, Transform2D, ZIndex};
 
 /// A 2D point in screen space
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -39,12 +39,12 @@ impl From<Point> for [f32; 2] {
 /// Stroke definition with width and color
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stroke {
-    pub width: crate::layout::Size,
+    pub width: Size,
     pub color: Color,
 }
 
 impl Stroke {
-    pub const fn new(width: crate::layout::Size, color: Color) -> Self {
+    pub const fn new(width: Size, color: Color) -> Self {
         Self { width, color }
     }
 }
@@ -118,21 +118,21 @@ pub enum CornerShape {
     /// No corner modification (sharp 90-degree corners)
     None,
     /// Circular arc rounding with specified radius
-    Round(f32),
+    Round(Size),
     /// Diagonal cut with specified distance from corner
-    Cut(f32),
+    Cut(Size),
     /// Inverse circular arc (concave, like a ticket punch)
-    InverseRound(f32),
+    InverseRound(Size),
     /// Squircle (superellipse) with specified radius and smoothness factor
     /// smoothness: 1.0 = circle, higher values = more square-like
-    Squircle { radius: f32, smoothness: f32 },
+    Squircle { radius: Size, smoothness: f32 },
 }
 
 impl CornerShape {
     /// Get the maximum distance this corner shape extends from the corner point
-    pub fn extent(&self) -> f32 {
+    pub fn extent(&self) -> Size {
         match self {
-            CornerShape::None => 0.0,
+            CornerShape::None => Size::Logical(0.0),
             CornerShape::Round(r) => *r,
             CornerShape::Cut(d) => *d,
             CornerShape::InverseRound(r) => *r,
@@ -187,7 +187,7 @@ pub struct TextShape {
     /// The text content to render
     pub text: String,
     /// Font size in logical pixels
-    pub font_size: crate::layout::Size,
+    pub font_size: Size,
     /// Text color
     pub color: Color,
     /// Horizontal alignment

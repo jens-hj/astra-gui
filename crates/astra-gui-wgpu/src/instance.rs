@@ -174,7 +174,10 @@ impl From<&ClippedShape> for RectInstance {
         let (stroke_color, stroke_width) = if let Some(stroke) = &rect.stroke {
             // Resolve stroke width to f32 (should already be in physical pixels at this point)
             let width = clipped.node_rect.max[0] - clipped.node_rect.min[0];
-            let resolved_width = stroke.width.try_resolve_with_scale(width, 1.0).unwrap_or(0.0);
+            let resolved_width = stroke
+                .width
+                .try_resolve_with_scale(width, 1.0)
+                .unwrap_or(0.0);
 
             (
                 [
@@ -194,10 +197,12 @@ impl From<&ClippedShape> for RectInstance {
         // Convert corner shape to type + parameters
         let (corner_type, param1, param2) = match rect.corner_shape {
             CornerShape::None => (0, 0.0, 0.0),
-            CornerShape::Round(radius) => (1, radius, 0.0),
-            CornerShape::Cut(distance) => (2, distance, 0.0),
-            CornerShape::InverseRound(radius) => (3, radius, 0.0),
-            CornerShape::Squircle { radius, smoothness } => (4, radius, smoothness),
+            CornerShape::Round(radius) => (1, radius.resolve_physical_or_zero(1.0), 0.0),
+            CornerShape::Cut(distance) => (2, distance.resolve_physical_or_zero(1.0), 0.0),
+            CornerShape::InverseRound(radius) => (3, radius.resolve_physical_or_zero(1.0), 0.0),
+            CornerShape::Squircle { radius, smoothness } => {
+                (4, radius.resolve_physical_or_zero(1.0), smoothness)
+            }
         };
 
         Self {

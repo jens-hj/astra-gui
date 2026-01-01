@@ -45,10 +45,10 @@ pub struct Style {
     // This is consistent with CSS where you can set `transform: translateX(5px)`
     // without overriding any existing translateY.
     /// Horizontal translation from default position
-    pub translation_x: Option<f32>,
+    pub translation_x: Option<crate::layout::Size>,
 
     /// Vertical translation from default position
-    pub translation_y: Option<f32>,
+    pub translation_y: Option<crate::layout::Size>,
 
     /// Rotation in radians (clockwise positive, CSS convention)
     pub rotation: Option<f32>,
@@ -161,7 +161,7 @@ impl Style {
                 } else {
                     #[allow(deprecated)]
                     if let Some(radius) = self.corner_radius {
-                        rect.corner_shape = CornerShape::Round(radius);
+                        rect.corner_shape = CornerShape::Round(crate::layout::Size::lpx(radius));
                     }
                 }
             }
@@ -187,12 +187,12 @@ impl Style {
             #[allow(deprecated)]
             let new_x = self
                 .translation_x
-                .or(self.offset_x)
+                .or(self.offset_x.map(crate::layout::Size::lpx))
                 .unwrap_or(current_translation.x);
             #[allow(deprecated)]
             let new_y = self
                 .translation_y
-                .or(self.offset_y)
+                .or(self.offset_y.map(crate::layout::Size::lpx))
                 .unwrap_or(current_translation.y);
             node.set_translation(Translation::new(new_x, new_y));
         }

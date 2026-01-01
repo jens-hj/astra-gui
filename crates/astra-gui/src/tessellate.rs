@@ -60,6 +60,7 @@ impl Tessellator {
         let extent = rect
             .corner_shape
             .extent()
+            .resolve_physical_or_zero(1.0)
             .min((max_x - min_x) * 0.5)
             .min((max_y - min_y) * 0.5);
 
@@ -358,6 +359,7 @@ impl Tessellator {
         let extent = rect
             .corner_shape
             .extent()
+            .resolve_physical_or_zero(1.0)
             .min((max_x - min_x) * 0.5)
             .min((max_y - min_y) * 0.5);
 

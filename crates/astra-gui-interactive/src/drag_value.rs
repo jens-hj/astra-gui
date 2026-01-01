@@ -201,7 +201,9 @@ pub fn drag_value(
                 Size::lpx(style.border_width),
                 style.idle_border_color,
             )),
-            corner_shape: Some(CornerShape::Round(style.border_radius)),
+            corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                style.border_radius,
+            ))),
             ..Default::default()
         })
         .with_hover_style(Style {
