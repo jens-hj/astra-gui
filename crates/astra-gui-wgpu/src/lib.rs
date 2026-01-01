@@ -61,6 +61,7 @@ struct SdfDraw {
 /// A rendering layer containing shapes at a specific z-index with rendering ranges.
 #[derive(Debug)]
 struct RenderLayer<'a> {
+    #[allow(dead_code)]
     z_index: astra_gui::ZIndex,
     shapes: Vec<&'a astra_gui::ClippedShape>,
 }
