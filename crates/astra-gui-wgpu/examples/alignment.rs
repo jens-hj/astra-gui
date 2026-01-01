@@ -33,7 +33,7 @@ const DEBUG_HELP_TEXT: &str = "Debug controls:
   ESC - Exit";
 
 const MM_PER_INCH: f32 = 25.4;
-const REFERENCE_PPI: f32 = 145.14;
+const REFERENCE_PPI: f32 = 100.0;
 
 fn handle_debug_keybinds(
     event: &WindowEvent,
@@ -154,7 +154,7 @@ impl App {
     fn render(&mut self) {
         self.interactive_state_manager.begin_frame();
 
-        let mut ui = self.build_ui().with_zoom(1.75);
+        let mut ui = self.build_ui().with_zoom(self.zoom_level);
 
         let size = match &self.window {
             Some(window) => window.inner_size(),
@@ -309,7 +309,6 @@ impl App {
         Node::new()
             .with_width(Size::Fill)
             .with_height(Size::Fill)
-            .with_zoom(self.zoom_level)
             .with_style(Style {
                 fill_color: Some(mocha::BASE),
                 ..Default::default()
@@ -455,33 +454,48 @@ impl ApplicationHandler for App {
             // We want MacBook Pro 16" (254 PPI) to have 1.75 zoom
             // Reference PPI = 254 / 1.75 = ~145.14
             if let Ok(displays) = display_info::DisplayInfo::all() {
-                if let Some(monitor) = window.current_monitor() {
-                    let monitor_pos = monitor.position();
+                if !displays.is_empty() {
+                    let monitor = window
+                        .current_monitor()
+                        .or_else(|| event_loop.primary_monitor());
 
-                    // Find the display that matches the winit monitor position
-                    if let Some(display) = displays
-                        .iter()
-                        .find(|d| d.x == monitor_pos.x && d.y == monitor_pos.y)
-                    {
-                        // Use winit for physical pixels (reliable) and display-info for physical dimensions
-                        let width_px = monitor.size().width as f32;
-                        let width_mm = display.width_mm as f32;
+                    // Try to find a matching display and monitor pair
+                    let display_match = if let Some(monitor) = monitor {
+                        let monitor_pos = monitor.position();
+                        displays
+                            .iter()
+                            .find(|d| d.x == monitor_pos.x && d.y == monitor_pos.y)
+                            .map(|d| (d, monitor.size().width as f32, monitor.size().height))
+                    } else {
+                        None
+                    };
 
-                        if width_mm > 0.0 {
-                            let width_inches = width_mm / MM_PER_INCH;
-                            let ppi = width_px / width_inches;
+                    // Fallback to first display if no match found or no monitor detected
+                    let (display, width_px, height_px) = display_match.unwrap_or_else(|| {
+                        let d = &displays[0];
+                        (
+                            d,
+                            d.width as f32 * d.scale_factor,
+                            (d.height as f32 * d.scale_factor) as u32,
+                        )
+                    });
 
-                            self.zoom_level = ppi / REFERENCE_PPI;
+                    let width_mm = display.width_mm as f32;
 
-                            println!(
-                                "Detected Display: {}x{}px ({}mm wide). PPI: {:.2}. Setting zoom to {:.2}",
-                                width_px,
-                                monitor.size().height,
-                                width_mm,
-                                ppi,
-                                self.zoom_level
-                            );
-                        }
+                    if width_mm > 0.0 {
+                        let width_inches = width_mm / MM_PER_INCH;
+                        let ppi = width_px / width_inches;
+
+                        self.zoom_level = ppi / REFERENCE_PPI;
+
+                        println!(
+                            "Detected Display: {}x{}px ({}mm wide). PPI: {:.2}. Setting zoom to {:.2}",
+                            width_px,
+                            height_px,
+                            width_mm,
+                            ppi,
+                            self.zoom_level
+                        );
                     }
                 }
             }
