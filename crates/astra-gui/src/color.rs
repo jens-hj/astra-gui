@@ -56,6 +56,21 @@ impl Color {
         self.a = alpha;
         self
     }
+
+    /// Calculate relative luminance (0.0 to 1.0)
+    /// Uses standard coefficients for linear RGB: 0.2126 R + 0.7152 G + 0.0722 B
+    pub fn luminance(&self) -> f32 {
+        0.2126 * self.r + 0.7152 * self.g + 0.0722 * self.b
+    }
+
+    /// Calculate contrast ratio with another color (1.0 to 21.0)
+    pub fn contrast_ratio(&self, other: &Color) -> f32 {
+        let l1 = self.luminance();
+        let l2 = other.luminance();
+        let lighter = l1.max(l2);
+        let darker = l1.min(l2);
+        (lighter + 0.05) / (darker + 0.05)
+    }
 }
 
 /// CSS color constants

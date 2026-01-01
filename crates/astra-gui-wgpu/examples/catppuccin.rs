@@ -265,7 +265,7 @@ fn theme_card(
             .with_children(
                 chunk
                     .iter()
-                    .map(|&(n, c)| color_swatch(n, c, text))
+                    .map(|&(n, c)| color_swatch(n, c, base, text))
                     .collect(),
             );
         rows.push(row);
@@ -303,10 +303,19 @@ fn theme_card(
         ])
 }
 
-fn color_swatch(name: &str, color: Color, text_color: Color) -> Node {
+fn color_swatch(name: &str, color: Color, base_color: Color, text_color: Color) -> Node {
     if name.is_empty() {
         return Node::new().with_width(Size::Fill).with_height(Size::Fill);
     }
+
+    let contrast_base = color.contrast_ratio(&base_color);
+    let contrast_text = color.contrast_ratio(&text_color);
+
+    let final_text_color = if contrast_base > contrast_text {
+        base_color
+    } else {
+        text_color
+    };
 
     Node::new()
         .with_width(Size::Fill)
@@ -318,7 +327,7 @@ fn color_swatch(name: &str, color: Color, text_color: Color) -> Node {
         .with_content(Content::Text(
             TextContent::new(name)
                 .with_font_size(Size::lpx(24.0))
-                .with_color(text_color)
+                .with_color(final_text_color)
                 .with_h_align(HorizontalAlign::Center)
                 .with_v_align(VerticalAlign::Center),
         ))
