@@ -33,6 +33,7 @@ The library is split into several crates:
 
 | Astra GUI Version | wgpu Version | cosmic-text Version |
 |-------------------|--------------|---------------------|
+| 0.4.x             | 28.x         | 0.16.x              |
 | 0.3.x             | 28.x         | 0.16.x              |
 | 0.2.x             | 27.x         | 0.15.x              |
 
@@ -42,8 +43,8 @@ Add astra-gui to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-astra-gui = "0.3.0"
-astra-gui-wgpu = "0.3.0"
+astra-gui = "0.4.0"
+astra-gui-wgpu = "0.4.0"
 ```
 
 ## Examples
