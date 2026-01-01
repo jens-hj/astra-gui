@@ -258,7 +258,7 @@ impl GpuState {
 fn child() -> Node {
     Node::new().with_height(Size::Fill).with_shape(Shape::Rect(
         StyledRect::new(Default::default(), mocha::SURFACE1)
-            .with_corner_shape(CornerShape::Round(30.0))
+            .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
             .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
     ))
 }
@@ -277,7 +277,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                 .with_height(Size::fraction(0.15))
                 .with_shape(Shape::Rect(
                     StyledRect::new(Default::default(), mocha::SURFACE0)
-                        .with_corner_shape(CornerShape::Round(50.0))
+                        .with_corner_shape(CornerShape::Round(Size::lpx(50.0)))
                         .with_stroke(Stroke::new(Size::lpx(3.0), mocha::BLUE)),
                 ))
                 .with_padding(Spacing::all(Size::lpx(20.0)))
@@ -286,7 +286,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                         .with_width(Size::Relative(0.7))
                         .with_shape(Shape::Rect(
                             StyledRect::new(Default::default(), mocha::SURFACE1)
-                                .with_corner_shape(CornerShape::Round(30.0))
+                                .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
                                 .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
                         )),
                     Node::new()
@@ -297,14 +297,14 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                             Node::new()
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
-                                        .with_corner_shape(CornerShape::Round(30.0))
+                                        .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
                                         .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
                                 ))
                                 .with_height(Size::Fill),
                             Node::new()
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
-                                        .with_corner_shape(CornerShape::Round(30.0))
+                                        .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
                                         .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
                                 ))
                                 .with_height(Size::Fill),
@@ -323,7 +323,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                         .with_gap(Size::lpx(10.0))
                         .with_shape(Shape::Rect(
                             StyledRect::new(Default::default(), mocha::SURFACE0)
-                                .with_corner_shape(CornerShape::Round(50.0))
+                                .with_corner_shape(CornerShape::Round(Size::lpx(50.0)))
                                 .with_stroke(Stroke::new(Size::lpx(3.0), mocha::MAUVE)),
                         ))
                         .with_layout_direction(Layout::Vertical)
@@ -347,7 +347,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                         .with_gap(Size::lpx(20.0))
                         .with_shape(Shape::Rect(
                             StyledRect::new(Default::default(), mocha::SURFACE0)
-                                .with_corner_shape(CornerShape::Round(50.0))
+                                .with_corner_shape(CornerShape::Round(Size::lpx(50.0)))
                                 .with_stroke(Stroke::new(Size::lpx(3.0), mocha::PEACH)),
                         ))
                         .with_layout_direction(Layout::Vertical)
@@ -357,7 +357,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                                 .with_height(Size::fraction(0.3))
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
-                                        .with_corner_shape(CornerShape::Round(30.0))
+                                        .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
                                         .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
                                 )),
                             // Horizontal row of smaller cards
@@ -369,7 +369,9 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                                     Node::new().with_width(Size::fraction(0.5)).with_shape(
                                         Shape::Rect(
                                             StyledRect::new(Default::default(), mocha::SURFACE1)
-                                                .with_corner_shape(CornerShape::Cut(30.0))
+                                                .with_corner_shape(CornerShape::Cut(Size::lpx(
+                                                    30.0,
+                                                )))
                                                 .with_stroke(Stroke::new(
                                                     Size::lpx(3.0),
                                                     mocha::SURFACE2,
@@ -379,7 +381,9 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                                     Node::new().with_width(Size::fraction(0.5)).with_shape(
                                         Shape::Rect(
                                             StyledRect::new(Default::default(), mocha::SURFACE1)
-                                                .with_corner_shape(CornerShape::Cut(30.0))
+                                                .with_corner_shape(CornerShape::Cut(Size::lpx(
+                                                    30.0,
+                                                )))
                                                 .with_stroke(Stroke::new(
                                                     Size::lpx(3.0),
                                                     mocha::SURFACE2,
@@ -391,7 +395,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                                 .with_height(Size::fraction(0.4))
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
-                                        .with_corner_shape(CornerShape::Round(30.0))
+                                        .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
                                         .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
                                 )),
                         ]),
@@ -404,23 +408,23 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                 .with_layout_direction(Layout::Horizontal)
                 .with_shape(Shape::Rect(
                     StyledRect::new(Default::default(), mocha::SURFACE0)
-                        .with_corner_shape(CornerShape::Round(50.0))
+                        .with_corner_shape(CornerShape::Round(Size::lpx(50.0)))
                         .with_stroke(Stroke::new(Size::lpx(3.0), mocha::BLUE)),
                 ))
                 .with_children(vec![
                     Node::new().with_width(Size::Fill).with_shape(Shape::Rect(
                         StyledRect::new(Default::default(), mocha::SURFACE1)
-                            .with_corner_shape(CornerShape::Round(30.0))
+                            .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
                             .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
                     )),
                     Node::new().with_width(Size::Fill).with_shape(Shape::Rect(
                         StyledRect::new(Default::default(), mocha::SURFACE1)
-                            .with_corner_shape(CornerShape::Round(30.0))
+                            .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
                             .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
                     )),
                     Node::new().with_width(Size::Fill).with_shape(Shape::Rect(
                         StyledRect::new(Default::default(), mocha::SURFACE1)
-                            .with_corner_shape(CornerShape::Round(30.0))
+                            .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
                             .with_stroke(Stroke::new(Size::lpx(3.0), mocha::SURFACE2)),
                     )),
                 ]),

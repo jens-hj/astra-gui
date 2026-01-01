@@ -239,7 +239,7 @@ impl App {
                 .with_style(Style {
                     fill_color: Some(mocha::CRUST),
                     stroke: Some(Stroke::new(Size::lpx(2.0), color)),
-                    corner_shape: Some(CornerShape::Round(8.0)),
+                    corner_shape: Some(CornerShape::Round(Size::lpx(8.0))),
                     ..Default::default()
                 })
                 .with_h_align(HorizontalAlign::Center)
@@ -288,7 +288,7 @@ impl App {
                         .with_style(Style {
                             fill_color: Some(mocha::CRUST),
                             stroke: Some(Stroke::new(Size::lpx(2.0), mocha::SURFACE0)),
-                            corner_shape: Some(CornerShape::Round(18.0)),
+                            corner_shape: Some(CornerShape::Round(Size::lpx(18.0))),
                             ..Default::default()
                         })
                         .with_padding(Spacing::all(Size::lpx(12.0)))

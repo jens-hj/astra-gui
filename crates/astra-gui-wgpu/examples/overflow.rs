@@ -284,7 +284,7 @@ impl GpuState {
 fn panel(fill: Color) -> Shape {
     Shape::Rect(
         StyledRect::new(Default::default(), fill)
-            .with_corner_shape(CornerShape::Round(14.0))
+            .with_corner_shape(CornerShape::Round(Size::lpx(14.0)))
             .with_stroke(Stroke::new(Size::lpx(2.0), mocha::SURFACE1)),
     )
 }

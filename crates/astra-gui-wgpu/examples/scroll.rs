@@ -310,7 +310,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         .with_shape(Shape::rect())
                         .with_style(Style {
                             fill_color: Some(mocha::BLUE),
-                            corner_shape: Some(CornerShape::Round(4.0)),
+                            corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
                             ..Default::default()
                         }),
                     Node::new()
@@ -319,7 +319,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         .with_shape(Shape::rect())
                         .with_style(Style {
                             fill_color: Some(mocha::GREEN),
-                            corner_shape: Some(CornerShape::Round(4.0)),
+                            corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
                             ..Default::default()
                         }),
                     Node::new()
@@ -328,7 +328,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         .with_shape(Shape::rect())
                         .with_style(Style {
                             fill_color: Some(mocha::RED),
-                            corner_shape: Some(CornerShape::Round(4.0)),
+                            corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
                             ..Default::default()
                         }),
                 ]),
@@ -348,7 +348,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     } else {
                         mocha::SURFACE1
                     }),
-                    corner_shape: Some(CornerShape::Round(8.0)),
+                    corner_shape: Some(CornerShape::Round(Size::lpx(8.0))),
                     ..Default::default()
                 })
                 .with_children(nested_children),
@@ -367,7 +367,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(mocha::MANTLE),
-            corner_shape: Some(CornerShape::Round(12.0)),
+            corner_shape: Some(CornerShape::Round(Size::lpx(12.0))),
             ..Default::default()
         })
         .with_children(items);
@@ -389,7 +389,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     } else {
                         mocha::SURFACE1
                     }),
-                    corner_shape: Some(CornerShape::Round(8.0)),
+                    corner_shape: Some(CornerShape::Round(Size::lpx(8.0))),
                     ..Default::default()
                 })
                 .with_children(vec![
@@ -415,7 +415,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                                 .with_shape(Shape::rect())
                                 .with_style(Style {
                                     fill_color: Some(mocha::PEACH),
-                                    corner_shape: Some(CornerShape::Round(4.0)),
+                                    corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
                                     ..Default::default()
                                 }),
                             Node::new()
@@ -424,7 +424,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                                 .with_shape(Shape::rect())
                                 .with_style(Style {
                                     fill_color: Some(mocha::YELLOW),
-                                    corner_shape: Some(CornerShape::Round(4.0)),
+                                    corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
                                     ..Default::default()
                                 }),
                             Node::new()
@@ -433,7 +433,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                                 .with_shape(Shape::rect())
                                 .with_style(Style {
                                     fill_color: Some(mocha::TEAL),
-                                    corner_shape: Some(CornerShape::Round(4.0)),
+                                    corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
                                     ..Default::default()
                                 }),
                         ]),
@@ -452,7 +452,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(mocha::MANTLE),
-            corner_shape: Some(CornerShape::Round(12.0)),
+            corner_shape: Some(CornerShape::Round(Size::lpx(12.0))),
             ..Default::default()
         })
         .with_children(horizontal_items);
@@ -478,7 +478,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         } else {
                             mocha::SURFACE1
                         }),
-                        corner_shape: Some(CornerShape::Round(8.0)),
+                        corner_shape: Some(CornerShape::Round(Size::lpx(8.0))),
                         ..Default::default()
                     })
                     .with_children(vec![
@@ -504,7 +504,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                                     .with_shape(Shape::rect())
                                     .with_style(Style {
                                         fill_color: Some(mocha::MAUVE),
-                                        corner_shape: Some(CornerShape::Round(3.0)),
+                                        corner_shape: Some(CornerShape::Round(Size::lpx(3.0))),
                                         ..Default::default()
                                     }),
                                 Node::new()
@@ -513,7 +513,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                                     .with_shape(Shape::rect())
                                     .with_style(Style {
                                         fill_color: Some(mocha::LAVENDER),
-                                        corner_shape: Some(CornerShape::Round(3.0)),
+                                        corner_shape: Some(CornerShape::Round(Size::lpx(3.0))),
                                         ..Default::default()
                                     }),
                             ]),
@@ -542,7 +542,7 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(mocha::MANTLE),
-            corner_shape: Some(CornerShape::Round(12.0)),
+            corner_shape: Some(CornerShape::Round(Size::lpx(12.0))),
             ..Default::default()
         })
         .with_children(grid_items);

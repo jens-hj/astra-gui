@@ -277,17 +277,17 @@ fn create_stroke_test_ui(width: f32, height: f32, debug_options: &DebugOptions) 
 
     let corner_types = vec![
         ("None", CornerShape::None, mocha::BLUE),
-        ("Round", CornerShape::Round(30.0), mocha::MAUVE),
-        ("Cut", CornerShape::Cut(30.0), mocha::RED),
+        ("Round", CornerShape::Round(Size::lpx(30.0)), mocha::MAUVE),
+        ("Cut", CornerShape::Cut(Size::lpx(30.0)), mocha::RED),
         (
             "InverseRound",
-            CornerShape::InverseRound(30.0),
+            CornerShape::InverseRound(Size::lpx(30.0)),
             mocha::YELLOW,
         ),
         (
             "Squircle",
             CornerShape::Squircle {
-                radius: 30.0,
+                radius: Size::lpx(30.0),
                 smoothness: 1.0,
             },
             mocha::GREEN,

@@ -264,7 +264,7 @@ impl App {
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::SURFACE0),
                 stroke: Some(Stroke::new(Size::lpx(2.0), mocha::OVERLAY0)),
-                corner_shape: Some(CornerShape::Round(8.0)),
+                corner_shape: Some(CornerShape::Round(Size::lpx(8.0))),
                 ..Default::default()
             })
             .with_padding(Spacing::all(Size::lpx(15.0)))
@@ -309,7 +309,7 @@ impl App {
                         .with_style(astra_gui::Style {
                             fill_color: Some(mocha::CRUST),
                             stroke: Some(Stroke::new(Size::lpx(2.0), color)),
-                            corner_shape: Some(CornerShape::Round(12.0)),
+                            corner_shape: Some(CornerShape::Round(Size::lpx(12.0))),
                             ..Default::default()
                         })
                         .with_padding(Spacing::all(Size::lpx(20.0)))

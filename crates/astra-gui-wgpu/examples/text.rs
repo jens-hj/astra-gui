@@ -281,7 +281,7 @@ fn label(
 fn panel(fill: Color) -> Shape {
     Shape::Rect(
         StyledRect::new(Default::default(), fill)
-            .with_corner_shape(CornerShape::Round(18.0))
+            .with_corner_shape(CornerShape::Round(Size::lpx(18.0)))
             .with_stroke(Stroke::new(Size::lpx(2.0), mocha::SURFACE1)),
     )
 }
@@ -296,7 +296,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
         .with_layout_direction(Layout::Vertical)
         .with_shape(Shape::Rect(
             StyledRect::new(Default::default(), Color::transparent())
-                .with_corner_shape(CornerShape::Round(24.0))
+                .with_corner_shape(CornerShape::Round(Size::lpx(24.0)))
                 .with_stroke(Stroke::new(Size::lpx(2.0), mocha::SURFACE0)),
         ))
         .with_children(vec![
@@ -416,7 +416,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                                 .with_overflow(Overflow::Hidden)
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::CRUST)
-                                        .with_corner_shape(CornerShape::Round(14.0))
+                                        .with_corner_shape(CornerShape::Round(Size::lpx(14.0)))
                                         .with_stroke(Stroke::new(Size::lpx(2.0), mocha::SURFACE0)),
                                 ))
                                 .with_children(vec![label(
@@ -461,7 +461,7 @@ fn alignment_cell(h: HorizontalAlign, v: VerticalAlign, label_text: &'static str
         .with_padding(Spacing::all(Size::lpx(10.0)))
         .with_shape(Shape::Rect(
             StyledRect::new(Default::default(), mocha::SURFACE0)
-                .with_corner_shape(CornerShape::Round(14.0))
+                .with_corner_shape(CornerShape::Round(Size::lpx(14.0)))
                 .with_stroke(Stroke::new(Size::lpx(2.0), mocha::SURFACE2)),
         ))
         .with_children(vec![

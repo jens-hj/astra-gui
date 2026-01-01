@@ -581,13 +581,15 @@ impl App {
                                     .with_width(Size::lpx(400.0))
                                     .with_height(Size::lpx(400.0))
                                     .with_translation(Translation::new(
-                                        self.outer_translation_x,
-                                        self.outer_translation_y,
+                                        Size::Logical(self.outer_translation_x),
+                                        Size::Logical(self.outer_translation_y),
                                     ))
                                     .with_shape(Shape::Rect(
                                         StyledRect::new(Default::default(), mocha::CRUST)
                                             .with_stroke(Stroke::new(Size::lpx(3.0), mocha::LAVENDER))
-                                            .with_corner_shape(astra_gui::CornerShape::Round(50.0)),
+                                            .with_corner_shape(astra_gui::CornerShape::Round(
+                                                Size::lpx(50.0),
+                                            )),
                                     ))
                                     .with_padding(Spacing::all(Size::lpx(30.0)))
                                     .with_layout_direction(Layout::Vertical)
@@ -633,13 +635,15 @@ impl App {
                                             .with_width(Size::Fill)
                                             .with_height(Size::lpx(200.0))
                                             .with_translation(Translation::new(
-                                                self.inner_translation_x,
-                                                self.inner_translation_y,
+                                                Size::Logical(self.inner_translation_x),
+                                                Size::Logical(self.inner_translation_y),
                                             ))
                                             .with_shape(Shape::Rect(
                                                 StyledRect::new(Default::default(), mocha::CRUST)
                                                     .with_stroke(Stroke::new(Size::lpx(2.0), mocha::GREEN))
-                                                    .with_corner_shape(astra_gui::CornerShape::Cut(20.0)),
+                                                    .with_corner_shape(astra_gui::CornerShape::Cut(
+                                                        Size::lpx(20.0),
+                                                    )),
                                             ))
                                             .with_padding(Spacing::all(Size::lpx(20.0)))
                                             .with_layout_direction(Layout::Vertical)

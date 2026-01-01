@@ -193,7 +193,10 @@ impl App {
         let ui = self
             .build_ui(actual_width, actual_height)
             .with_zoom(self.zoom_level)
-            .with_pan_offset(Translation::new(self.pan_offset.0, self.pan_offset.1));
+            .with_pan_offset(Translation::new(
+                Size::Logical(self.pan_offset.0),
+                Size::Logical(self.pan_offset.1),
+            ));
 
         let output_data = FullOutput::from_node_with_debug_and_scale_factor(
             ui,
@@ -266,12 +269,12 @@ impl App {
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::CRUST),
                 stroke: Some(Stroke::new(Size::lpx(4.0), mocha::YELLOW)),
-                corner_shape: Some(CornerShape::Round(16.0)),
+                corner_shape: Some(CornerShape::Round(Size::lpx(16.0))),
                 ..Default::default()
             })
             .with_padding(Spacing::all(Size::lpx(20.0)))
             .with_z_index(ZIndex::OVERLAY) // z-index: 100 - Forced to TOP
-            .with_translation(Translation::new(50.0, 50.0))
+            .with_translation(Translation::new(Size::lpx(50.0), Size::lpx(50.0)))
             .with_child(
                 Node::new().with_content(astra_gui::Content::Text(TextContent {
                     text: "z-index: 100\nYELLOW\n(OVERLAY)\n\nFirst in tree,\nFORCED TO TOP"
@@ -291,12 +294,12 @@ impl App {
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::CRUST),
                 stroke: Some(Stroke::new(Size::lpx(4.0), mocha::GREEN)),
-                corner_shape: Some(CornerShape::Round(16.0)),
+                corner_shape: Some(CornerShape::Round(Size::lpx(16.0))),
                 ..Default::default()
             })
             .with_padding(Spacing::all(Size::lpx(20.0)))
             // No z-index set, defaults to 0
-            .with_translation(Translation::new(70.0, 180.0))
+            .with_translation(Translation::new(Size::lpx(70.0), Size::lpx(180.0)))
             .with_child(
                 Node::new().with_content(astra_gui::Content::Text(TextContent {
                     text: "z-index: 0\nGREEN\n(DEFAULT)\n\nSecond in tree,\nmiddle layer"
@@ -317,12 +320,12 @@ impl App {
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::CRUST),
                 stroke: Some(Stroke::new(Size::lpx(4.0), mocha::BLUE)),
-                corner_shape: Some(CornerShape::Round(16.0)),
+                corner_shape: Some(CornerShape::Round(Size::lpx(16.0))),
                 ..Default::default()
             })
             .with_padding(Spacing::all(Size::lpx(20.0)))
             // No z-index set, defaults to 0
-            .with_translation(Translation::new(210.0, 210.0))
+            .with_translation(Translation::new(Size::lpx(210.0), Size::lpx(210.0)))
             .with_child(
                 Node::new().with_content(astra_gui::Content::Text(TextContent {
                     text: "z-index: 0\nBLUE\n(DEFAULT)\n\nThird in tree,\nmiddle layer".to_string(),
@@ -341,12 +344,12 @@ impl App {
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::CRUST),
                 stroke: Some(Stroke::new(Size::lpx(4.0), mocha::RED)),
-                corner_shape: Some(CornerShape::Round(16.0)),
+                corner_shape: Some(CornerShape::Round(Size::lpx(16.0))),
                 ..Default::default()
             })
             .with_padding(Spacing::all(Size::lpx(20.0)))
             .with_z_index(ZIndex::BACKGROUND) // z-index: -100 - Forced to BOTTOM
-            .with_translation(Translation::new(180.0, 70.0))
+            .with_translation(Translation::new(Size::lpx(180.0), Size::lpx(70.0)))
             .with_child(
                 Node::new().with_content(astra_gui::Content::Text(TextContent {
                     text: "z-index: -100\nRED\n(BACKGROUND)\n\nLast in tree,\nFORCED TO BOTTOM"

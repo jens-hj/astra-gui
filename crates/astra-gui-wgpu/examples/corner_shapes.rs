@@ -317,7 +317,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                         .with_padding(Spacing::all(Size::lpx(20.0)))
                         .with_shape(card(
                             mocha::GREEN,
-                            CornerShape::Round(corner_size),
+                            CornerShape::Round(Size::lpx(corner_size)),
                             stroke_width,
                         )),
                     // Cut
@@ -326,7 +326,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                         .with_padding(Spacing::all(Size::lpx(20.0)))
                         .with_shape(card(
                             mocha::BLUE,
-                            CornerShape::Cut(corner_size),
+                            CornerShape::Cut(Size::lpx(corner_size)),
                             stroke_width,
                         )),
                 ]),
@@ -342,7 +342,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                         .with_padding(Spacing::all(Size::lpx(20.0)))
                         .with_shape(card(
                             mocha::YELLOW,
-                            CornerShape::InverseRound(corner_size),
+                            CornerShape::InverseRound(Size::lpx(corner_size)),
                             stroke_width,
                         )),
                     // Squircle low smoothness
@@ -352,7 +352,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                         .with_shape(card(
                             mocha::MAUVE,
                             CornerShape::Squircle {
-                                radius: corner_size,
+                                radius: Size::lpx(corner_size),
                                 smoothness: 0.5,
                             },
                             stroke_width,
@@ -364,7 +364,7 @@ fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Full
                         .with_shape(card(
                             mocha::TEAL,
                             CornerShape::Squircle {
-                                radius: corner_size,
+                                radius: Size::lpx(corner_size),
                                 smoothness: 3.0,
                             },
                             stroke_width,
