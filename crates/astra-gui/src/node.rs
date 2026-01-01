@@ -716,7 +716,39 @@ impl Node {
                         Content::Text(text_content) => {
                             let mut request = MeasureTextRequest::from_text_content(text_content);
                             request.font_size *= scale_factor;
-                            // Note: measure_node doesn't have width constraints - use None for max_width
+
+                            // If this node has an absolute width, use it as a constraint for text wrapping
+                            request.max_width = match self.width {
+                                Size::Logical(w) => {
+                                    let width_px = w * scale_factor;
+                                    let padding_left = self
+                                        .padding
+                                        .left
+                                        .try_resolve_with_scale(width_px, scale_factor)
+                                        .unwrap_or(0.0);
+                                    let padding_right = self
+                                        .padding
+                                        .right
+                                        .try_resolve_with_scale(width_px, scale_factor)
+                                        .unwrap_or(0.0);
+                                    Some((width_px - padding_left - padding_right).max(0.0))
+                                }
+                                Size::Physical(w) => {
+                                    let padding_left = self
+                                        .padding
+                                        .left
+                                        .try_resolve_with_scale(w, scale_factor)
+                                        .unwrap_or(0.0);
+                                    let padding_right = self
+                                        .padding
+                                        .right
+                                        .try_resolve_with_scale(w, scale_factor)
+                                        .unwrap_or(0.0);
+                                    Some((w - padding_left - padding_right).max(0.0))
+                                }
+                                _ => None, // FitContent/Fill/Relative: no width constraint known yet
+                            };
+
                             measurer.measure_text(request).height
                         }
                     }
@@ -1045,15 +1077,6 @@ impl Node {
                 let mut request = MeasureTextRequest::from_text_content(text_content);
                 request.font_size *= effective_scale_factor;
                 request.max_width = max_width;
-
-                // DEBUG: Log what we're about to measure
-                println!(
-                    "LAYOUT MEASURE: width={:?} height={:?} | max_width={:?} | text='{}'",
-                    self.width,
-                    self.height,
-                    max_width,
-                    text_content.text.chars().take(30).collect::<String>()
-                );
 
                 let size = measurer.measure_text(request);
 

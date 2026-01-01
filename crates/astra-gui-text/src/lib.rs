@@ -641,18 +641,6 @@ pub mod cosmic {
 
             let result = IntrinsicSize::new(shaped_text.total_width, shaped_text.total_height);
 
-            // DEBUG: Log measurement results
-            println!(
-                "MEASURE TEXT: '{}' | max_width={:?} | wrap={:?} | font_px={} | result={}x{} | lines={}",
-                request.text.chars().take(30).collect::<String>(),
-                request.max_width,
-                wrap,
-                request.font_size,
-                result.width,
-                result.height,
-                shaped_text.lines.len()
-            );
-
             result
         }
     }
