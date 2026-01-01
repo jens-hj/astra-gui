@@ -2057,7 +2057,7 @@ impl Node {
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
-                            Color::new(1.0, 0.0, 0.0, 0.2),
+                            Color::rgba(1.0, 0.0, 0.0, 0.2),
                         )),
                     ));
                 }
@@ -2070,7 +2070,7 @@ impl Node {
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
-                            Color::new(1.0, 0.0, 0.0, 0.2),
+                            Color::rgba(1.0, 0.0, 0.0, 0.2),
                         )),
                     ));
                 }
@@ -2083,7 +2083,7 @@ impl Node {
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
-                            Color::new(1.0, 0.0, 0.0, 0.2),
+                            Color::rgba(1.0, 0.0, 0.0, 0.2),
                         )),
                     ));
                 }
@@ -2096,7 +2096,7 @@ impl Node {
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
-                            Color::new(1.0, 0.0, 0.0, 0.2),
+                            Color::rgba(1.0, 0.0, 0.0, 0.2),
                         )),
                     ));
                 }
@@ -2117,7 +2117,7 @@ impl Node {
                     content_rect,
                     Shape::Rect(
                         StyledRect::new(Default::default(), Color::transparent()).with_stroke(
-                            Stroke::new(Size::lpx(1.0), Color::new(1.0, 1.0, 0.0, 0.5)),
+                            Stroke::new(Size::lpx(1.0), Color::rgba(1.0, 1.0, 0.0, 0.5)),
                         ),
                     ),
                 ));
@@ -2139,7 +2139,7 @@ impl Node {
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
-                            Color::new(0.0, 0.0, 1.0, 0.2),
+                            Color::rgba(0.0, 0.0, 1.0, 0.2),
                         )),
                     ));
                 }
@@ -2152,7 +2152,7 @@ impl Node {
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
-                            Color::new(0.0, 0.0, 1.0, 0.2),
+                            Color::rgba(0.0, 0.0, 1.0, 0.2),
                         )),
                     ));
                 }
@@ -2165,7 +2165,7 @@ impl Node {
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
-                            Color::new(0.0, 0.0, 1.0, 0.2),
+                            Color::rgba(0.0, 0.0, 1.0, 0.2),
                         )),
                     ));
                 }
@@ -2178,7 +2178,7 @@ impl Node {
                         ),
                         Shape::Rect(StyledRect::new(
                             Default::default(),
-                            Color::new(0.0, 0.0, 1.0, 0.2),
+                            Color::rgba(0.0, 0.0, 1.0, 0.2),
                         )),
                     ));
                 }
@@ -2190,7 +2190,7 @@ impl Node {
                     rect,
                     Shape::Rect(
                         StyledRect::new(Default::default(), Color::transparent()).with_stroke(
-                            Stroke::new(Size::lpx(1.0), Color::new(0.0, 1.0, 0.0, 0.5)),
+                            Stroke::new(Size::lpx(1.0), Color::rgba(0.0, 1.0, 0.0, 0.5)),
                         ),
                     ),
                 ));
