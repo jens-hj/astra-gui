@@ -19,7 +19,7 @@
 #![deny(warnings)]
 
 use astra_gui::{
-    ContentMeasurer, HorizontalAlign, IntrinsicSize, MeasureTextRequest, Rect, VerticalAlign,
+    ContentMeasurer, HorizontalAlign, IntrinsicSize, MeasureTextRequest, Rect, VerticalAlign, Wrap,
 };
 
 /// A stable identifier for a font face known to the text engine.
@@ -103,6 +103,14 @@ pub struct ShapedLine {
     pub metrics: LineMetrics,
 }
 
+/// Multi-line shaped text output
+#[derive(Clone, Debug, Default)]
+pub struct ShapedText {
+    pub lines: Vec<ShapedLine>,
+    pub total_width: f32,  // Widest line
+    pub total_height: f32, // Sum of line heights
+}
+
 /// Input describing a single-line shaping request.
 ///
 /// This intentionally stays close to `astra-gui`'s current `TextShape` information.
@@ -117,6 +125,23 @@ pub struct ShapeLineRequest<'a> {
     pub v_align: VerticalAlign,
     /// Optional family name (engine-defined meaning). For now, Inter is used by default.
     pub family: Option<&'a str>,
+}
+
+/// Input describing a multi-line text shaping request.
+#[derive(Clone, Debug)]
+pub struct ShapeTextRequest<'a> {
+    pub text: &'a str,
+    /// Layout box (content rect) to align within.
+    pub rect: Rect,
+    pub font_px: f32,
+    pub h_align: HorizontalAlign,
+    pub v_align: VerticalAlign,
+    /// Optional family name (engine-defined meaning). For now, Inter is used by default.
+    pub family: Option<&'a str>,
+    /// Text wrapping mode
+    pub wrap: Wrap,
+    /// Line height as a multiplier of font size
+    pub line_height_multiplier: f32,
 }
 
 /// Output describing how to place a line in a rectangle.
@@ -134,6 +159,9 @@ pub struct LinePlacement {
 pub trait TextEngine {
     /// Shape a single line and compute its placement within `req.rect` according to alignment.
     fn shape_line(&mut self, req: ShapeLineRequest<'_>) -> (ShapedLine, LinePlacement);
+
+    /// Shape text (potentially multi-line) and compute its placement within `req.rect` according to alignment.
+    fn shape_text(&mut self, req: ShapeTextRequest<'_>) -> (ShapedText, LinePlacement);
 
     /// Rasterize the glyph bitmap for the given `key`, if available.
     ///
@@ -164,6 +192,13 @@ impl TextEngine for Engine {
         match self {
             #[cfg(feature = "cosmic")]
             Self::Cosmic(engine) => engine.shape_line(req),
+        }
+    }
+
+    fn shape_text(&mut self, req: ShapeTextRequest<'_>) -> (ShapedText, LinePlacement) {
+        match self {
+            #[cfg(feature = "cosmic")]
+            Self::Cosmic(engine) => engine.shape_text(req),
         }
     }
 
@@ -219,10 +254,10 @@ pub mod cosmic {
 
     use super::{
         align_origin, FontId, GlyphBitmap, GlyphKey, LineMetrics, LinePlacement, PositionedGlyph,
-        ShapeLineRequest, ShapedLine, TextEngine,
+        ShapeLineRequest, ShapeTextRequest, ShapedLine, ShapedText, TextEngine,
     };
 
-    use astra_gui::{ContentMeasurer, IntrinsicSize, MeasureTextRequest, Rect};
+    use astra_gui::{ContentMeasurer, IntrinsicSize, MeasureTextRequest, Rect, Wrap};
     use cosmic_text::{fontdb, Attrs, Buffer, FontSystem, Metrics, Shaping};
 
     /// Concrete engine backed by `cosmic-text`.
@@ -280,6 +315,13 @@ pub mod cosmic {
             attrs
         }
 
+        fn make_attrs_text(&self, req: &ShapeTextRequest<'_>) -> Attrs<'static> {
+            // Same as make_attrs but for ShapeTextRequest
+            let attrs = Attrs::new().family(cosmic_text::Family::Name("Inter"));
+            let _req = req;
+            attrs
+        }
+
         fn find_fontdb_id_for_default(&mut self) -> Option<fontdb::ID> {
             // Prefer Inter by family name; fall back to any available face.
             let db = self.font_system.db();
@@ -302,6 +344,16 @@ pub mod cosmic {
             });
 
             out.or_else(|| db.faces().next().map(|face| face.id))
+        }
+
+        /// Convert astra-gui Wrap to cosmic-text Wrap
+        fn cosmic_wrap(wrap: Wrap) -> cosmic_text::Wrap {
+            match wrap {
+                Wrap::None => cosmic_text::Wrap::None,
+                Wrap::Word => cosmic_text::Wrap::Word,
+                Wrap::Glyph => cosmic_text::Wrap::Glyph,
+                Wrap::WordOrGlyph => cosmic_text::Wrap::WordOrGlyph,
+            }
         }
     }
 
@@ -403,6 +455,95 @@ pub mod cosmic {
             (out, LinePlacement { origin_px })
         }
 
+        fn shape_text(&mut self, req: ShapeTextRequest<'_>) -> (ShapedText, LinePlacement) {
+            let metrics = Metrics::new(req.font_px, req.font_px * req.line_height_multiplier);
+            let mut buffer = Buffer::new(&mut self.font_system, metrics);
+
+            // Set wrapping based on the wrap mode
+            let wrap_width = if req.wrap == Wrap::None {
+                None // No wrapping
+            } else {
+                Some(req.rect.width())
+            };
+
+            buffer.set_size(&mut self.font_system, wrap_width, None);
+            buffer.set_wrap(&mut self.font_system, Self::cosmic_wrap(req.wrap));
+
+            let attrs = self.make_attrs_text(&req);
+
+            buffer.set_text(
+                &mut self.font_system,
+                req.text,
+                &attrs,
+                Shaping::Advanced,
+                None,
+            );
+            buffer.shape_until_scroll(&mut self.font_system, false);
+
+            let mut shaped_lines = Vec::new();
+            let mut total_width = 0.0f32;
+            let mut total_height = 0.0f32;
+
+            // Iterate all layout runs (one per visual line)
+            for run in buffer.layout_runs() {
+                let mut line = ShapedLine {
+                    glyphs: Vec::new(),
+                    metrics: LineMetrics {
+                        width_px: run.line_w,
+                        height_px: run.line_height,
+                        baseline_px: (run.line_y - run.line_top).max(0.0),
+                    },
+                };
+
+                // Collect glyphs for this line
+                for glyph in run.glyphs.iter() {
+                    let physical = glyph.physical((0.0, 0.0), 1.0);
+
+                    let key = GlyphKey::new(
+                        self.default_font_id,
+                        physical.cache_key.glyph_id as u32,
+                        f32::from_bits(physical.cache_key.font_size_bits)
+                            .round()
+                            .max(1.0) as u16,
+                        0,
+                    );
+
+                    // Position in line-local space (baseline-relative)
+                    let baseline_offset = (run.line_y - run.line_top).max(0.0);
+                    line.glyphs.push(PositionedGlyph {
+                        key,
+                        x_px: physical.x as f32,
+                        y_px: baseline_offset + physical.y as f32,
+                    });
+                }
+
+                total_width = total_width.max(line.metrics.width_px);
+                total_height += line.metrics.height_px;
+                shaped_lines.push(line);
+            }
+
+            let shaped = ShapedText {
+                lines: shaped_lines,
+                total_width,
+                total_height,
+            };
+
+            // Compute placement based on v_align (entire text block)
+            let origin_y = match req.v_align {
+                astra_gui::VerticalAlign::Top => req.rect.min[1],
+                astra_gui::VerticalAlign::Center => {
+                    req.rect.min[1] + (req.rect.height() - total_height) * 0.5
+                }
+                astra_gui::VerticalAlign::Bottom => req.rect.max[1] - total_height,
+            };
+
+            let placement = LinePlacement {
+                origin_px: [req.rect.min[0], origin_y],
+            };
+
+            (shaped, placement)
+        }
+
         fn rasterize_glyph(&mut self, key: GlyphKey) -> Option<GlyphBitmap> {
             // NOTE: This is a first cut. We currently:
             // - map our opaque `FontId` to a fontdb::ID by picking a default face (Inter)
@@ -472,21 +613,47 @@ pub mod cosmic {
 
     impl ContentMeasurer for CosmicEngine {
         fn measure_text(&mut self, request: MeasureTextRequest<'_>) -> IntrinsicSize {
-            // Use a dummy rect for measurement - we only care about the metrics
-            let dummy_rect = Rect::new([0.0, 0.0], [f32::MAX, f32::MAX]);
+            // Determine wrap mode for measurement
+            // If no width constraint is provided, disable wrapping for measurement
+            // to get the natural text dimensions
+            let (wrap, width) = if let Some(max_w) = request.max_width {
+                // Width constraint provided: use it and honor wrap mode
+                (request.wrap, max_w)
+            } else {
+                // No width constraint: disable wrapping to measure natural size
+                (Wrap::None, 1_000_000.0)
+            };
 
-            let shape_request = ShapeLineRequest {
+            let dummy_rect = Rect::new([0.0, 0.0], [width, 1_000_000.0]);
+
+            let shape_request = ShapeTextRequest {
                 text: request.text,
                 rect: dummy_rect,
                 font_px: request.font_size,
                 h_align: request.h_align,
                 v_align: request.v_align,
                 family: request.family,
+                wrap,
+                line_height_multiplier: request.line_height_multiplier,
             };
 
-            let (shaped_line, _placement) = self.shape_line(shape_request);
+            let (shaped_text, _placement) = self.shape_text(shape_request);
 
-            IntrinsicSize::new(shaped_line.metrics.width_px, shaped_line.metrics.height_px)
+            let result = IntrinsicSize::new(shaped_text.total_width, shaped_text.total_height);
+
+            // DEBUG: Log measurement results
+            println!(
+                "MEASURE TEXT: '{}' | max_width={:?} | wrap={:?} | font_px={} | result={}x{} | lines={}",
+                request.text.chars().take(30).collect::<String>(),
+                request.max_width,
+                wrap,
+                request.font_size,
+                result.width,
+                result.height,
+                shaped_text.lines.len()
+            );
+
+            result
         }
     }
 }

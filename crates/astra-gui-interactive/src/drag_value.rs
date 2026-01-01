@@ -242,6 +242,8 @@ pub fn drag_value(
                     color: style.text_color,
                     h_align: HorizontalAlign::Center,
                     v_align: VerticalAlign::Center,
+                    wrap: astra_gui::Wrap::Word,
+                    line_height_multiplier: 1.2,
                 }))
                 .with_style(Style {
                     text_color: Some(style.text_color),

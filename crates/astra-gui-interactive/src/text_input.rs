@@ -189,6 +189,9 @@ pub fn text_input(
                 h_align: style.text_align,
                 v_align: VerticalAlign::Center,
                 family: None,
+                max_width: None,
+                wrap: astra_gui::Wrap::None,
+                line_height_multiplier: 1.2,
             })
             .width
     } else {
@@ -214,6 +217,9 @@ pub fn text_input(
                     h_align: HorizontalAlign::Left, // Always measure from left for positioning
                     v_align: VerticalAlign::Center,
                     family: None,
+                    max_width: None,
+                    wrap: astra_gui::Wrap::None,
+                    line_height_multiplier: 1.2,
                 })
                 .width
         } else {
@@ -236,6 +242,9 @@ pub fn text_input(
                             h_align: HorizontalAlign::Left, // Always measure from left for positioning
                             v_align: VerticalAlign::Center,
                             family: None,
+                            max_width: None,
+                            wrap: astra_gui::Wrap::None,
+                            line_height_multiplier: 1.2,
                         })
                         .width
                 } else {
@@ -256,6 +265,9 @@ pub fn text_input(
                         h_align: HorizontalAlign::Left, // Always measure from left for positioning
                         v_align: VerticalAlign::Center,
                         family: None,
+                        max_width: None,
+                        wrap: astra_gui::Wrap::None,
+                        line_height_multiplier: 1.2,
                     })
                     .width
             } else {
@@ -288,6 +300,8 @@ pub fn text_input(
                 color: text_color,
                 h_align: style.text_align,
                 v_align: VerticalAlign::Center,
+                wrap: astra_gui::Wrap::None,
+                line_height_multiplier: 1.2,
             }))
             .with_style(Style {
                 text_color: Some(text_color),
@@ -325,6 +339,9 @@ pub fn text_input(
                             h_align: HorizontalAlign::Left,
                             v_align: VerticalAlign::Center,
                             family: None,
+                            max_width: None,
+                            wrap: astra_gui::Wrap::None,
+                            line_height_multiplier: 1.2,
                         })
                         .width;
                     char_width
@@ -352,6 +369,9 @@ pub fn text_input(
                             h_align: HorizontalAlign::Left,
                             v_align: VerticalAlign::Center,
                             family: None,
+                            max_width: None,
+                            wrap: astra_gui::Wrap::None,
+                            line_height_multiplier: 1.2,
                         })
                         .width;
                     char_width

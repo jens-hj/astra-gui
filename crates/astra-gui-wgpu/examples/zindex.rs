@@ -275,14 +275,16 @@ impl App {
             .with_z_index(ZIndex::OVERLAY) // z-index: 100 - Forced to TOP
             .with_translation(Translation::new(Size::lpx(50.0), Size::lpx(50.0)))
             .with_child(
-                Node::new().with_content(astra_gui::Content::Text(TextContent {
-                    text: "z-index: 100\nYELLOW\n(OVERLAY)\n\nFirst in tree,\nFORCED TO TOP"
-                        .to_string(),
-                    font_size: Size::lpx(16.0),
-                    color: mocha::YELLOW,
-                    h_align: HorizontalAlign::Center,
-                    v_align: VerticalAlign::Center,
-                })),
+                Node::new().with_content(astra_gui::Content::Text(
+                    TextContent::new(
+                        "z-index: 100\nYELLOW\n(OVERLAY)\n\nFirst in tree,\nFORCED TO TOP"
+                            .to_string(),
+                    )
+                    .with_font_size(Size::lpx(16.0))
+                    .with_color(mocha::YELLOW)
+                    .with_h_align(HorizontalAlign::Center)
+                    .with_v_align(VerticalAlign::Center),
+                )),
             );
 
         // Green box: Second in tree order, z-index: 0 (default)
@@ -299,14 +301,15 @@ impl App {
             // No z-index set, defaults to 0
             .with_translation(Translation::new(Size::lpx(70.0), Size::lpx(180.0)))
             .with_child(
-                Node::new().with_content(astra_gui::Content::Text(TextContent {
-                    text: "z-index: 0\nGREEN\n(DEFAULT)\n\nSecond in tree,\nmiddle layer"
-                        .to_string(),
-                    font_size: Size::lpx(16.0),
-                    color: mocha::GREEN,
-                    h_align: HorizontalAlign::Center,
-                    v_align: VerticalAlign::Center,
-                })),
+                Node::new().with_content(astra_gui::Content::Text(
+                    TextContent::new(
+                        "z-index: 0\nGREEN\n(DEFAULT)\n\nSecond in tree,\nmiddle layer".to_string(),
+                    )
+                    .with_font_size(Size::lpx(16.0))
+                    .with_color(mocha::GREEN)
+                    .with_h_align(HorizontalAlign::Center)
+                    .with_v_align(VerticalAlign::Center),
+                )),
             );
 
         // Blue box: Third in tree order, z-index: 0 (default)
@@ -324,13 +327,15 @@ impl App {
             // No z-index set, defaults to 0
             .with_translation(Translation::new(Size::lpx(210.0), Size::lpx(210.0)))
             .with_child(
-                Node::new().with_content(astra_gui::Content::Text(TextContent {
-                    text: "z-index: 0\nBLUE\n(DEFAULT)\n\nThird in tree,\nmiddle layer".to_string(),
-                    font_size: Size::lpx(16.0),
-                    color: mocha::BLUE,
-                    h_align: HorizontalAlign::Center,
-                    v_align: VerticalAlign::Center,
-                })),
+                Node::new().with_content(astra_gui::Content::Text(
+                    TextContent::new(
+                        "z-index: 0\nBLUE\n(DEFAULT)\n\nThird in tree,\nmiddle layer".to_string(),
+                    )
+                    .with_font_size(Size::lpx(16.0))
+                    .with_color(mocha::BLUE)
+                    .with_h_align(HorizontalAlign::Center)
+                    .with_v_align(VerticalAlign::Center),
+                )),
             );
 
         // Red box: Fourth/last in tree order, but z-index: -10 forces it to BOTTOM
@@ -347,14 +352,16 @@ impl App {
             .with_z_index(ZIndex::BACKGROUND) // z-index: -100 - Forced to BOTTOM
             .with_translation(Translation::new(Size::lpx(180.0), Size::lpx(70.0)))
             .with_child(
-                Node::new().with_content(astra_gui::Content::Text(TextContent {
-                    text: "z-index: -100\nRED\n(BACKGROUND)\n\nLast in tree,\nFORCED TO BOTTOM"
-                        .to_string(),
-                    font_size: Size::lpx(16.0),
-                    color: mocha::RED,
-                    h_align: HorizontalAlign::Center,
-                    v_align: VerticalAlign::Center,
-                })),
+                Node::new().with_content(astra_gui::Content::Text(
+                    TextContent::new(
+                        "z-index: -100\nRED\n(BACKGROUND)\n\nLast in tree,\nFORCED TO BOTTOM"
+                            .to_string(),
+                    )
+                    .with_font_size(Size::lpx(16.0))
+                    .with_color(mocha::RED)
+                    .with_h_align(HorizontalAlign::Center)
+                    .with_v_align(VerticalAlign::Center),
+                )),
             );
 
         // Stack layout to make boxes overlap

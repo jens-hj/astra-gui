@@ -7,6 +7,7 @@ use crate::primitives::{ClippedShape, Rect, Shape, Stroke};
 #[derive(Clone, Debug, Default)]
 pub struct FullOutput {
     pub shapes: Vec<ClippedShape>,
+    pub debug_options: Option<crate::debug::DebugOptions>,
 }
 
 impl FullOutput {
@@ -15,7 +16,10 @@ impl FullOutput {
     }
 
     pub fn with_shapes(shapes: Vec<ClippedShape>) -> Self {
-        Self { shapes }
+        Self {
+            shapes,
+            debug_options: None,
+        }
     }
 
     /// Create output from a node tree
@@ -181,7 +185,10 @@ impl FullOutput {
             )
             .collect();
 
-        Self { shapes }
+        Self {
+            shapes,
+            debug_options,
+        }
     }
 }
 
@@ -412,6 +419,8 @@ fn collect_clipped_shapes_with_opacity(
                     .try_resolve_with_scale(width, scale_factor)
                     .unwrap_or(16.0);
                 text_shape.font_size = Size::lpx(scaled_font_size);
+                text_shape.wrap = text_content.wrap;
+                text_shape.line_height_multiplier = text_content.line_height_multiplier;
                 // OPTIMIZATION: Store opacity instead of applying it to shape
                 out.push((
                     node_rect,

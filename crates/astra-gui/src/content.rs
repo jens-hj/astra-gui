@@ -10,6 +10,25 @@ pub enum Content {
     Text(TextContent),
 }
 
+/// Text wrapping mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Wrap {
+    /// No wrapping, text overflows
+    None,
+    /// Wrap at word boundaries
+    Word,
+    /// Wrap at character boundaries
+    Glyph,
+    /// Try word boundaries, fallback to character wrap
+    WordOrGlyph,
+}
+
+impl Default for Wrap {
+    fn default() -> Self {
+        Self::Word
+    }
+}
+
 /// Text content configuration
 #[derive(Debug, Clone)]
 pub struct TextContent {
@@ -23,6 +42,10 @@ pub struct TextContent {
     pub h_align: HorizontalAlign,
     /// Vertical alignment within the node
     pub v_align: VerticalAlign,
+    /// Text wrapping mode
+    pub wrap: Wrap,
+    /// Line height as a multiplier of font size (default: 1.2)
+    pub line_height_multiplier: f32,
 }
 
 impl TextContent {
@@ -34,6 +57,8 @@ impl TextContent {
             color: Color::rgba(1.0, 1.0, 1.0, 1.0),
             h_align: HorizontalAlign::Left,
             v_align: VerticalAlign::Top,
+            wrap: Wrap::Word,
+            line_height_multiplier: 1.2,
         }
     }
 
@@ -58,6 +83,18 @@ impl TextContent {
     /// Set vertical alignment
     pub fn with_v_align(mut self, align: VerticalAlign) -> Self {
         self.v_align = align;
+        self
+    }
+
+    /// Set text wrapping mode
+    pub fn with_wrap(mut self, wrap: Wrap) -> Self {
+        self.wrap = wrap;
+        self
+    }
+
+    /// Set line height multiplier
+    pub fn with_line_height(mut self, multiplier: f32) -> Self {
+        self.line_height_multiplier = multiplier;
         self
     }
 }

@@ -20,7 +20,10 @@ pub use interactive_state::*;
 pub use winit::event::MouseButton;
 pub use winit::keyboard::{Key, NamedKey};
 
-use astra_gui::{FullOutput, HorizontalAlign, Shape, Tessellator, VerticalAlign};
+use astra_gui::{
+    ClippedShape, Color, CornerShape, FullOutput, HorizontalAlign, Rect, Shape, Size, Stroke,
+    StyledRect, Tessellator, Transform2D, VerticalAlign, ZIndex,
+};
 use instance::RectInstance;
 use vertex::WgpuVertex;
 
@@ -150,10 +153,13 @@ pub struct Renderer {
     text_engine: gui_text::Engine,
 
     // Text shaping cache - stores pre-shaped text to avoid expensive reshaping every frame
-    // Key: (text, font_size, width, height)
-    // NOTE: Only caches ShapedLine, NOT LinePlacement (which contains absolute positions)
+    // Key: (text, font_size, width, height, wrap, line_height * 100)
+    // NOTE: Only caches ShapedText, NOT LinePlacement (which contains absolute positions)
     #[cfg(feature = "text-cosmic")]
-    shape_cache: std::collections::HashMap<(String, u32, u32, u32), gui_text::ShapedLine>,
+    shape_cache: std::collections::HashMap<
+        (String, u32, u32, u32, astra_gui::Wrap, u32),
+        gui_text::ShapedText,
+    >,
 
     // Glyph metrics cache - stores bearing, size, AND atlas placement to avoid lookups
     // Key: GlyphKey (font_id, glyph_id, px_size, subpixel)
@@ -625,6 +631,12 @@ impl Renderer {
         self.render_mode = mode;
     }
 
+    /// Get mutable access to the text engine for measurement
+    #[cfg(feature = "text-cosmic")]
+    pub fn text_engine_mut(&mut self) -> &mut gui_text::Engine {
+        &mut self.text_engine
+    }
+
     #[cfg(feature = "text-cosmic")]
     fn resize_atlas(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
         // Collect all cached glyphs before resize (we need to preserve them)
@@ -926,6 +938,9 @@ impl Renderer {
 
         let mut layer_draw_commands: Vec<Vec<DrawCommand>> = Vec::with_capacity(layers.len());
 
+        // Collect debug rectangles for text line bounds
+        let mut debug_text_rects: Vec<(Rect, Color, Stroke, Rect)> = Vec::new();
+
         // Process shapes layer by layer to respect z-index ordering
         for layer in &layers {
             let mut current_layer_commands = Vec::new();
@@ -1042,12 +1057,14 @@ impl Renderer {
                                 .try_resolve_with_scale(width, 1.0)
                                 .unwrap_or(16.0);
 
-                            // Create cache key from text + font size + rect dimensions
+                            // Create cache key from text + font size + rect dimensions + wrap + line height
                             let cache_key = (
                                 text.to_string(),
                                 font_size_px as u32,
                                 (rect.max[0] - rect.min[0]) as u32,
                                 (rect.max[1] - rect.min[1]) as u32,
+                                text_shape.wrap,
+                                (text_shape.line_height_multiplier * 100.0) as u32,
                             );
 
                             let shaped = if let Some(cached) = self.shape_cache.get(&cache_key) {
@@ -1055,41 +1072,32 @@ impl Renderer {
                                 cached.clone()
                             } else {
                                 // Cache miss - shape the text
-                                let (shaped_line, _placement) =
-                                    self.text_engine.shape_line(gui_text::ShapeLineRequest {
+                                let (shaped_text, _placement) =
+                                    self.text_engine.shape_text(gui_text::ShapeTextRequest {
                                         text,
                                         rect,
                                         font_px: font_size_px,
                                         h_align: text_shape.h_align,
                                         v_align: text_shape.v_align,
                                         family: None,
+                                        wrap: text_shape.wrap,
+                                        line_height_multiplier: text_shape.line_height_multiplier,
                                     });
-                                self.shape_cache.insert(cache_key, shaped_line.clone());
-                                shaped_line
+                                self.shape_cache.insert(cache_key, shaped_text.clone());
+                                shaped_text
                             };
 
                             // Always recalculate placement for this specific rect position
                             // (placement contains absolute screen positions, so it can't be cached)
-                            let line_w = shaped.metrics.width_px;
-                            let line_h = shaped.metrics.height_px;
-                            let origin_px = {
-                                let x = match text_shape.h_align {
-                                    HorizontalAlign::Left => rect.min[0],
-                                    HorizontalAlign::Center => {
-                                        rect.min[0] + ((rect.max[0] - rect.min[0]) - line_w) * 0.5
-                                    }
-                                    HorizontalAlign::Right => rect.max[0] - line_w,
-                                };
-                                let y = match text_shape.v_align {
-                                    VerticalAlign::Top => rect.min[1],
-                                    VerticalAlign::Center => {
-                                        rect.min[1] + ((rect.max[1] - rect.min[1]) - line_h) * 0.5
-                                    }
-                                    VerticalAlign::Bottom => rect.max[1] - line_h,
-                                };
-                                [x, y]
+                            // v_align applies to entire text block
+                            let origin_y = match text_shape.v_align {
+                                VerticalAlign::Top => rect.min[1],
+                                VerticalAlign::Center => {
+                                    rect.min[1]
+                                        + ((rect.max[1] - rect.min[1]) - shaped.total_height) * 0.5
+                                }
+                                VerticalAlign::Bottom => rect.max[1] - shaped.total_height,
                             };
-                            let placement = gui_text::LinePlacement { origin_px };
 
                             // Pre-calculate rotation trig functions outside the glyph loop
                             let rotation = clipped.transform.rotation;
@@ -1100,206 +1108,252 @@ impl Renderer {
                             };
                             let has_rotation = rotation.abs() > 0.0001;
 
-                            for g in &shaped.glyphs {
-                                // Map glyph key to atlas key
-                                let atlas_key = text::atlas::GlyphKey::new(
-                                    g.key.font_id.0,
-                                    g.key.glyph_id,
-                                    g.key.px_size,
-                                    g.key.subpixel_x_64 as u16,
-                                );
+                            // Render all lines
+                            let mut current_y = origin_y;
+                            for line in &shaped.lines {
+                                // h_align applies per-line
+                                let line_x = match text_shape.h_align {
+                                    HorizontalAlign::Left => rect.min[0],
+                                    HorizontalAlign::Center => {
+                                        rect.min[0]
+                                            + ((rect.max[0] - rect.min[0]) - line.metrics.width_px)
+                                                * 0.5
+                                    }
+                                    HorizontalAlign::Right => rect.max[0] - line.metrics.width_px,
+                                };
 
-                                // OPTIMIZATION: Check metrics cache first (includes placement)
-                                let (glyph_bearing, glyph_size, placed) = if let Some(&(
-                                    bearing,
-                                    size,
-                                    placement,
-                                )) =
-                                    self.glyph_metrics_cache.get(&atlas_key)
-                                {
-                                    // Cache hit - use cached metrics and placement (no atlas lookup!)
-                                    (bearing, size, placement)
-                                } else {
-                                    // Cache miss - need to rasterize and upload
-                                    let Some(bitmap) = self.text_engine.rasterize_glyph(g.key)
-                                    else {
-                                        continue;
-                                    };
+                                for g in &line.glyphs {
+                                    // Map glyph key to atlas key
+                                    let atlas_key = text::atlas::GlyphKey::new(
+                                        g.key.font_id.0,
+                                        g.key.glyph_id,
+                                        g.key.px_size,
+                                        g.key.subpixel_x_64 as u16,
+                                    );
 
-                                    // Insert into atlas
-                                    let placed = match self
-                                        .atlas
-                                        .insert(atlas_key.clone(), bitmap.size_px)
+                                    // OPTIMIZATION: Check metrics cache first (includes placement)
+                                    let (glyph_bearing, glyph_size, placed) = if let Some(&(
+                                        bearing,
+                                        size,
+                                        placement,
+                                    )) =
+                                        self.glyph_metrics_cache.get(&atlas_key)
                                     {
-                                        text::atlas::AtlasInsert::AlreadyPresent => {
-                                            // Already in atlas, get placement
-                                            self.atlas.get(&atlas_key)
-                                        }
-                                        text::atlas::AtlasInsert::Placed(p) => {
-                                            // Newly placed - upload texture
-                                            let rect_px =
-                                                text::atlas::GlyphAtlas::upload_rect_px(p);
-                                            let pad = p.padding_px;
-                                            queue.write_texture(
-                                                wgpu::TexelCopyTextureInfo {
-                                                    texture: &self.atlas_texture,
-                                                    mip_level: 0,
-                                                    origin: wgpu::Origin3d {
-                                                        x: rect_px.min.x + pad,
-                                                        y: rect_px.min.y + pad,
-                                                        z: 0,
+                                        // Cache hit - use cached metrics and placement (no atlas lookup!)
+                                        (bearing, size, placement)
+                                    } else {
+                                        // Cache miss - need to rasterize and upload
+                                        let Some(bitmap) = self.text_engine.rasterize_glyph(g.key)
+                                        else {
+                                            continue;
+                                        };
+
+                                        // Insert into atlas
+                                        let placed = match self
+                                            .atlas
+                                            .insert(atlas_key.clone(), bitmap.size_px)
+                                        {
+                                            text::atlas::AtlasInsert::AlreadyPresent => {
+                                                // Already in atlas, get placement
+                                                self.atlas.get(&atlas_key)
+                                            }
+                                            text::atlas::AtlasInsert::Placed(p) => {
+                                                // Newly placed - upload texture
+                                                let rect_px =
+                                                    text::atlas::GlyphAtlas::upload_rect_px(p);
+                                                let pad = p.padding_px;
+                                                queue.write_texture(
+                                                    wgpu::TexelCopyTextureInfo {
+                                                        texture: &self.atlas_texture,
+                                                        mip_level: 0,
+                                                        origin: wgpu::Origin3d {
+                                                            x: rect_px.min.x + pad,
+                                                            y: rect_px.min.y + pad,
+                                                            z: 0,
+                                                        },
+                                                        aspect: wgpu::TextureAspect::All,
                                                     },
-                                                    aspect: wgpu::TextureAspect::All,
-                                                },
-                                                &bitmap.pixels,
-                                                wgpu::TexelCopyBufferLayout {
-                                                    offset: 0,
-                                                    bytes_per_row: Some(bitmap.size_px[0]),
-                                                    rows_per_image: Some(bitmap.size_px[1]),
-                                                },
-                                                wgpu::Extent3d {
-                                                    width: bitmap.size_px[0],
-                                                    height: bitmap.size_px[1],
-                                                    depth_or_array_layers: 1,
-                                                },
-                                            );
+                                                    &bitmap.pixels,
+                                                    wgpu::TexelCopyBufferLayout {
+                                                        offset: 0,
+                                                        bytes_per_row: Some(bitmap.size_px[0]),
+                                                        rows_per_image: Some(bitmap.size_px[1]),
+                                                    },
+                                                    wgpu::Extent3d {
+                                                        width: bitmap.size_px[0],
+                                                        height: bitmap.size_px[1],
+                                                        depth_or_array_layers: 1,
+                                                    },
+                                                );
 
-                                            // Update size estimate for better future predictions (smooth average)
-                                            let glyph_area = bitmap.size_px[0] * bitmap.size_px[1];
-                                            let glyph_size = (glyph_area as f32).sqrt() as u32;
-                                            self.avg_glyph_size_estimate_px =
-                                                (self.avg_glyph_size_estimate_px * 7 + glyph_size)
-                                                    / 8;
+                                                // Update size estimate for better future predictions (smooth average)
+                                                let glyph_area =
+                                                    bitmap.size_px[0] * bitmap.size_px[1];
+                                                let glyph_size = (glyph_area as f32).sqrt() as u32;
+                                                self.avg_glyph_size_estimate_px =
+                                                    (self.avg_glyph_size_estimate_px * 7
+                                                        + glyph_size)
+                                                        / 8;
 
-                                            Some(p)
-                                        }
-                                        text::atlas::AtlasInsert::Full => {
-                                            eprintln!(
+                                                Some(p)
+                                            }
+                                            text::atlas::AtlasInsert::Full => {
+                                                eprintln!(
                                     "WARNING: Glyph atlas full during render! Will resize next frame. \
                                      (font_id={}, glyph_id={}, size={}px)",
                                     atlas_key.font_id, atlas_key.glyph_id, atlas_key.font_px
                                 );
 
-                                            // Mark for resize before next frame
-                                            self.atlas_needs_resize = true;
+                                                // Mark for resize before next frame
+                                                self.atlas_needs_resize = true;
 
-                                            // Update size estimate for better future predictions
-                                            let glyph_area = bitmap.size_px[0] * bitmap.size_px[1];
-                                            let glyph_size = (glyph_area as f32).sqrt() as u32;
-                                            self.avg_glyph_size_estimate_px =
-                                                (self.avg_glyph_size_estimate_px + glyph_size) / 2;
+                                                // Update size estimate for better future predictions
+                                                let glyph_area =
+                                                    bitmap.size_px[0] * bitmap.size_px[1];
+                                                let glyph_size = (glyph_area as f32).sqrt() as u32;
+                                                self.avg_glyph_size_estimate_px =
+                                                    (self.avg_glyph_size_estimate_px + glyph_size)
+                                                        / 2;
 
-                                            None
+                                                None
+                                            }
+                                        };
+
+                                        let Some(p) = placed else {
+                                            continue;
+                                        };
+
+                                        // Cache metrics AND placement for future frames
+                                        let metrics = (bitmap.bearing_px, bitmap.size_px, p);
+                                        self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
+                                        (bitmap.bearing_px, bitmap.size_px, p)
+                                    };
+
+                                    let x0 = line_x + g.x_px + glyph_bearing[0] as f32;
+                                    let y0 = current_y + g.y_px + glyph_bearing[1] as f32;
+                                    let x1 = x0 + glyph_size[0] as f32;
+                                    let y1 = y0 + glyph_size[1] as f32;
+
+                                    // Apply full transform (translation + rotation) to the glyph quad vertices
+                                    let translation = clipped.transform.translation;
+                                    let transform_origin = if let Some(abs_origin) =
+                                        clipped.transform.absolute_origin
+                                    {
+                                        abs_origin
+                                    } else {
+                                        // Fallback: resolve origin relative to the node rect
+                                        let node_width =
+                                            clipped.node_rect.max[0] - clipped.node_rect.min[0];
+                                        let node_height =
+                                            clipped.node_rect.max[1] - clipped.node_rect.min[1];
+                                        let (origin_x, origin_y) = clipped
+                                            .transform
+                                            .origin
+                                            .resolve(node_width, node_height);
+                                        [
+                                            clipped.node_rect.min[0] + origin_x,
+                                            clipped.node_rect.min[1] + origin_y,
+                                        ]
+                                    };
+
+                                    // Helper to apply translation first, then rotation around the transform origin
+                                    // Uses pre-calculated cos_r and sin_r from outside the loop
+                                    let apply_transform = |pos: [f32; 2]| -> [f32; 2] {
+                                        // 1. Apply translation first
+                                        let mut x = pos[0] + translation.x;
+                                        let mut y = pos[1] + translation.y;
+
+                                        // 2. Apply rotation if present (use pre-calculated trig values)
+                                        if has_rotation {
+                                            // Translate to origin
+                                            x -= transform_origin[0];
+                                            y -= transform_origin[1];
+
+                                            // Rotate (clockwise positive) - uses pre-calculated cos_r and sin_r
+                                            let rx = x * cos_r + y * sin_r;
+                                            let ry = -x * sin_r + y * cos_r;
+
+                                            x = rx;
+                                            y = ry;
+
+                                            // Translate back from origin
+                                            x += transform_origin[0];
+                                            y += transform_origin[1];
                                         }
+
+                                        [x, y]
                                     };
 
-                                    let Some(p) = placed else {
-                                        continue;
-                                    };
+                                    let p0 = apply_transform([x0, y0]);
+                                    let p1 = apply_transform([x1, y0]);
+                                    let p2 = apply_transform([x1, y1]);
+                                    let p3 = apply_transform([x0, y1]);
 
-                                    // Cache metrics AND placement for future frames
-                                    let metrics = (bitmap.bearing_px, bitmap.size_px, p);
-                                    self.glyph_metrics_cache.insert(atlas_key.clone(), metrics);
-                                    (bitmap.bearing_px, bitmap.size_px, p)
-                                };
+                                    // Apply opacity from ClippedShape to text color
+                                    let color = [
+                                        text_shape.color.r,
+                                        text_shape.color.g,
+                                        text_shape.color.b,
+                                        text_shape.color.a * clipped.opacity,
+                                    ];
+                                    let uv = placed.uv;
 
-                                let x0 = placement.origin_px[0] + g.x_px + glyph_bearing[0] as f32;
-                                let y0 = placement.origin_px[1] + g.y_px + glyph_bearing[1] as f32;
-                                let x1 = x0 + glyph_size[0] as f32;
-                                let y1 = y0 + glyph_size[1] as f32;
+                                    let base = self.text_vertices.len() as u32;
+                                    self.text_vertices.push(text::vertex::TextVertex::new(
+                                        p0,
+                                        [uv.min[0], uv.min[1]],
+                                        color,
+                                    ));
+                                    self.text_vertices.push(text::vertex::TextVertex::new(
+                                        p1,
+                                        [uv.max[0], uv.min[1]],
+                                        color,
+                                    ));
+                                    self.text_vertices.push(text::vertex::TextVertex::new(
+                                        p2,
+                                        [uv.max[0], uv.max[1]],
+                                        color,
+                                    ));
+                                    self.text_vertices.push(text::vertex::TextVertex::new(
+                                        p3,
+                                        [uv.min[0], uv.max[1]],
+                                        color,
+                                    ));
 
-                                // Apply full transform (translation + rotation) to the glyph quad vertices
-                                let translation = clipped.transform.translation;
-                                let transform_origin = if let Some(abs_origin) =
-                                    clipped.transform.absolute_origin
-                                {
-                                    abs_origin
-                                } else {
-                                    // Fallback: resolve origin relative to the node rect
-                                    let node_width =
-                                        clipped.node_rect.max[0] - clipped.node_rect.min[0];
-                                    let node_height =
-                                        clipped.node_rect.max[1] - clipped.node_rect.min[1];
-                                    let (origin_x, origin_y) =
-                                        clipped.transform.origin.resolve(node_width, node_height);
-                                    [
-                                        clipped.node_rect.min[0] + origin_x,
-                                        clipped.node_rect.min[1] + origin_y,
-                                    ]
-                                };
+                                    self.text_indices.extend_from_slice(&[
+                                        base,
+                                        base + 1,
+                                        base + 2,
+                                        base,
+                                        base + 2,
+                                        base + 3,
+                                    ]);
+                                }
 
-                                // Helper to apply translation first, then rotation around the transform origin
-                                // Uses pre-calculated cos_r and sin_r from outside the loop
-                                let apply_transform = |pos: [f32; 2]| -> [f32; 2] {
-                                    // 1. Apply translation first
-                                    let mut x = pos[0] + translation.x;
-                                    let mut y = pos[1] + translation.y;
-
-                                    // 2. Apply rotation if present (use pre-calculated trig values)
-                                    if has_rotation {
-                                        // Translate to origin
-                                        x -= transform_origin[0];
-                                        y -= transform_origin[1];
-
-                                        // Rotate (clockwise positive) - uses pre-calculated cos_r and sin_r
-                                        let rx = x * cos_r + y * sin_r;
-                                        let ry = -x * sin_r + y * cos_r;
-
-                                        x = rx;
-                                        y = ry;
-
-                                        // Translate back from origin
-                                        x += transform_origin[0];
-                                        y += transform_origin[1];
+                                // Debug: Show text line bounds (cyan outline)
+                                if let Some(debug_opts) = output.debug_options.as_ref() {
+                                    if debug_opts.show_text_bounds {
+                                        let line_rect = Rect::new(
+                                            [line_x, current_y],
+                                            [
+                                                line_x + line.metrics.width_px,
+                                                current_y + line.metrics.height_px,
+                                            ],
+                                        );
+                                        debug_text_rects.push((
+                                            line_rect,
+                                            Color::rgba(0.0, 1.0, 1.0, 1.0), // Cyan
+                                            Stroke::new(
+                                                Size::ppx(1.0),
+                                                Color::rgba(0.0, 1.0, 1.0, 1.0),
+                                            ),
+                                            clipped.clip_rect,
+                                        ));
                                     }
+                                }
 
-                                    [x, y]
-                                };
-
-                                let p0 = apply_transform([x0, y0]);
-                                let p1 = apply_transform([x1, y0]);
-                                let p2 = apply_transform([x1, y1]);
-                                let p3 = apply_transform([x0, y1]);
-
-                                // Apply opacity from ClippedShape to text color
-                                let color = [
-                                    text_shape.color.r,
-                                    text_shape.color.g,
-                                    text_shape.color.b,
-                                    text_shape.color.a * clipped.opacity,
-                                ];
-                                let uv = placed.uv;
-
-                                let base = self.text_vertices.len() as u32;
-                                self.text_vertices.push(text::vertex::TextVertex::new(
-                                    p0,
-                                    [uv.min[0], uv.min[1]],
-                                    color,
-                                ));
-                                self.text_vertices.push(text::vertex::TextVertex::new(
-                                    p1,
-                                    [uv.max[0], uv.min[1]],
-                                    color,
-                                ));
-                                self.text_vertices.push(text::vertex::TextVertex::new(
-                                    p2,
-                                    [uv.max[0], uv.max[1]],
-                                    color,
-                                ));
-                                self.text_vertices.push(text::vertex::TextVertex::new(
-                                    p3,
-                                    [uv.min[0], uv.max[1]],
-                                    color,
-                                ));
-
-                                self.text_indices.extend_from_slice(&[
-                                    base,
-                                    base + 1,
-                                    base + 2,
-                                    base,
-                                    base + 2,
-                                    base + 3,
-                                ]);
+                                // Move to next line
+                                current_y += line.metrics.height_px;
                             }
                             let index_end = self.text_indices.len() as u32;
                             if index_end > index_start {
@@ -1350,8 +1404,88 @@ impl Renderer {
             layer_draw_commands.push(current_layer_commands);
         } // End for layer in layers
 
+        // Add debug text line bounds as SDF rectangles (rendered on top)
+        if !debug_text_rects.is_empty() {
+            let mut debug_layer_commands = Vec::new();
+
+            for (rect, _fill_color, stroke, clip_rect) in debug_text_rects {
+                // Create a StyledRect for the debug rectangle
+                let styled_rect = StyledRect {
+                    rect,
+                    fill: Color::rgba(0.0, 0.0, 0.0, 0.0), // Transparent fill
+                    stroke: Some(stroke),
+                    corner_shape: CornerShape::None,
+                };
+
+                // Create a ClippedShape for this debug rectangle
+                let clipped_debug = ClippedShape {
+                    shape: Shape::Rect(styled_rect),
+                    node_rect: rect,
+                    clip_rect,
+                    opacity: 1.0,
+                    transform: Transform2D::default(),
+                    z_index: ZIndex(i32::MAX), // Render on top
+                    tree_index: 0,
+                };
+
+                // Compute scissor rect
+                let sc_min_x = clip_rect.min[0].max(0.0).floor() as i32;
+                let sc_min_y = clip_rect.min[1].max(0.0).floor() as i32;
+                let sc_max_x = clip_rect.max[0].min(screen_width).ceil() as i32;
+                let sc_max_y = clip_rect.max[1].min(screen_height).ceil() as i32;
+
+                let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
+                let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
+
+                if sc_w > 0 && sc_h > 0 {
+                    let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
+                    let instance_index = self.sdf_instances.len() as u32;
+
+                    self.sdf_instances.push(RectInstance::from(&clipped_debug));
+
+                    // Try to batch with previous debug draw
+                    let can_batch =
+                        if let Some(DrawCommand::Sdf(last_idx)) = debug_layer_commands.last() {
+                            *last_idx == self.sdf_draws.len() - 1
+                        } else {
+                            false
+                        };
+
+                    if can_batch {
+                        if let Some(last_draw) = self.sdf_draws.last_mut() {
+                            if last_draw.scissor == scissor
+                                && last_draw.instance_start + last_draw.instance_count
+                                    == instance_index
+                            {
+                                last_draw.instance_count += 1;
+                            } else {
+                                self.sdf_draws.push(SdfDraw {
+                                    scissor,
+                                    instance_start: instance_index,
+                                    instance_count: 1,
+                                });
+                                debug_layer_commands
+                                    .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
+                            }
+                        }
+                    } else {
+                        self.sdf_draws.push(SdfDraw {
+                            scissor,
+                            instance_start: instance_index,
+                            instance_count: 1,
+                        });
+                        debug_layer_commands.push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
+                    }
+                }
+            }
+
+            if !debug_layer_commands.is_empty() {
+                layer_draw_commands.push(debug_layer_commands);
+            }
+        }
+
         // Store layer count for later use in render pass
-        let layer_count = layers.len();
+        let layer_count = layer_draw_commands.len();
 
         // Process mesh shapes if using Mesh render mode
         if self.render_mode == RenderMode::Mesh {

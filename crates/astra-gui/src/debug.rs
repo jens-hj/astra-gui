@@ -15,6 +15,8 @@ pub struct DebugOptions {
     pub show_gaps: bool,
     /// Show transform origins (crosshair)
     pub show_transform_origins: bool,
+    /// Show text line bounds (cyan outline for each line)
+    pub show_text_bounds: bool,
 }
 
 impl DebugOptions {
@@ -28,6 +30,7 @@ impl DebugOptions {
             show_clip_rects: false,
             show_gaps: false,
             show_transform_origins: false,
+            show_text_bounds: false,
         }
     }
 
@@ -41,6 +44,7 @@ impl DebugOptions {
             show_clip_rects: true,
             show_gaps: true,
             show_transform_origins: true,
+            show_text_bounds: true,
         }
     }
 
@@ -95,5 +99,6 @@ impl DebugOptions {
             || self.show_clip_rects
             || self.show_gaps
             || self.show_transform_origins
+            || self.show_text_bounds
     }
 }

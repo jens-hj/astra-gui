@@ -277,13 +277,13 @@ impl App {
                     Node::new()
                         .with_width(Size::Fill)
                         .with_margin(Spacing::bottom(Size::lpx(20.0)))
-                        .with_content(Content::Text(TextContent {
-                            text: format!("{} {}", h_label, v_label),
-                            font_size: Size::lpx(24.0),
-                            color: mocha::SUBTEXT0,
-                            h_align: HorizontalAlign::Center,
-                            v_align: VerticalAlign::Center,
-                        })),
+                        .with_content(Content::Text(
+                            TextContent::new(format!("{} {}", h_label, v_label))
+                                .with_font_size(Size::lpx(24.0))
+                                .with_color(mocha::SUBTEXT0)
+                                .with_h_align(HorizontalAlign::Center)
+                                .with_v_align(VerticalAlign::Center),
+                        )),
                     // Container with alignment
                     Node::new()
                         .with_width(Size::lpx(300.0))
@@ -327,24 +327,23 @@ impl App {
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::lpx(60.0))
-                        .with_content(Content::Text(TextContent {
-                            text: "Alignment Examples".to_string(),
-                            font_size: Size::lpx(46.0),
-                            color: mocha::TEXT,
-                            h_align: HorizontalAlign::Center,
-                            v_align: VerticalAlign::Center,
-                        })),
+                        .with_content(Content::Text(
+                            TextContent::new("Alignment Examples")
+                                .with_font_size(Size::lpx(46.0))
+                                .with_color(mocha::TEXT)
+                                .with_h_align(HorizontalAlign::Center)
+                                .with_v_align(VerticalAlign::Center),
+                        )),
                     // Instructions
                     Node::new()
                         .with_width(Size::Fill)
-                        .with_content(Content::Text(TextContent {
-                            text: "h_align and v_align control child positioning within containers"
-                                .to_string(),
-                            font_size: Size::lpx(24.0),
-                            color: mocha::SUBTEXT0,
-                            h_align: HorizontalAlign::Center,
-                            v_align: VerticalAlign::Center,
-                        })),
+                        .with_content(Content::Text(
+                            TextContent::new("h_align and v_align control child positioning within containers".to_string())
+                                .with_font_size(Size::lpx(24.0))
+                                .with_color(mocha::SUBTEXT0)
+                                .with_h_align(HorizontalAlign::Center)
+                                .with_v_align(VerticalAlign::Center),
+                        )),
                 ]),
                 // Main content area
                 Node::new()

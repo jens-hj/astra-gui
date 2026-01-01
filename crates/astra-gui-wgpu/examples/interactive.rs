@@ -355,23 +355,23 @@ impl App {
                 // Title
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_content(Content::Text(TextContent {
-                        text: "Interactive Button Example".to_string(),
-                        font_size: Size::lpx(32.0),
-                        color: mocha::TEXT,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    })),
+                    .with_content(Content::Text(
+                        TextContent::new("Interactive Button Example".to_string())
+                            .with_font_size(Size::lpx(32.0))
+                            .with_color(mocha::TEXT)
+                            .with_h_align(HorizontalAlign::Center)
+                            .with_v_align(VerticalAlign::Center),
+                    )),
                 // Counter display
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_content(Content::Text(TextContent {
-                        text: format!("Count: {}", self.counter),
-                        font_size: Size::lpx(48.0),
-                        color: mocha::LAVENDER,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    })),
+                    .with_content(Content::Text(
+                        TextContent::new(format!("Count: {}", self.counter))
+                            .with_font_size(Size::lpx(48.0))
+                            .with_color(mocha::LAVENDER)
+                            .with_h_align(HorizontalAlign::Center)
+                            .with_v_align(VerticalAlign::Center),
+                    )),
                 // Centered button container
                 Node::new()
                     .with_width(Size::Fill)
@@ -411,13 +411,13 @@ impl App {
                         Node::new()
                             .with_width(Size::FitContent)
                             .with_height(Size::FitContent)
-                            .with_content(Content::Text(TextContent {
-                                text: "Enable buttons:".to_string(),
-                                font_size: Size::lpx(20.0),
-                                color: mocha::TEXT,
-                                h_align: HorizontalAlign::Center,
-                                v_align: VerticalAlign::Center,
-                            })),
+                            .with_content(Content::Text(
+                                TextContent::new("Enable buttons:".to_string())
+                                    .with_font_size(Size::lpx(20.0))
+                                    .with_color(mocha::TEXT)
+                                    .with_h_align(HorizontalAlign::Center)
+                                    .with_v_align(VerticalAlign::Center),
+                            )),
                         // Toggle Switch
                         toggle(
                             "enable_toggle",
@@ -431,14 +431,16 @@ impl App {
                 // Instructions
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_content(Content::Text(TextContent {
-                        text: "Use the toggle switch to enable/disable the counter buttons!"
-                            .to_string(),
-                        font_size: Size::lpx(16.0),
-                        color: mocha::SUBTEXT0,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    })),
+                    .with_content(Content::Text(
+                        TextContent::new(
+                            "Use the toggle switch to enable/disable the counter buttons!"
+                                .to_string(),
+                        )
+                        .with_font_size(Size::lpx(16.0))
+                        .with_color(mocha::SUBTEXT0)
+                        .with_h_align(HorizontalAlign::Center)
+                        .with_v_align(VerticalAlign::Center),
+                    )),
                 // Text input section
                 Node::new()
                     .with_width(Size::Fill)
@@ -487,13 +489,13 @@ impl App {
                         Node::new()
                             .with_width(Size::lpx(150.0))
                             .with_height(Size::FitContent)
-                            .with_content(Content::Text(TextContent {
-                                text: "Stepped (7):".to_string(),
-                                font_size: Size::lpx(20.0),
-                                color: mocha::TEXT,
-                                h_align: HorizontalAlign::Right,
-                                v_align: VerticalAlign::Center,
-                            })),
+                            .with_content(Content::Text(
+                                TextContent::new("Stepped (7):".to_string())
+                                    .with_font_size(Size::lpx(20.0))
+                                    .with_color(mocha::TEXT)
+                                    .with_h_align(HorizontalAlign::Right)
+                                    .with_v_align(VerticalAlign::Center),
+                            )),
                         // Slider
                         slider(
                             "stepped_slider",
@@ -506,13 +508,13 @@ impl App {
                         Node::new()
                             .with_width(Size::lpx(55.0))
                             .with_height(Size::FitContent)
-                            .with_content(Content::Text(TextContent {
-                                text: format!("{:.0}", self.slider_value),
-                                font_size: Size::lpx(20.0),
-                                color: mocha::LAVENDER,
-                                h_align: HorizontalAlign::Right,
-                                v_align: VerticalAlign::Center,
-                            })),
+                            .with_content(Content::Text(
+                                TextContent::new(format!("{:.0}", self.slider_value))
+                                    .with_font_size(Size::lpx(20.0))
+                                    .with_color(mocha::LAVENDER)
+                                    .with_h_align(HorizontalAlign::Right)
+                                    .with_v_align(VerticalAlign::Center),
+                            )),
                         // Spacer
                         Node::new().with_width(Size::Fill),
                     ]),
@@ -530,13 +532,13 @@ impl App {
                         Node::new()
                             .with_width(Size::lpx(150.0))
                             .with_height(Size::FitContent)
-                            .with_content(Content::Text(TextContent {
-                                text: "Continuous:".to_string(),
-                                font_size: Size::lpx(20.0),
-                                color: mocha::TEXT,
-                                h_align: HorizontalAlign::Right,
-                                v_align: VerticalAlign::Center,
-                            })),
+                            .with_content(Content::Text(
+                                TextContent::new("Continuous:".to_string())
+                                    .with_font_size(Size::lpx(20.0))
+                                    .with_color(mocha::TEXT)
+                                    .with_h_align(HorizontalAlign::Right)
+                                    .with_v_align(VerticalAlign::Center),
+                            )),
                         // Slider
                         slider(
                             "continuous_slider",
@@ -549,13 +551,13 @@ impl App {
                         Node::new()
                             .with_width(Size::lpx(55.0))
                             .with_height(Size::FitContent)
-                            .with_content(Content::Text(TextContent {
-                                text: format!("{:.2}", self.continuous_slider_value),
-                                font_size: Size::lpx(20.0),
-                                color: mocha::LAVENDER,
-                                h_align: HorizontalAlign::Right,
-                                v_align: VerticalAlign::Center,
-                            })),
+                            .with_content(Content::Text(
+                                TextContent::new(format!("{:.2}", self.continuous_slider_value))
+                                    .with_font_size(Size::lpx(20.0))
+                                    .with_color(mocha::LAVENDER)
+                                    .with_h_align(HorizontalAlign::Right)
+                                    .with_v_align(VerticalAlign::Center),
+                            )),
                         // Spacer
                         Node::new().with_width(Size::Fill),
                     ]),

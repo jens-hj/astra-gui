@@ -263,23 +263,23 @@ impl App {
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::SURFACE0),
                 stroke: Some(Stroke::new(Size::lpx(2.0), mocha::OVERLAY0)),
-                corner_shape: Some(CornerShape::Round(Size::ppx(8.0))),
+                corner_shape: Some(CornerShape::Round(Size::lpx(8.0))),
                 ..Default::default()
             })
             .with_padding(Spacing::all(Size::lpx(15.0)))
             .with_z_index(ZIndex::OVERLAY) // Ensure panel renders on top of grid
-            .with_content(astra_gui::Content::Text(TextContent {
-                text: format!(
+            .with_content(astra_gui::Content::Text(
+                TextContent::new(format!(
                     "Zoom: {:.0}%\nPan: ({:.0}, {:.0})\n\nWheel: Zoom\nArrows: Pan\nR: Reset",
                     self.zoom_level * 100.0,
                     self.pan_offset.0,
                     self.pan_offset.1
-                ),
-                font_size: Size::lpx(14.0),
-                color: mocha::TEXT,
-                h_align: HorizontalAlign::Left,
-                v_align: VerticalAlign::Center,
-            }));
+                ))
+                .with_font_size(Size::lpx(14.0))
+                .with_color(mocha::TEXT)
+                .with_h_align(HorizontalAlign::Left)
+                .with_v_align(VerticalAlign::Center),
+            ));
 
         // Create a colorful grid of boxes to demonstrate zoom
         let mut grid_rows = Vec::new();
@@ -311,13 +311,13 @@ impl App {
                             ..Default::default()
                         })
                         .with_padding(Spacing::all(Size::lpx(20.0)))
-                        .with_content(astra_gui::Content::Text(TextContent {
-                            text: format!("{},{}", row + 1, col + 1),
-                            font_size: Size::lpx(24.0),
-                            color: mocha::TEXT,
-                            h_align: HorizontalAlign::Center,
-                            v_align: VerticalAlign::Center,
-                        })),
+                        .with_content(astra_gui::Content::Text(
+                            TextContent::new(format!("{},{}", row + 1, col + 1))
+                                .with_font_size(Size::lpx(24.0))
+                                .with_color(mocha::TEXT)
+                                .with_h_align(HorizontalAlign::Center)
+                                .with_v_align(VerticalAlign::Center),
+                        )),
                 );
             }
 

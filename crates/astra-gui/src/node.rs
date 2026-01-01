@@ -679,6 +679,7 @@ impl Node {
                         Content::Text(text_content) => {
                             let mut request = MeasureTextRequest::from_text_content(text_content);
                             request.font_size *= scale_factor;
+                            // Note: measure_node doesn't have width constraints - use None for max_width
                             measurer.measure_text(request).width
                         }
                     }
@@ -715,6 +716,7 @@ impl Node {
                         Content::Text(text_content) => {
                             let mut request = MeasureTextRequest::from_text_content(text_content);
                             request.font_size *= scale_factor;
+                            // Note: measure_node doesn't have width constraints - use None for max_width
                             measurer.measure_text(request).height
                         }
                     }
@@ -996,10 +998,94 @@ impl Node {
         // IMPORTANT: Only measure FitContent dimensions. For Fixed/Relative/Fill, use constraints directly.
         // This prevents children from incorrectly affecting parent sizes when parent has constrained dimensions.
         //
-        // OPTIMIZATION: Cache measurement result to avoid calling measure_node() twice when both
-        // width and height are FitContent
+        // Text measurement logic:
+        // - Width FitContent: Measure with max_width=None (natural width, no wrapping)
+        // - Width constrained + Height FitContent: Measure with max_width=Some(resolved_width) (wrapped height)
+        // - Both constrained: No measurement needed
         let measured_size = if self.width.is_fit_content() || self.height.is_fit_content() {
-            Some(self.measure_node(measurer, effective_scale_factor))
+            // For text content, handle width constraints correctly
+            if let Some(Content::Text(text_content)) = &self.content {
+                // Determine max_width constraint based on width mode
+                // IMPORTANT: Only use width constraint for absolute sizes (Logical/Physical).
+                // Fill/Relative depend on parent layout and can't be used for measurement.
+                let max_width = match self.width {
+                    Size::FitContent => {
+                        // Width is FitContent: measure natural width without wrapping constraint
+                        None
+                    }
+                    Size::Logical(_) | Size::Physical(_) => {
+                        // Absolute width: resolve it and use for height measurement
+                        let resolved_width = self
+                            .width
+                            .try_resolve_with_scale(available_width, effective_scale_factor)
+                            .unwrap_or(available_width);
+
+                        // Subtract padding to get content width for wrapping
+                        let padding_left = self
+                            .padding
+                            .left
+                            .try_resolve_with_scale(resolved_width, effective_scale_factor)
+                            .unwrap_or(0.0);
+                        let padding_right = self
+                            .padding
+                            .right
+                            .try_resolve_with_scale(resolved_width, effective_scale_factor)
+                            .unwrap_or(0.0);
+                        let content_width =
+                            (resolved_width - padding_left - padding_right).max(0.0);
+                        Some(content_width)
+                    }
+                    Size::Fill | Size::Relative(_) => {
+                        // Dynamic width depends on parent - can't use for measurement
+                        // Measure without width constraint
+                        None
+                    }
+                };
+
+                let mut request = MeasureTextRequest::from_text_content(text_content);
+                request.font_size *= effective_scale_factor;
+                request.max_width = max_width;
+
+                // DEBUG: Log what we're about to measure
+                println!(
+                    "LAYOUT MEASURE: width={:?} height={:?} | max_width={:?} | text='{}'",
+                    self.width,
+                    self.height,
+                    max_width,
+                    text_content.text.chars().take(30).collect::<String>()
+                );
+
+                let size = measurer.measure_text(request);
+
+                // Add padding to get final size
+                let padding_left = self
+                    .padding
+                    .left
+                    .try_resolve_with_scale(size.width, effective_scale_factor)
+                    .unwrap_or(0.0);
+                let padding_right = self
+                    .padding
+                    .right
+                    .try_resolve_with_scale(size.width, effective_scale_factor)
+                    .unwrap_or(0.0);
+                let padding_top = self
+                    .padding
+                    .top
+                    .try_resolve_with_scale(size.width, effective_scale_factor)
+                    .unwrap_or(0.0);
+                let padding_bottom = self
+                    .padding
+                    .bottom
+                    .try_resolve_with_scale(size.width, effective_scale_factor)
+                    .unwrap_or(0.0);
+
+                Some(IntrinsicSize::new(
+                    size.width + padding_left + padding_right,
+                    size.height + padding_top + padding_bottom,
+                ))
+            } else {
+                Some(self.measure_node(measurer, effective_scale_factor))
+            }
         } else {
             None
         };

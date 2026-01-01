@@ -137,6 +137,8 @@ pub fn button(
             color: style.text_color,
             h_align: HorizontalAlign::Center,
             v_align: VerticalAlign::Center,
+            wrap: astra_gui::Wrap::Word,
+            line_height_multiplier: 1.2,
         }))
         // Declarative styles - no manual state tracking needed!
         .with_style(Style {

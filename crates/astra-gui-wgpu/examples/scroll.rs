@@ -291,13 +291,13 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
             Node::new()
                 .with_width(Size::Fill)
                 .with_height(Size::lpx(30.0))
-                .with_content(Content::Text(TextContent {
-                    text: format!("Item {}", i + 1),
-                    font_size: Size::lpx(20.0),
-                    color: mocha::TEXT,
-                    h_align: HorizontalAlign::Left,
-                    v_align: VerticalAlign::Center,
-                })),
+                .with_content(Content::Text(
+                    TextContent::new(format!("Item {}", i + 1))
+                        .with_font_size(Size::lpx(20.0))
+                        .with_color(mocha::TEXT)
+                        .with_h_align(HorizontalAlign::Left)
+                        .with_v_align(VerticalAlign::Center),
+                )),
             Node::new()
                 .with_width(Size::Fill)
                 .with_height(Size::Fill)
@@ -390,13 +390,13 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::lpx(30.0))
-                        .with_content(Content::Text(TextContent {
-                            text: format!("H-Item {}", i + 1),
-                            font_size: Size::lpx(18.0),
-                            color: mocha::TEXT,
-                            h_align: HorizontalAlign::Center,
-                            v_align: VerticalAlign::Center,
-                        })),
+                        .with_content(Content::Text(
+                            TextContent::new(format!("H-Item {}", i + 1))
+                                .with_font_size(Size::lpx(18.0))
+                                .with_color(mocha::TEXT)
+                                .with_h_align(HorizontalAlign::Center)
+                                .with_v_align(VerticalAlign::Center),
+                        )),
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::Fill)
@@ -474,13 +474,13 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                         Node::new()
                             .with_width(Size::Fill)
                             .with_height(Size::lpx(25.0))
-                            .with_content(Content::Text(TextContent {
-                                text: format!("R{} C{}", row + 1, col + 1),
-                                font_size: Size::lpx(16.0),
-                                color: mocha::TEXT,
-                                h_align: HorizontalAlign::Center,
-                                v_align: VerticalAlign::Center,
-                            })),
+                            .with_content(Content::Text(
+                                TextContent::new(format!("R{} C{}", row + 1, col + 1))
+                                    .with_font_size(Size::lpx(16.0))
+                                    .with_color(mocha::TEXT)
+                                    .with_h_align(HorizontalAlign::Center)
+                                    .with_v_align(VerticalAlign::Center),
+                            )),
                         Node::new()
                             .with_width(Size::Fill)
                             .with_height(Size::Fill)
@@ -549,14 +549,16 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::fraction(0.1))
-                        .with_content(Content::Text(TextContent {
-                            text: "Scroll Example - Use Mouse Wheel (Shift for horizontal)"
-                                .to_string(),
-                            font_size: Size::lpx(32.0),
-                            color: mocha::TEXT,
-                            h_align: HorizontalAlign::Center,
-                            v_align: VerticalAlign::Center,
-                        })),
+                        .with_content(Content::Text(
+                            TextContent::new(
+                                "Scroll Example - Use Mouse Wheel (Shift for horizontal)"
+                                    .to_string(),
+                            )
+                            .with_font_size(Size::lpx(32.0))
+                            .with_color(mocha::TEXT)
+                            .with_h_align(HorizontalAlign::Center)
+                            .with_v_align(VerticalAlign::Center),
+                        )),
                     // Centered vertical scroll container
                     Node::new()
                         .with_width(Size::Fill)

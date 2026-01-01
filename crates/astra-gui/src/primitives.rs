@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::content::{HorizontalAlign, TextContent, VerticalAlign};
+use crate::content::{HorizontalAlign, TextContent, VerticalAlign, Wrap};
 use crate::layout::{Size, Transform2D, ZIndex};
 
 /// A 2D point in screen space
@@ -194,6 +194,10 @@ pub struct TextShape {
     pub h_align: HorizontalAlign,
     /// Vertical alignment
     pub v_align: VerticalAlign,
+    /// Text wrapping mode
+    pub wrap: Wrap,
+    /// Line height as a multiplier of font size
+    pub line_height_multiplier: f32,
 }
 
 impl TextShape {
@@ -206,6 +210,8 @@ impl TextShape {
             color: content.color,
             h_align: content.h_align,
             v_align: content.v_align,
+            wrap: content.wrap,
+            line_height_multiplier: content.line_height_multiplier,
         }
     }
 

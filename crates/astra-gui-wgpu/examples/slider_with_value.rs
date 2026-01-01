@@ -391,25 +391,26 @@ impl App {
                 // Title
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_content(Content::Text(TextContent {
-                        text: "Slider with Value Widget Example".to_string(),
-                        font_size: Size::lpx(32.0),
-                        color: mocha::TEXT,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    })),
+                    .with_content(Content::Text(
+                        TextContent::new("Slider with Value Widget Example".to_string())
+                            .with_font_size(Size::lpx(32.0))
+                            .with_color(mocha::TEXT)
+                            .with_h_align(HorizontalAlign::Center)
+                            .with_v_align(VerticalAlign::Center),
+                    )),
                 // Instructions
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_content(Content::Text(TextContent {
-                        text:
+                    .with_content(Content::Text(
+                        TextContent::new(
                             "Drag slider or value • Click value to type • Shift=precise, Ctrl=fast"
                                 .to_string(),
-                        font_size: Size::lpx(16.0),
-                        color: mocha::SUBTEXT0,
-                        h_align: HorizontalAlign::Center,
-                        v_align: VerticalAlign::Center,
-                    })),
+                        )
+                        .with_font_size(Size::lpx(16.0))
+                        .with_color(mocha::SUBTEXT0)
+                        .with_h_align(HorizontalAlign::Center)
+                        .with_v_align(VerticalAlign::Center),
+                    )),
                 Node::new().with_height(Size::lpx(20.0)),
                 // Basic slider
                 self.create_slider_row(
@@ -508,13 +509,13 @@ impl App {
                 Node::new()
                     .with_width(Size::lpx(200.0))
                     .with_height(Size::Fill)
-                    .with_content(Content::Text(TextContent {
-                        text: label.to_string(),
-                        font_size: Size::lpx(20.0),
-                        color: mocha::TEXT,
-                        h_align: HorizontalAlign::Right,
-                        v_align: VerticalAlign::Center,
-                    })),
+                    .with_content(Content::Text(
+                        TextContent::new(label.to_string())
+                            .with_font_size(Size::lpx(20.0))
+                            .with_color(mocha::TEXT)
+                            .with_h_align(HorizontalAlign::Right)
+                            .with_v_align(VerticalAlign::Center),
+                    )),
                 // Slider with value widget
                 slider_with_value(
                     slider_id,
