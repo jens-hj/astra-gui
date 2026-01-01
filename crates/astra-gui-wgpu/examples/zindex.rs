@@ -14,8 +14,8 @@
 //! - ESC: Exit
 
 use astra_gui::{
-    catppuccin::mocha, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Shape,
-    Size, Spacing, Stroke, TextContent, Translation, VerticalAlign, ZIndex,
+    catppuccin::mocha, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Size,
+    Spacing, Stroke, TextContent, Translation, VerticalAlign, ZIndex,
 };
 use astra_gui_wgpu::{RenderMode, Renderer};
 use std::sync::Arc;
@@ -265,7 +265,6 @@ impl App {
         let yellow_box = Node::new()
             .with_width(Size::lpx(200.0))
             .with_height(Size::lpx(200.0))
-            .with_shape(Shape::rect())
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::CRUST),
                 stroke: Some(Stroke::new(Size::lpx(4.0), mocha::YELLOW)),
@@ -290,7 +289,6 @@ impl App {
         let green_box = Node::new()
             .with_width(Size::lpx(200.0))
             .with_height(Size::lpx(200.0))
-            .with_shape(Shape::rect())
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::CRUST),
                 stroke: Some(Stroke::new(Size::lpx(4.0), mocha::GREEN)),
@@ -316,7 +314,6 @@ impl App {
         let blue_box = Node::new()
             .with_width(Size::lpx(200.0))
             .with_height(Size::lpx(200.0))
-            .with_shape(Shape::rect())
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::CRUST),
                 stroke: Some(Stroke::new(Size::lpx(4.0), mocha::BLUE)),
@@ -340,7 +337,6 @@ impl App {
         let red_box = Node::new()
             .with_width(Size::lpx(200.0))
             .with_height(Size::lpx(200.0))
-            .with_shape(Shape::rect())
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::CRUST),
                 stroke: Some(Stroke::new(Size::lpx(4.0), mocha::RED)),

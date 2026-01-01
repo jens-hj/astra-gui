@@ -8,7 +8,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout,
-    Node, NodeId, Overflow, Shape, Size, Spacing, Style, TextContent, VerticalAlign,
+    Node, NodeId, Overflow, Size, Spacing, Style, TextContent, VerticalAlign,
 };
 use astra_gui_wgpu::{EventDispatcher, InputState, InteractiveStateManager, RenderMode, Renderer};
 use std::sync::Arc;
@@ -307,7 +307,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::Fill)
-                        .with_shape(Shape::rect())
                         .with_style(Style {
                             fill_color: Some(mocha::BLUE),
                             corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
@@ -316,7 +315,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::Fill)
-                        .with_shape(Shape::rect())
                         .with_style(Style {
                             fill_color: Some(mocha::GREEN),
                             corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
@@ -325,7 +323,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::Fill)
-                        .with_shape(Shape::rect())
                         .with_style(Style {
                             fill_color: Some(mocha::RED),
                             corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
@@ -341,7 +338,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                 .with_padding(Spacing::all(Size::lpx(8.0)))
                 .with_gap(Size::lpx(5.0))
                 .with_layout_direction(Layout::Vertical)
-                .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(if i % 2 == 0 {
                         mocha::SURFACE0
@@ -364,7 +360,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_gap(Size::lpx(10.0))
         .with_layout_direction(Layout::Vertical)
         .with_overflow(Overflow::Scroll)
-        .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(mocha::MANTLE),
             corner_shape: Some(CornerShape::Round(Size::lpx(12.0))),
@@ -382,7 +377,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                 .with_padding(Spacing::all(Size::lpx(8.0)))
                 .with_gap(Size::lpx(5.0))
                 .with_layout_direction(Layout::Vertical)
-                .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(if i % 2 == 0 {
                         mocha::SURFACE0
@@ -412,7 +406,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                             Node::new()
                                 .with_width(Size::Fill)
                                 .with_height(Size::Fill)
-                                .with_shape(Shape::rect())
                                 .with_style(Style {
                                     fill_color: Some(mocha::PEACH),
                                     corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
@@ -421,7 +414,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                             Node::new()
                                 .with_width(Size::Fill)
                                 .with_height(Size::Fill)
-                                .with_shape(Shape::rect())
                                 .with_style(Style {
                                     fill_color: Some(mocha::YELLOW),
                                     corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
@@ -430,7 +422,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                             Node::new()
                                 .with_width(Size::Fill)
                                 .with_height(Size::Fill)
-                                .with_shape(Shape::rect())
                                 .with_style(Style {
                                     fill_color: Some(mocha::TEAL),
                                     corner_shape: Some(CornerShape::Round(Size::lpx(4.0))),
@@ -449,7 +440,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_gap(Size::lpx(10.0))
         .with_layout_direction(Layout::Horizontal)
         .with_overflow(Overflow::Scroll)
-        .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(mocha::MANTLE),
             corner_shape: Some(CornerShape::Round(Size::lpx(12.0))),
@@ -471,7 +461,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                     .with_padding(Spacing::all(Size::lpx(6.0)))
                     .with_gap(Size::lpx(3.0))
                     .with_layout_direction(Layout::Vertical)
-                    .with_shape(Shape::rect())
                     .with_style(Style {
                         fill_color: Some(if (row + col) % 2 == 0 {
                             mocha::SURFACE0
@@ -501,7 +490,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                                 Node::new()
                                     .with_width(Size::Fill)
                                     .with_height(Size::Fill)
-                                    .with_shape(Shape::rect())
                                     .with_style(Style {
                                         fill_color: Some(mocha::MAUVE),
                                         corner_shape: Some(CornerShape::Round(Size::lpx(3.0))),
@@ -510,7 +498,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
                                 Node::new()
                                     .with_width(Size::Fill)
                                     .with_height(Size::Fill)
-                                    .with_shape(Shape::rect())
                                     .with_style(Style {
                                         fill_color: Some(mocha::LAVENDER),
                                         corner_shape: Some(CornerShape::Round(Size::lpx(3.0))),
@@ -539,7 +526,6 @@ fn create_demo_ui(_width: f32, _height: f32, item_heights: &[f32], item_widths: 
         .with_gap(Size::lpx(10.0))
         .with_layout_direction(Layout::Vertical)
         .with_overflow(Overflow::Scroll)
-        .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(mocha::MANTLE),
             corner_shape: Some(CornerShape::Round(Size::lpx(12.0))),

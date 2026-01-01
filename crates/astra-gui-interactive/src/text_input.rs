@@ -268,7 +268,6 @@ pub fn text_input(
                     .with_width(Size::lpx(selection_width))
                     .with_height(Size::lpx(style.font_size))
                     .with_translation(Translation::x(astra_gui::Size::Logical(selection_x_offset)))
-                    .with_shape(Shape::rect())
                     .with_style(Style {
                         fill_color: Some(style.selection_color),
                         corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(5.0))),
@@ -406,7 +405,6 @@ pub fn text_input(
         .with_height(Size::lpx(style.font_size + style.padding.get_vertical()))
         .with_padding(style.padding)
         .with_layout_direction(Layout::Stack)
-        .with_shape(Shape::rect())
         .with_overflow(Overflow::Hidden)
         .with_style(Style {
             fill_color: Some(fill_color),

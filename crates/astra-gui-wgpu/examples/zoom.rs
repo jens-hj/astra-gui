@@ -9,8 +9,8 @@
 //! - ESC: Exit
 
 use astra_gui::{
-    catppuccin::mocha, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Shape,
-    Size, Spacing, Stroke, TextContent, VerticalAlign, ZIndex,
+    catppuccin::mocha, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Size,
+    Spacing, Stroke, TextContent, VerticalAlign, ZIndex,
 };
 use astra_gui_wgpu::{RenderMode, Renderer};
 use std::sync::Arc;
@@ -260,11 +260,10 @@ impl App {
         let debug_panel = Node::new()
             .with_width(Size::lpx(115.0))
             .with_height(Size::lpx(40.0))
-            .with_shape(Shape::rect())
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::SURFACE0),
                 stroke: Some(Stroke::new(Size::lpx(2.0), mocha::OVERLAY0)),
-                corner_shape: Some(CornerShape::Round(Size::lpx(8.0))),
+                corner_shape: Some(CornerShape::Round(Size::ppx(8.0))),
                 ..Default::default()
             })
             .with_padding(Spacing::all(Size::lpx(15.0)))
@@ -305,11 +304,10 @@ impl App {
                     Node::new()
                         .with_width(Size::Fill)
                         .with_height(Size::Fill)
-                        .with_shape(Shape::rect())
                         .with_style(astra_gui::Style {
                             fill_color: Some(mocha::CRUST),
                             stroke: Some(Stroke::new(Size::lpx(2.0), color)),
-                            corner_shape: Some(CornerShape::Round(Size::lpx(12.0))),
+                            corner_shape: Some(CornerShape::Round(Size::ppx(12.0))),
                             ..Default::default()
                         })
                         .with_padding(Spacing::all(Size::lpx(20.0)))

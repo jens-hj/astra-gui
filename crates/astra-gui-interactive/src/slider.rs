@@ -3,7 +3,7 @@
 //! Provides a draggable slider for selecting values within a range.
 
 use astra_gui::{
-    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Shape, Size, Style, Transition,
+    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Size, Style, Transition,
     Translation,
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
@@ -99,7 +99,6 @@ pub fn slider(
             Node::new()
                 .with_width(Size::lpx(style.track_width))
                 .with_height(Size::lpx(style.track_height))
-                .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.track_color),
                     corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
@@ -113,7 +112,6 @@ pub fn slider(
             Node::new()
                 .with_width(Size::lpx(filled_width))
                 .with_height(Size::lpx(style.track_height))
-                .with_shape(astra_gui::Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.filled_color),
                     corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
@@ -134,7 +132,6 @@ pub fn slider(
                     astra_gui::Size::Logical(thumb_offset_x),
                     astra_gui::Size::Logical(thumb_inset),
                 ))
-                .with_shape(Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.thumb_color),
                     opacity: Some(1.0),

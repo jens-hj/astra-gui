@@ -68,7 +68,6 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
         .with_height(Size::lpx(style.track_height))
         .with_layout_direction(Layout::Horizontal)
         .with_padding(Spacing::all(Size::lpx(style.knob_margin)))
-        .with_shape(astra_gui::Shape::rect())
         .with_style(Style {
             fill_color: Some(if value {
                 style.on_color
@@ -105,7 +104,6 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
                 .with_id(NodeId::new(format!("{}_knob", id_str)))
                 .with_width(Size::lpx(style.knob_width))
                 .with_height(Size::Fill)
-                .with_shape(astra_gui::Shape::rect())
                 .with_style(Style {
                     fill_color: Some(style.knob_color),
                     corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(

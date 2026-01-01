@@ -8,7 +8,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign,
-    Layout, Node, Rect, Shape, Size, Spacing, Stroke, Style, TextContent, VerticalAlign,
+    Layout, Node, Rect, Size, Spacing, Stroke, Style, TextContent, VerticalAlign,
 };
 use astra_gui_text::Engine as TextEngine;
 use astra_gui_wgpu::{EventDispatcher, InputState, InteractiveStateManager, RenderMode, Renderer};
@@ -306,7 +306,6 @@ impl App {
         Node::new()
             .with_width(Size::Fill)
             .with_height(Size::Fill)
-            .with_shape(Shape::rect())
             .with_style(Style {
                 fill_color: Some(mocha::BASE),
                 ..Default::default()
@@ -422,7 +421,6 @@ impl App {
                     .with_width(Size::Fill)
                     .with_height(Size::lpx(30.0))
                     .with_padding(Spacing::horizontal(Size::lpx(10.0)))
-                    .with_shape(Shape::rect())
                     .with_style(Style {
                         fill_color: Some(mocha::SURFACE0),
                         ..Default::default()

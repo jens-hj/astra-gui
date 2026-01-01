@@ -4,8 +4,8 @@
 //! Users can drag left/right to adjust the value, or click to enter text input mode.
 
 use astra_gui::{
-    catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, NodeId, Shape,
-    Size, Spacing, Stroke, Style, TextContent, Transition, VerticalAlign,
+    catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, NodeId, Size,
+    Spacing, Stroke, Style, TextContent, Transition, VerticalAlign,
 };
 use astra_gui_wgpu::{EventDispatcher, InputState, InteractionEvent, Key, NamedKey, TargetedEvent};
 use std::ops::RangeInclusive;
@@ -194,7 +194,6 @@ pub fn drag_value(
         .with_height(Size::lpx(style.font_size + style.padding.get_vertical()))
         .with_padding(style.padding)
         .with_layout_direction(Layout::Stack)
-        .with_shape(Shape::rect())
         .with_style(Style {
             fill_color: Some(style.idle_color),
             stroke: Some(Stroke::new(

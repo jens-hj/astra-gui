@@ -12,7 +12,7 @@
 
 use astra_gui::{
     catppuccin::mocha, Content, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Rect,
-    Shape, Size, Spacing, StyledRect, TextContent, VerticalAlign,
+    Size, Spacing, Style, TextContent, VerticalAlign,
 };
 use astra_gui_interactive::{drag_value, drag_value_update, DragValueStyle};
 use astra_gui_text::Engine as TextEngine;
@@ -498,10 +498,10 @@ impl App {
                     .with_width(Size::Fill)
                     .with_height(Size::lpx(30.0))
                     .with_padding(Spacing::horizontal(Size::lpx(10.0)))
-                    .with_shape(Shape::Rect(StyledRect::new(
-                        Default::default(),
-                        mocha::SURFACE0,
-                    )))
+                    .with_style(Style {
+                        fill_color: Some(mocha::SURFACE0),
+                        ..Default::default()
+                    })
                     .with_content(Content::Text(
                         TextContent::new(DEBUG_HELP_TEXT_ONELINE)
                             .with_font_size(Size::lpx(16.0))
