@@ -272,6 +272,7 @@ fn label(
     Node::new().with_content(Content::Text(
         TextContent::new(text)
             .with_font_size(Size::lpx(font_size))
+            .with_wrap(astra_gui::Wrap::None)
             .with_color(color)
             .with_h_align(h)
             .with_v_align(v),

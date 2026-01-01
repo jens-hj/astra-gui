@@ -534,7 +534,7 @@ impl App {
                 Node::new().with_width(Size::Fill),
                 // Label
                 Node::new()
-                    .with_width(Size::lpx(200.0))
+                    .with_width(Size::lpx(220.0))
                     .with_height(Size::Fill)
                     .with_content(Content::Text(
                         TextContent::new(label.to_string())

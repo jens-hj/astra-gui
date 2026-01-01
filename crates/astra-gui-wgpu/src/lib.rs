@@ -939,7 +939,8 @@ impl Renderer {
         let mut layer_draw_commands: Vec<Vec<DrawCommand>> = Vec::with_capacity(layers.len());
 
         // Collect debug rectangles for text line bounds
-        let mut debug_text_rects: Vec<(Rect, Color, Stroke, Rect)> = Vec::new();
+        // (rect, color, stroke, clip_rect, transform)
+        let mut debug_text_rects: Vec<(Rect, Color, Stroke, Rect, Transform2D)> = Vec::new();
 
         // Process shapes layer by layer to respect z-index ordering
         for layer in &layers {
@@ -1348,6 +1349,7 @@ impl Renderer {
                                                 Color::rgba(0.0, 1.0, 1.0, 1.0),
                                             ),
                                             clipped.clip_rect,
+                                            clipped.transform,
                                         ));
                                     }
                                 }
@@ -1408,7 +1410,7 @@ impl Renderer {
         if !debug_text_rects.is_empty() {
             let mut debug_layer_commands = Vec::new();
 
-            for (rect, _fill_color, stroke, clip_rect) in debug_text_rects {
+            for (rect, _fill_color, stroke, clip_rect, transform) in debug_text_rects {
                 // Create a StyledRect for the debug rectangle
                 let styled_rect = StyledRect {
                     rect,
@@ -1417,13 +1419,13 @@ impl Renderer {
                     corner_shape: CornerShape::None,
                 };
 
-                // Create a ClippedShape for this debug rectangle
+                // Create a ClippedShape for this debug rectangle with the text's transform
                 let clipped_debug = ClippedShape {
                     shape: Shape::Rect(styled_rect),
                     node_rect: rect,
                     clip_rect,
                     opacity: 1.0,
-                    transform: Transform2D::default(),
+                    transform,                 // Use the transform from the text shape
                     z_index: ZIndex(i32::MAX), // Render on top
                     tree_index: 0,
                 };

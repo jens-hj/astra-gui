@@ -258,8 +258,6 @@ impl App {
     fn build_ui(&self, _window_width: f32, _window_height: f32) -> Node {
         // Debug info panel (not affected by content zoom, positioned absolutely)
         let debug_panel = Node::new()
-            .with_width(Size::lpx(115.0))
-            .with_height(Size::lpx(40.0))
             .with_style(astra_gui::Style {
                 fill_color: Some(mocha::SURFACE0),
                 stroke: Some(Stroke::new(Size::lpx(2.0), mocha::OVERLAY0)),

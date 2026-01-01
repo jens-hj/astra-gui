@@ -12,7 +12,8 @@
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, DebugOptions, FullOutput, HorizontalAlign,
-    Layout, Node, Rect, Shape, Size, Spacing, Style, StyledRect, TextContent, VerticalAlign, Wrap,
+    Layout, Node, Overflow, Rect, Shape, Size, Spacing, Style, StyledRect, TextContent,
+    VerticalAlign, Wrap,
 };
 use astra_gui_wgpu::{RenderMode, Renderer};
 use std::sync::Arc;
@@ -408,12 +409,12 @@ fn build_ui(
                                 1.2,
                             ),
                             example_box(
-                                "Line Height 1.5x",
+                                "Line Height 3.0x",
                                 "This text has\nincreased line\nheight spacing\nfor better readability",
                                 Wrap::None,
                                 Size::FitContent,
                                 mocha::YELLOW,
-                                1.5,
+                                3.0,
                             ),
                         ]),
                         // Middle column
@@ -506,6 +507,7 @@ fn example_box(
         .with_layout_direction(Layout::Vertical)
         .with_gap(Size::lpx(8.0))
         .with_padding(Spacing::all(Size::lpx(15.0)))
+        .with_overflow(Overflow::Hidden)
         .with_style(Style {
             fill_color: Some(mocha::SURFACE0),
             corner_shape: Some(CornerShape::Round(Size::lpx(8.0))),
@@ -568,6 +570,8 @@ fn main() {
         gpu_state: None,
         debug_options: DebugOptions::none(),
     };
+
+    println!("{}", DEBUG_HELP_TEXT);
 
     event_loop.run_app(&mut app).unwrap();
 }
