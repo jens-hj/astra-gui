@@ -1,2 +1,4 @@
-- Always keep the README.md up to date.
+- Always keep the README.md up to date
 - Debug visualisations: padding (blue), margin (red), border (green), gap (purple), clip rect (red), content-area (yellow)
+- Always use conventional commit messages
+- Always make commit messages short and precise
