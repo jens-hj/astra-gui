@@ -460,7 +460,7 @@ impl Node {
     }
 
     /// Get the zoom level (if set on this node)
-    pub(crate) fn zoom_level(&self) -> Option<f32> {
+    pub(crate) fn zoom(&self) -> Option<f32> {
         self.zoom
     }
 
@@ -666,12 +666,13 @@ impl Node {
     fn measure_node(&self, measurer: &mut dyn ContentMeasurer, scale_factor: f32) -> IntrinsicSize {
         // Short-circuit: if both dimensions are Fixed, we can return immediately
         if let (Size::Logical(w), Size::Logical(h)) = (self.width, self.height) {
-            return IntrinsicSize::new(w, h);
+            return IntrinsicSize::new(w * scale_factor, h * scale_factor);
         }
 
         // Measure width - only FitContent measures children
         let width = match self.width {
-            Size::Logical(w) => w,
+            Size::Logical(w) => w * scale_factor,
+            Size::Physical(w) => w,
             Size::FitContent => {
                 let content_width = if let Some(content) = &self.content {
                     match content {
@@ -706,7 +707,8 @@ impl Node {
 
         // Measure height - only FitContent measures children
         let height = match self.height {
-            Size::Logical(h) => h,
+            Size::Logical(h) => h * scale_factor,
+            Size::Physical(h) => h,
             Size::FitContent => {
                 let content_height = if let Some(content) = &self.content {
                     match content {

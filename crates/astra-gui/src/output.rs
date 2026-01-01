@@ -103,7 +103,7 @@ impl FullOutput {
         scale_factor: f32,
     ) -> Self {
         // Get the effective scale factor: use root's zoom_level if set, otherwise the provided scale_factor
-        let effective_scale_factor = root.zoom_level().unwrap_or(scale_factor);
+        let effective_scale_factor = root.zoom().unwrap_or(scale_factor);
 
         // Compute layout starting from the full window
         let window_rect = Rect::new([0.0, 0.0], [window_size.0, window_size.1]);

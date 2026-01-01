@@ -23,3 +23,4 @@ env_logger = { workspace = true }
 log = { workspace = true }
 rand = { workspace = true }
 astra-gui-interactive = { workspace = true }
+display-info = "0.5"

@@ -32,6 +32,9 @@ const DEBUG_HELP_TEXT: &str = "Debug controls:
   S - Toggle render mode (SDF/Mesh)
   ESC - Exit";
 
+const MM_PER_INCH: f32 = 25.4;
+const REFERENCE_PPI: f32 = 145.14;
+
 fn handle_debug_keybinds(
     event: &WindowEvent,
     debug_options: &mut DebugOptions,
@@ -132,8 +135,8 @@ struct App {
     event_dispatcher: EventDispatcher,
     interactive_state_manager: InteractiveStateManager,
     debug_options: DebugOptions,
+    zoom_level: f32,
 }
-
 impl App {
     fn new() -> Self {
         Self {
@@ -144,13 +147,14 @@ impl App {
             event_dispatcher: EventDispatcher::new(),
             interactive_state_manager: InteractiveStateManager::new(),
             debug_options: DebugOptions::none(),
+            zoom_level: 1.0,
         }
     }
 
     fn render(&mut self) {
         self.interactive_state_manager.begin_frame();
 
-        let mut ui = self.build_ui();
+        let mut ui = self.build_ui().with_zoom(1.75);
 
         let size = match &self.window {
             Some(window) => window.inner_size(),
@@ -271,7 +275,6 @@ impl App {
                 .with_children(vec![
                     // Label
                     Node::new()
-                        // .with_height(Size::px(50.0))
                         .with_width(Size::Fill)
                         .with_margin(Spacing::bottom(Size::lpx(20.0)))
                         .with_content(Content::Text(TextContent {
@@ -306,6 +309,7 @@ impl App {
         Node::new()
             .with_width(Size::Fill)
             .with_height(Size::Fill)
+            .with_zoom(self.zoom_level)
             .with_style(Style {
                 fill_color: Some(mocha::BASE),
                 ..Default::default()
@@ -347,19 +351,19 @@ impl App {
                 Node::new()
                     .with_width(Size::Fill)
                     .with_layout_direction(Layout::Horizontal)
-                    .with_gap(Size::lpx(40.0))
+                    .with_gap(Size::ppx(40.0))
                     .with_children(vec![
                         // Spacer
                         Node::new().with_width(Size::Fill),
                         // Content container
                         Node::new()
                             .with_layout_direction(Layout::Vertical)
-                            .with_gap(Size::lpx(36.0))
+                            .with_gap(Size::ppx(36.0))
                             .with_children(vec![
                                 // Horizontal Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(Size::lpx(36.0))
+                                    .with_gap(Size::ppx(36.0))
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
@@ -377,7 +381,7 @@ impl App {
                                 // Vertical Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(Size::lpx(36.0))
+                                    .with_gap(Size::ppx(36.0))
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
@@ -395,7 +399,7 @@ impl App {
                                 // Stack Layout Examples
                                 Node::new()
                                     .with_layout_direction(Layout::Horizontal)
-                                    .with_gap(Size::lpx(36.0))
+                                    .with_gap(Size::ppx(36.0))
                                     .with_children(vec![
                                         create_container(
                                             HorizontalAlign::Left,
@@ -446,6 +450,41 @@ impl ApplicationHandler for App {
                 .with_inner_size(winit::dpi::LogicalSize::new(1200, 1200));
 
             let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+
+            // Calculate zoom based on PPI
+            // We want MacBook Pro 16" (254 PPI) to have 1.75 zoom
+            // Reference PPI = 254 / 1.75 = ~145.14
+            if let Ok(displays) = display_info::DisplayInfo::all() {
+                if let Some(monitor) = window.current_monitor() {
+                    let monitor_pos = monitor.position();
+
+                    // Find the display that matches the winit monitor position
+                    if let Some(display) = displays
+                        .iter()
+                        .find(|d| d.x == monitor_pos.x && d.y == monitor_pos.y)
+                    {
+                        // Use winit for physical pixels (reliable) and display-info for physical dimensions
+                        let width_px = monitor.size().width as f32;
+                        let width_mm = display.width_mm as f32;
+
+                        if width_mm > 0.0 {
+                            let width_inches = width_mm / MM_PER_INCH;
+                            let ppi = width_px / width_inches;
+
+                            self.zoom_level = ppi / REFERENCE_PPI;
+
+                            println!(
+                                "Detected Display: {}x{}px ({}mm wide). PPI: {:.2}. Setting zoom to {:.2}",
+                                width_px,
+                                monitor.size().height,
+                                width_mm,
+                                ppi,
+                                self.zoom_level
+                            );
+                        }
+                    }
+                }
+            }
 
             let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
                 backends: wgpu::Backends::PRIMARY,
