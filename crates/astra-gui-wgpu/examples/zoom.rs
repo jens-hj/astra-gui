@@ -8,255 +8,45 @@
 //! - S: Toggle render mode (SDF/Mesh)
 //! - ESC: Exit
 
+mod shared;
+
 use astra_gui::{
-    catppuccin::mocha, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Size,
-    Spacing, Stroke, TextContent, VerticalAlign, ZIndex,
+    catppuccin::mocha, CornerShape, DebugOptions, HorizontalAlign, Layout, Node, Size, Spacing,
+    Stroke, TextContent, VerticalAlign, ZIndex,
 };
-use astra_gui_wgpu::{RenderMode, Renderer};
-use std::sync::Arc;
-use winit::{
-    application::ApplicationHandler,
-    event::*,
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
-    window::{Window, WindowId},
-};
+use astra_gui_text::Engine as TextEngine;
+use shared::debug_controls::DEBUG_HELP_TEXT;
+use shared::{ExampleApp, InteractiveState};
+use winit::event::{ElementState, MouseScrollDelta, WindowEvent};
 
-const DEBUG_HELP_TEXT: &str =
-    "M:Margins | P:Padding | B:Borders | C:Content | G:Gaps | D:All | S:RenderMode";
-
-fn handle_debug_keybinds(
-    event: &WindowEvent,
-    debug_options: &mut DebugOptions,
-    renderer: Option<&mut Renderer>,
-) -> bool {
-    let WindowEvent::KeyboardInput {
-        event:
-            KeyEvent {
-                physical_key: winit::keyboard::PhysicalKey::Code(key_code),
-                state: ElementState::Pressed,
-                ..
-            },
-        ..
-    } = event
-    else {
-        return false;
-    };
-
-    match *key_code {
-        winit::keyboard::KeyCode::KeyM => {
-            debug_options.show_margins = !debug_options.show_margins;
-            println!("Margins: {}", debug_options.show_margins);
-            true
-        }
-        winit::keyboard::KeyCode::KeyP => {
-            debug_options.show_padding = !debug_options.show_padding;
-            println!("Padding: {}", debug_options.show_padding);
-            true
-        }
-        winit::keyboard::KeyCode::KeyB => {
-            debug_options.show_borders = !debug_options.show_borders;
-            println!("Borders: {}", debug_options.show_borders);
-            true
-        }
-        winit::keyboard::KeyCode::KeyC => {
-            debug_options.show_content_area = !debug_options.show_content_area;
-            println!("Content area: {}", debug_options.show_content_area);
-            true
-        }
-        winit::keyboard::KeyCode::KeyG => {
-            debug_options.show_gaps = !debug_options.show_gaps;
-            println!("Gaps: {}", debug_options.show_gaps);
-            true
-        }
-        winit::keyboard::KeyCode::KeyD => {
-            if debug_options.is_enabled() {
-                *debug_options = DebugOptions::none();
-                println!("Debug: OFF");
-            } else {
-                *debug_options = DebugOptions::all();
-                println!("Debug: ALL ON");
-            }
-            true
-        }
-        winit::keyboard::KeyCode::KeyS => {
-            if let Some(renderer) = renderer {
-                let new_mode = match renderer.render_mode() {
-                    RenderMode::Sdf | RenderMode::Auto => RenderMode::Mesh,
-                    RenderMode::Mesh => RenderMode::Sdf,
-                };
-                renderer.set_render_mode(new_mode);
-                println!("Render mode: {:?}", new_mode);
-                true
-            } else {
-                false
-            }
-        }
-        _ => false,
-    }
-}
-
-struct App {
-    gpu_state: Option<GpuState>,
+struct Zoom {
+    interactive: InteractiveState,
+    text_engine: TextEngine,
+    debug_options: DebugOptions,
     zoom_level: f32, // 1.0 = 100%, 2.0 = 200%, etc.
     pan_offset: (f32, f32),
-    debug_options: DebugOptions,
 }
 
-struct GpuState {
-    surface: wgpu::Surface<'static>,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    window: Arc<Window>,
-    renderer: Renderer,
-}
-
-impl App {
+impl ExampleApp for Zoom {
     fn new() -> Self {
         Self {
-            gpu_state: None,
+            interactive: InteractiveState::new(),
+            text_engine: TextEngine::new_default(),
+            debug_options: DebugOptions::none(),
             zoom_level: 1.0,
             pan_offset: (0.0, 0.0),
-            debug_options: DebugOptions::none(),
         }
     }
 
-    fn handle_input(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key: winit::keyboard::PhysicalKey::Code(key_code),
-                        state: ElementState::Pressed,
-                        ..
-                    },
-                ..
-            } => match *key_code {
-                winit::keyboard::KeyCode::KeyR => {
-                    self.zoom_level = 1.0;
-                    self.pan_offset = (0.0, 0.0);
-                    println!("Reset zoom and pan");
-                    true
-                }
-                winit::keyboard::KeyCode::ArrowUp => {
-                    self.pan_offset.1 -= 20.0;
-                    println!("Pan: ({:.1}, {:.1})", self.pan_offset.0, self.pan_offset.1);
-                    true
-                }
-                winit::keyboard::KeyCode::ArrowDown => {
-                    self.pan_offset.1 += 20.0;
-                    println!("Pan: ({:.1}, {:.1})", self.pan_offset.0, self.pan_offset.1);
-                    true
-                }
-                winit::keyboard::KeyCode::ArrowLeft => {
-                    self.pan_offset.0 -= 20.0;
-                    println!("Pan: ({:.1}, {:.1})", self.pan_offset.0, self.pan_offset.1);
-                    true
-                }
-                winit::keyboard::KeyCode::ArrowRight => {
-                    self.pan_offset.0 += 20.0;
-                    println!("Pan: ({:.1}, {:.1})", self.pan_offset.0, self.pan_offset.1);
-                    true
-                }
-                _ => false,
-            },
-            WindowEvent::MouseWheel { delta, .. } => {
-                let scroll_delta = match delta {
-                    MouseScrollDelta::LineDelta(_, y) => *y,
-                    MouseScrollDelta::PixelDelta(pos) => (pos.y / 20.0) as f32,
-                };
-
-                // Browser-style zoom with mouse wheel
-                self.zoom_level *= 1.0 + scroll_delta * 0.1;
-                self.zoom_level = self.zoom_level.clamp(0.25, 10.0);
-                println!("Zoom: {:.0}%", self.zoom_level * 100.0);
-                true
-            }
-            _ => false,
-        }
+    fn window_title() -> &'static str {
+        "Zoom Example - Mouse Wheel: Zoom | Arrows: Pan | R: Reset"
     }
 
-    fn render(&mut self) {
-        // Get window size first
-        let (actual_width, actual_height) = if let Some(gpu_state) = &self.gpu_state {
-            (
-                gpu_state.config.width as f32,
-                gpu_state.config.height as f32,
-            )
-        } else {
-            return;
-        };
-
-        // Build UI with zoom_level set on the root node
-        // Browser-style zoom: zoom_level converts logical pixels to physical pixels
-        // At 1.0x zoom, 10 logical pixels = 10 physical pixels
-        // At 2.0x zoom, 10 logical pixels = 20 physical pixels (everything twice as big)
-        let ui = self
-            .build_ui(actual_width, actual_height)
-            .with_zoom(self.zoom_level);
-
-        let Some(gpu_state) = &mut self.gpu_state else {
-            return;
-        };
-
-        let output_data = FullOutput::from_node_with_debug_measurer_and_scale_factor(
-            ui,
-            (actual_width, actual_height),
-            Some(self.debug_options),
-            Some(gpu_state.renderer.text_engine_mut()),
-            1.0, // Default scale_factor (will be overridden by root's zoom_level)
-        );
-
-        let output = gpu_state.surface.get_current_texture().unwrap();
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder =
-            gpu_state
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: mocha::BASE.r as f64,
-                        g: mocha::BASE.g as f64,
-                        b: mocha::BASE.b as f64,
-                        a: 1.0,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-                depth_slice: None,
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
-
-        // Render with zoom scale applied
-        gpu_state.renderer.render(
-            &gpu_state.device,
-            &gpu_state.queue,
-            &mut encoder,
-            &view,
-            actual_width,
-            actual_height,
-            &output_data,
-        );
-
-        gpu_state.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
+    fn window_size() -> (u32, u32) {
+        (800, 700)
     }
 
-    fn build_ui(&self, _window_width: f32, _window_height: f32) -> Node {
+    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
         // Debug info panel (not affected by content zoom, positioned absolutely)
         let debug_panel = Node::new()
             .with_style(astra_gui::Style {
@@ -346,142 +136,293 @@ impl App {
             .with_padding(Spacing::top(Size::lpx(1.0)) + Spacing::bottom(Size::lpx(1.0)))
             .with_children(vec![content_grid, debug_panel])
     }
+
+    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
+        Some(&mut self.text_engine)
+    }
+
+    fn interactive_state(&mut self) -> Option<&mut InteractiveState> {
+        Some(&mut self.interactive)
+    }
+
+    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
+        Some(&mut self.debug_options)
+    }
+
+    fn zoom_level(&self) -> f32 {
+        self.zoom_level
+    }
+
+    fn handle_escape(&mut self) -> bool {
+        // No focus management in this example - always allow exit
+        false
+    }
 }
 
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.gpu_state.is_some() {
-            return;
-        }
-
-        let window_attributes = Window::default_attributes()
-            .with_title("Zoom Example - Mouse Wheel: Zoom | Arrows: Pan | R: Reset")
-            .with_inner_size(winit::dpi::PhysicalSize::new(800, 700));
-        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        let surface = instance.create_surface(window.clone()).unwrap();
-
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        }))
-        .unwrap();
-
-        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: None,
-            required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::default(),
-            memory_hints: Default::default(),
-            experimental_features: wgpu::ExperimentalFeatures::disabled(),
-            trace: wgpu::Trace::Off,
-        }))
-        .unwrap();
-
-        let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .find(|f| f.is_srgb())
-            .copied()
-            .unwrap_or(surface_caps.formats[0]);
-
-        let size = window.inner_size();
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
-        surface.configure(&device, &config);
-
-        let renderer = Renderer::new(&device, config.format);
-
-        self.gpu_state = Some(GpuState {
-            surface,
-            device,
-            queue,
-            config,
-            window,
-            renderer,
-        });
-
-        println!("\nZoom Example");
-        println!("Controls:");
-        println!("  Mouse Wheel - Browser-style zoom");
-        println!("  Arrow Keys  - Pan camera");
-        println!("  R           - Reset zoom and pan");
-        println!("  {}", DEBUG_HELP_TEXT);
-        println!("  ESC         - Exit\n");
-    }
-
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        _window_id: WindowId,
-        event: WindowEvent,
-    ) {
+impl Zoom {
+    /// Custom input handling for zoom and pan controls
+    /// This needs to be called from the window_event handler
+    pub fn handle_custom_input(&mut self, event: &WindowEvent) -> bool {
         match event {
-            WindowEvent::CloseRequested
-            | WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        state: ElementState::Pressed,
-                        physical_key:
-                            winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::Escape),
-                        ..
-                    },
+            WindowEvent::KeyboardInput {
+                event: ref key_event,
                 ..
-            } => {
-                event_loop.exit();
-            }
-            WindowEvent::Resized(physical_size) => {
-                if let Some(gpu_state) = &mut self.gpu_state {
-                    gpu_state.config.width = physical_size.width;
-                    gpu_state.config.height = physical_size.height;
-                    gpu_state
-                        .surface
-                        .configure(&gpu_state.device, &gpu_state.config);
+            } if key_event.state == ElementState::Pressed => match key_event.physical_key {
+                winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyR) => {
+                    self.zoom_level = 1.0;
+                    self.pan_offset = (0.0, 0.0);
+                    println!("Reset zoom and pan");
+                    true
                 }
-            }
-            WindowEvent::RedrawRequested => {
-                self.render();
-            }
-            _ => {
-                // Handle debug keybinds first
-                let renderer = self.gpu_state.as_mut().map(|s| &mut s.renderer);
-                let handled = handle_debug_keybinds(&event, &mut self.debug_options, renderer);
+                winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::ArrowUp) => {
+                    self.pan_offset.1 -= 20.0;
+                    println!("Pan: ({:.1}, {:.1})", self.pan_offset.0, self.pan_offset.1);
+                    true
+                }
+                winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::ArrowDown) => {
+                    self.pan_offset.1 += 20.0;
+                    println!("Pan: ({:.1}, {:.1})", self.pan_offset.0, self.pan_offset.1);
+                    true
+                }
+                winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::ArrowLeft) => {
+                    self.pan_offset.0 -= 20.0;
+                    println!("Pan: ({:.1}, {:.1})", self.pan_offset.0, self.pan_offset.1);
+                    true
+                }
+                winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::ArrowRight) => {
+                    self.pan_offset.0 += 20.0;
+                    println!("Pan: ({:.1}, {:.1})", self.pan_offset.0, self.pan_offset.1);
+                    true
+                }
+                _ => false,
+            },
+            WindowEvent::MouseWheel { delta, .. } => {
+                let scroll_delta = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => *y,
+                    MouseScrollDelta::PixelDelta(pos) => (pos.y / 20.0) as f32,
+                };
 
-                // Then handle app input if not handled by debug
-                if !handled && self.handle_input(&event) {
-                    if let Some(gpu_state) = &self.gpu_state {
-                        gpu_state.window.request_redraw();
-                    }
-                } else if handled {
-                    // Redraw if debug state changed
-                    if let Some(gpu_state) = &self.gpu_state {
-                        gpu_state.window.request_redraw();
-                    }
-                }
+                // Browser-style zoom with mouse wheel
+                self.zoom_level *= 1.0 + scroll_delta * 0.1;
+                self.zoom_level = self.zoom_level.clamp(0.25, 10.0);
+                println!("Zoom: {:.0}%", self.zoom_level * 100.0);
+                true
             }
+            _ => false,
         }
-    }
-
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        // Don't request redraw here - only redraw when state actually changes
-        // This prevents infinite redraw loop that can overwhelm the GPU
     }
 }
 
 fn main() {
+    // Custom main to handle special input
     env_logger::init();
+
+    use astra_gui::{FullOutput, Rect};
+    use shared::gpu_state::GpuState;
+    use std::sync::Arc;
+    use winit::{
+        application::ApplicationHandler,
+        event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+        window::{Window, WindowId},
+    };
+
+    struct ZoomRunner {
+        window: Option<Arc<Window>>,
+        gpu_state: Option<GpuState>,
+        app: Zoom,
+    }
+
+    impl ApplicationHandler for ZoomRunner {
+        fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+            if self.window.is_some() {
+                return;
+            }
+
+            let (width, height) = Zoom::window_size();
+            let window_attributes = Window::default_attributes()
+                .with_title(Zoom::window_title())
+                .with_inner_size(winit::dpi::LogicalSize::new(width, height));
+
+            let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+            self.app.on_window_created(&window);
+
+            self.window = Some(window.clone());
+            self.gpu_state = Some(pollster::block_on(GpuState::new(window)));
+        }
+
+        fn window_event(
+            &mut self,
+            event_loop: &ActiveEventLoop,
+            _window_id: WindowId,
+            event: WindowEvent,
+        ) {
+            // Handle interactive input
+            if let Some(interactive) = self.app.interactive_state() {
+                interactive.input_state.handle_event(&event);
+            }
+
+            // Handle custom zoom/pan input BEFORE other processing
+            let custom_handled = self.app.handle_custom_input(&event);
+
+            match event {
+                WindowEvent::CloseRequested => {
+                    event_loop.exit();
+                }
+
+                WindowEvent::KeyboardInput {
+                    event: ref key_event,
+                    ..
+                } if matches!(
+                    key_event.physical_key,
+                    winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::Escape)
+                ) && key_event.state == ElementState::Pressed =>
+                {
+                    if !self.app.handle_escape() {
+                        event_loop.exit();
+                    }
+                }
+
+                WindowEvent::Resized(physical_size) => {
+                    if let Some(gpu_state) = &mut self.gpu_state {
+                        gpu_state.resize(physical_size);
+                    }
+                }
+
+                WindowEvent::RedrawRequested => {
+                    self.render();
+                }
+
+                _ => {
+                    // Debug keybinds
+                    if !custom_handled {
+                        let renderer = self.gpu_state.as_mut().map(|s| &mut s.renderer);
+                        let debug_options = self.app.debug_options_mut();
+                        if let Some(debug_opts) = debug_options {
+                            let _handled = shared::debug_controls::handle_debug_keybinds(
+                                &event, debug_opts, renderer,
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Always request redraw
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+        }
+    }
+
+    impl ZoomRunner {
+        fn render(&mut self) {
+            // Update app state
+            if let Some(interactive) = self.app.interactive_state() {
+                let _delta_time = interactive.delta_time();
+                interactive.begin_frame();
+            }
+
+            // Get window size
+            let size = match &self.window {
+                Some(window) => window.inner_size(),
+                None => return,
+            };
+
+            // Build UI
+            let mut ui = self.app.build_ui(size.width as f32, size.height as f32);
+
+            // Apply zoom
+            let zoom = self.app.zoom_level();
+            if zoom != 1.0 {
+                ui = ui.with_zoom(zoom);
+            }
+
+            // Apply pan offset using translation
+            if self.app.pan_offset != (0.0, 0.0) {
+                ui = ui.with_pan_offset(astra_gui::Translation::new(
+                    Size::Logical(self.app.pan_offset.0),
+                    Size::Logical(self.app.pan_offset.1),
+                ));
+            }
+
+            // Compute layout
+            let window_rect =
+                Rect::from_min_size([0.0, 0.0], [size.width as f32, size.height as f32]);
+
+            if let Some(text_measurer) = self.app.text_measurer() {
+                ui.compute_layout_with_measurer(window_rect, text_measurer);
+            } else {
+                ui.compute_layout(window_rect);
+            }
+
+            // Handle interactive events if needed
+            if let Some(interactive) = self.app.interactive_state() {
+                let (events, interaction_states) = interactive
+                    .event_dispatcher
+                    .dispatch(&interactive.input_state, &mut ui);
+
+                interactive
+                    .state_manager
+                    .apply_styles(&mut ui, &interaction_states);
+
+                // Let app handle events
+                self.app.handle_events(&events);
+            }
+
+            // Generate output
+            let debug_options = self.app.debug_options_mut().copied();
+            let output = if let Some(text_measurer) = self.app.text_measurer() {
+                FullOutput::from_node_with_debug_and_measurer(
+                    ui,
+                    (size.width as f32, size.height as f32),
+                    debug_options,
+                    Some(text_measurer),
+                )
+            } else {
+                FullOutput::from_node_with_debug(
+                    ui,
+                    (size.width as f32, size.height as f32),
+                    debug_options,
+                )
+            };
+
+            // Render
+            let Some(gpu_state) = &mut self.gpu_state else {
+                return;
+            };
+
+            match gpu_state.render(&output) {
+                Ok(_) => {}
+                Err(wgpu::SurfaceError::Lost) => {
+                    if let Some(window) = &self.window {
+                        gpu_state.resize(window.inner_size())
+                    }
+                }
+                Err(wgpu::SurfaceError::OutOfMemory) => {
+                    eprintln!("Out of memory");
+                    std::process::exit(1);
+                }
+                Err(e) => eprintln!("Render error: {:?}", e),
+            }
+        }
+    }
+
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App::new();
-    event_loop.run_app(&mut app).unwrap();
+
+    let app = Zoom::new();
+    let mut runner = ZoomRunner {
+        window: None,
+        gpu_state: None,
+        app,
+    };
+
+    println!("\nZoom Example");
+    println!("Controls:");
+    println!("  Mouse Wheel - Browser-style zoom");
+    println!("  Arrow Keys  - Pan camera");
+    println!("  R           - Reset zoom and pan");
+    println!("  {}", DEBUG_HELP_TEXT);
+    println!("  ESC         - Exit\n");
+
+    event_loop.run_app(&mut runner).unwrap();
 }
