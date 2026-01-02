@@ -639,7 +639,11 @@ pub mod cosmic {
 
             let (shaped_text, _placement) = self.shape_text(shape_request);
 
-            let result = IntrinsicSize::new(shaped_text.total_width, shaped_text.total_height);
+            // Add a small epsilon to width to prevent floating point wrapping issues
+            // when the container is sized exactly to the text width
+            let width = shaped_text.total_width + 0.001;
+
+            let result = IntrinsicSize::new(width, shaped_text.total_height);
 
             result
         }
