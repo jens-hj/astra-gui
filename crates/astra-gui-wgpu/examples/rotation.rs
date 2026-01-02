@@ -58,6 +58,7 @@ impl ExampleApp for RotationExample {
 
     fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
         Node::new()
+            .with_zoom(1.5)
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_layout_direction(Layout::Vertical)

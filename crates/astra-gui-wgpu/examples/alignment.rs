@@ -18,7 +18,7 @@ use shared::{run_example, ExampleApp};
 use winit::window::Window;
 
 const MM_PER_INCH: f32 = 25.4;
-const REFERENCE_PPI: f32 = 100.0;
+const REFERENCE_PPI: f32 = 180.0;
 
 struct Alignment {
     text_engine: TextEngine,

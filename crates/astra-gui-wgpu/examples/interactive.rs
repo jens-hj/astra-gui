@@ -63,11 +63,12 @@ impl ExampleApp for Interactive {
     }
 
     fn window_size() -> (u32, u32) {
-        (800, 600)
+        (1100, 800)
     }
 
     fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
         Node::new()
+            .with_zoom(2.0)
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_layout_direction(Layout::Vertical)

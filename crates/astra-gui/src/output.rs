@@ -711,10 +711,8 @@ fn collect_debug_shapes_clipped(
             content_rect,
             clip_rect,
             Shape::Rect(
-                StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
-                    Size::lpx(1.0 * scale_factor),
-                    Color::rgba(1.0, 1.0, 0.0, 0.5),
-                )),
+                StyledRect::new(Default::default(), Color::transparent())
+                    .with_stroke(Stroke::new(Size::lpx(1.0), Color::rgb(1.0, 1.0, 0.0))),
             ),
             *transform,
             1.0,
@@ -821,10 +819,8 @@ fn collect_debug_shapes_clipped(
             node_rect,
             clip_rect,
             Shape::Rect(
-                StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
-                    Size::lpx(1.0 * scale_factor),
-                    Color::rgba(0.0, 1.0, 0.0, 0.5),
-                )),
+                StyledRect::new(Default::default(), Color::transparent())
+                    .with_stroke(Stroke::new(Size::ppx(1.0), Color::rgb(0.0, 1.0, 0.0))),
             ),
             *transform,
             1.0,
@@ -841,10 +837,8 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             clip_rect, // Don't clip the clip rect visualization itself
             Shape::Rect(
-                StyledRect::new(Default::default(), Color::transparent()).with_stroke(Stroke::new(
-                    Size::lpx(2.0 * scale_factor),
-                    Color::rgba(1.0, 0.0, 0.0, 0.8),
-                )),
+                StyledRect::new(Default::default(), Color::transparent())
+                    .with_stroke(Stroke::new(Size::ppx(2.0), Color::rgb(1.0, 0.0, 0.0))),
             ),
             Transform2D::IDENTITY, // Clip rects are already in world space
             1.0,
@@ -880,7 +874,7 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(StyledRect::new(
                 Default::default(),
-                Color::rgba(1.0, 0.5, 0.0, 0.9), // Orange
+                Color::rgb(1.0, 0.5, 0.0), // Orange
             )),
             *transform,
             1.0,
@@ -904,7 +898,7 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(StyledRect::new(
                 Default::default(),
-                Color::rgba(1.0, 0.5, 0.0, 0.9), // Orange
+                Color::rgb(1.0, 0.5, 0.0), // Orange
             )),
             *transform,
             1.0,
@@ -931,11 +925,8 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(
                 StyledRect::new(circle_rect, Color::transparent())
-                    .with_corner_shape(CornerShape::Round(Size::ppx(circle_radius * scale_factor)))
-                    .with_stroke(Stroke::new(
-                        Size::lpx(2.0 * scale_factor),
-                        Color::rgba(1.0, 0.5, 0.0, 0.9),
-                    )), // Orange stroke
+                    .with_corner_shape(CornerShape::Round(Size::ppx(circle_radius)))
+                    .with_stroke(Stroke::new(Size::ppx(2.0), Color::rgb(1.0, 0.5, 0.0))), // Orange stroke
             ),
             *transform,
             1.0,

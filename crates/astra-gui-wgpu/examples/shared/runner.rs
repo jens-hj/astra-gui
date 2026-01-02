@@ -59,7 +59,7 @@ impl<T: ExampleApp> AppRunner<T> {
         }
 
         // Handle interactive events if needed
-        if let Some(interactive) = self.app.interactive_state() {
+        let events = if let Some(interactive) = self.app.interactive_state() {
             let (events, interaction_states) = interactive
                 .event_dispatcher
                 .dispatch(&interactive.input_state, &mut ui);
@@ -68,7 +68,13 @@ impl<T: ExampleApp> AppRunner<T> {
                 .state_manager
                 .apply_styles(&mut ui, &interaction_states);
 
-            // Let app handle events
+            events
+        } else {
+            Vec::new()
+        };
+
+        // Let app handle events (after releasing the borrow on interactive_state)
+        if !events.is_empty() {
             self.app.handle_events(&events);
         }
 

@@ -27,7 +27,7 @@ use winit::{
 };
 
 const DEBUG_HELP_TEXT: &str =
-    "M:Margins | P:Padding | B:Borders | C:Content | G:Gaps | D:All | S:RenderMode";
+    "M:Margins | P:Padding | B:Borders | C:Content | G:Gaps | T:Text | D:All | S:RenderMode";
 
 fn handle_debug_keybinds(
     event: &WindowEvent,

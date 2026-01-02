@@ -44,7 +44,7 @@ fn child() -> Node {
     ))
 }
 
-fn create_demo_ui(width: f32, height: f32, debug_options: &DebugOptions) -> Node {
+fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> Node {
     // Root container - full window with padding
     let root = Node::new()
         .with_padding(Spacing::all(Size::lpx(20.0)))

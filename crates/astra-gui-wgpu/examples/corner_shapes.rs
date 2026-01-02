@@ -37,7 +37,7 @@ impl ExampleApp for CornerShapesExample {
     }
 
     fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
-        create_demo_ui()
+        create_demo_ui().with_zoom(2.0)
     }
 
     fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {

@@ -51,7 +51,7 @@ impl ExampleApp for OverflowExample {
     }
 
     fn build_ui(&mut self, width: f32, height: f32) -> Node {
-        create_demo_ui(width, height, &self.debug_options)
+        create_demo_ui(width, height, &self.debug_options).with_zoom(2.0)
     }
 
     fn text_measurer(&mut self) -> Option<&mut TextEngine> {

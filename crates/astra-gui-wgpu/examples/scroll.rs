@@ -52,7 +52,7 @@ impl ExampleApp for ScrollExample {
     }
 
     fn window_size() -> (u32, u32) {
-        (800, 700)
+        (1200, 1000)
     }
 
     fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
@@ -306,6 +306,7 @@ impl ExampleApp for ScrollExample {
 
         // Root with centered layout
         Node::new()
+            .with_zoom(1.5)
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_padding(Spacing::all(Size::lpx(40.0)))

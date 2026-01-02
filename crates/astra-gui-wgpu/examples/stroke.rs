@@ -24,11 +24,11 @@ impl ExampleApp for StrokeExample {
     }
 
     fn window_size() -> (u32, u32) {
-        (1600, 900)
+        (1600, 1000)
     }
 
     fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
-        create_stroke_test_ui()
+        create_stroke_test_ui().with_zoom(2.0)
     }
 
     fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
@@ -96,8 +96,8 @@ fn create_stroke_test_ui() -> Node {
 
         rows.push(
             Node::new()
-                .with_height(Size::lpx(120.0))
-                .with_gap(Size::lpx(60.0))
+                .with_height(Size::lpx(100.0))
+                .with_gap(Size::ppx(60.0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_children(cells),
         );
@@ -120,8 +120,8 @@ fn create_stroke_test_ui() -> Node {
         ));
 
     let content = Node::new()
-        .with_padding(Spacing::all(Size::lpx(60.0)))
-        .with_gap(Size::lpx(60.0))
+        .with_padding(Spacing::all(Size::ppx(60.0)))
+        .with_gap(Size::ppx(60.0))
         .with_width(Size::Fill)
         .with_height(Size::Fill)
         .with_layout_direction(Layout::Vertical)

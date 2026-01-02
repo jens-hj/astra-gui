@@ -54,97 +54,101 @@ impl ExampleApp for MultilineTextExample {
 }
 
 fn build_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> Node {
-    Node::new().with_width(Size::Fill).with_height(Size::Fill).with_children(vec![
-        Node::new()
-            .with_width(Size::Fill)
-            .with_height(Size::Fill)
-            .with_layout_direction(Layout::Vertical)
-            .with_padding(Spacing::all(Size::lpx(30.0)))
-            .with_gap(Size::lpx(20.0))
-            .with_style(Style {
-                fill_color: Some(mocha::BASE),
-                ..Default::default()
-            })
-            .with_children(vec![
-                // Title
-                Node::new()
-                    .with_width(Size::Fill)
-                    .with_height(Size::lpx(40.0))
-                    .with_content(Content::Text(
-                        TextContent::new("Multi-Line Text & Wrapping Examples")
-                            .with_font_size(Size::lpx(36.0))
-                            .with_color(mocha::TEXT)
-                            .with_h_align(HorizontalAlign::Center),
-                    )),
-                // Examples grid
-                Node::new()
-                    .with_width(Size::Fill)
-                    .with_height(Size::Fill)
-                    .with_layout_direction(Layout::Horizontal)
-                    .with_gap(Size::lpx(20.0))
-                    .with_children(vec![
-                        // Left column
-                        column(vec![
-                            example_box(
-                                "Explicit Newlines",
-                                "Line 1\nLine 2\nLine 3\nLine 4",
-                                Wrap::None,
-                                Size::FitContent,
-                                mocha::BLUE,
-                                1.2,
-                            ),
-                            example_box(
-                                "Word Wrap (default)",
-                                "This is a longer text that will automatically wrap at word boundaries when the container width is constrained. It's the default behavior.",
-                                Wrap::Word,
-                                Size::lpx(250.0),
-                                mocha::GREEN,
-                                1.2,
-                            ),
-                            example_box(
-                                "Line Height 3.0x",
-                                "This text has\nincreased line\nheight spacing\nfor better readability",
-                                Wrap::None,
-                                Size::FitContent,
-                                mocha::YELLOW,
-                                3.0,
-                            ),
+    Node::new()
+        .with_width(Size::Fill)
+        .with_height(Size::Fill)
+        .with_zoom(2.0)
+        .with_children(vec![
+            Node::new()
+                .with_width(Size::Fill)
+                .with_height(Size::Fill)
+                .with_layout_direction(Layout::Vertical)
+                .with_padding(Spacing::all(Size::lpx(30.0)))
+                .with_gap(Size::lpx(20.0))
+                .with_style(Style {
+                    fill_color: Some(mocha::BASE),
+                    ..Default::default()
+                })
+                .with_children(vec![
+                    // Title
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::lpx(40.0))
+                        .with_content(Content::Text(
+                            TextContent::new("Multi-Line Text & Wrapping Examples")
+                                .with_font_size(Size::lpx(36.0))
+                                .with_color(mocha::TEXT)
+                                .with_h_align(HorizontalAlign::Center),
+                        )),
+                    // Examples grid
+                    Node::new()
+                        .with_width(Size::Fill)
+                        .with_height(Size::Fill)
+                        .with_layout_direction(Layout::Horizontal)
+                        .with_gap(Size::lpx(20.0))
+                        .with_children(vec![
+                            // Left column
+                            column(vec![
+                                example_box(
+                                    "Explicit Newlines",
+                                    "Line 1\nLine 2\nLine 3\nLine 4",
+                                    Wrap::None,
+                                    Size::FitContent,
+                                    mocha::BLUE,
+                                    1.2,
+                                ),
+                                example_box(
+                                    "Word Wrap (default)",
+                                    "This is a longer text that will automatically wrap at word boundaries when the container width is constrained. It's the default behavior.",
+                                    Wrap::Word,
+                                    Size::lpx(250.0),
+                                    mocha::GREEN,
+                                    1.2,
+                                ),
+                                example_box(
+                                    "Line Height 3.0x",
+                                    "This text has\nincreased line\nheight spacing\nfor better readability",
+                                    Wrap::None,
+                                    Size::FitContent,
+                                    mocha::YELLOW,
+                                    3.0,
+                                ),
+                            ]),
+                            // Middle column
+                            column(vec![
+                                example_box(
+                                    "No Wrap (Overflow)",
+                                    "This is a very long text that will overflow the container instead of wrapping because wrapping is disabled.",
+                                    Wrap::None,
+                                    Size::lpx(250.0),
+                                    mocha::RED,
+                                    1.2,
+                                ),
+                                example_box(
+                                    "Glyph Wrap",
+                                    "Verylongwordthatwillwrapatanycharacterboundaryinsteadofwordswhenspaceisunavailable",
+                                    Wrap::Glyph,
+                                    Size::lpx(250.0),
+                                    mocha::MAUVE,
+                                    1.2,
+                                ),
+                                example_box(
+                                    "WordOrGlyph Wrap",
+                                    "Normal words wrap normally, but verylongwordswithoutspacesbreakanywheretofit",
+                                    Wrap::WordOrGlyph,
+                                    Size::lpx(250.0),
+                                    mocha::PEACH,
+                                    1.2,
+                                ),
+                            ]),
+                            // Right column
+                            column(vec![
+                                alignment_example("Left Aligned\nMultiple Lines\nH: Left", HorizontalAlign::Left),
+                                alignment_example("Center Aligned\nMultiple Lines\nH: Center", HorizontalAlign::Center),
+                                alignment_example("Right Aligned\nMultiple Lines\nH: Right", HorizontalAlign::Right),
+                            ]),
                         ]),
-                        // Middle column
-                        column(vec![
-                            example_box(
-                                "No Wrap (Overflow)",
-                                "This is a very long text that will overflow the container instead of wrapping because wrapping is disabled.",
-                                Wrap::None,
-                                Size::lpx(250.0),
-                                mocha::RED,
-                                1.2,
-                            ),
-                            example_box(
-                                "Glyph Wrap",
-                                "Verylongwordthatwillwrapatanycharacterboundaryinsteadofwordswhenspaceisunavailable",
-                                Wrap::Glyph,
-                                Size::lpx(250.0),
-                                mocha::MAUVE,
-                                1.2,
-                            ),
-                            example_box(
-                                "WordOrGlyph Wrap",
-                                "Normal words wrap normally, but verylongwordswithoutspacesbreakanywheretofit",
-                                Wrap::WordOrGlyph,
-                                Size::lpx(250.0),
-                                mocha::PEACH,
-                                1.2,
-                            ),
-                        ]),
-                        // Right column
-                        column(vec![
-                            alignment_example("Left Aligned\nMultiple Lines\nH: Left", HorizontalAlign::Left),
-                            alignment_example("Center Aligned\nMultiple Lines\nH: Center", HorizontalAlign::Center),
-                            alignment_example("Right Aligned\nMultiple Lines\nH: Right", HorizontalAlign::Right),
-                        ]),
-                    ]),
-            ]),
+                ]),
         // Help text at bottom
         Node::new()
             .with_width(Size::Fill)
