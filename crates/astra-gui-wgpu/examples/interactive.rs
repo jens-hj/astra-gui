@@ -68,7 +68,7 @@ impl ExampleApp for Interactive {
 
     fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
         Node::new()
-            .with_zoom(2.0)
+            // .with_zoom(2.0)
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_layout_direction(Layout::Vertical)

@@ -74,8 +74,40 @@ impl<T: ExampleApp> AppRunner<T> {
         };
 
         // Let app handle events (after releasing the borrow on interactive_state)
-        if !events.is_empty() {
-            self.app.handle_events(&events);
+        // If state changed, rebuild the UI with the new state
+        let state_changed = if !events.is_empty() {
+            self.app.handle_events(&events)
+        } else {
+            false
+        };
+
+        // Rebuild UI if state changed
+        if state_changed {
+            ui = self.app.build_ui(size.width as f32, size.height as f32);
+
+            // Reapply zoom
+            let zoom = self.app.zoom_level();
+            if zoom != 1.0 {
+                ui = ui.with_zoom(zoom);
+            }
+
+            // Recompute layout with new UI
+            if let Some(text_measurer) = self.app.text_measurer() {
+                ui.compute_layout_with_measurer(window_rect, text_measurer);
+            } else {
+                ui.compute_layout(window_rect);
+            }
+
+            // Reapply interactive styles (dispatch again on new UI)
+            if let Some(interactive) = self.app.interactive_state() {
+                let (_, interaction_states) = interactive
+                    .event_dispatcher
+                    .dispatch(&interactive.input_state, &mut ui);
+
+                interactive
+                    .state_manager
+                    .apply_styles(&mut ui, &interaction_states);
+            }
         }
 
         // Generate output
