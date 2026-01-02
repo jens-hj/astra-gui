@@ -195,16 +195,17 @@ impl App {
             .build_ui(actual_width, actual_height)
             .with_zoom(self.zoom_level);
 
-        let output_data = FullOutput::from_node_with_debug_and_scale_factor(
-            ui,
-            (actual_width, actual_height),
-            Some(self.debug_options),
-            1.0, // Default scale_factor (will be overridden by root's zoom_level)
-        );
-
         let Some(gpu_state) = &mut self.gpu_state else {
             return;
         };
+
+        let output_data = FullOutput::from_node_with_debug_measurer_and_scale_factor(
+            ui,
+            (actual_width, actual_height),
+            Some(self.debug_options),
+            Some(gpu_state.renderer.text_engine_mut()),
+            1.0, // Default scale_factor (will be overridden by root's zoom_level)
+        );
 
         let output = gpu_state.surface.get_current_texture().unwrap();
         let view = output
@@ -323,12 +324,15 @@ impl App {
                 Node::new()
                     .with_layout_direction(Layout::Horizontal)
                     .with_height(Size::Fill)
+                    .with_width(Size::Fill)
                     .with_gap(Size::ppx(20.0))
                     .with_children(row_children),
             );
         }
 
         let content_grid = Node::new()
+            .with_height(Size::Fill)
+            .with_width(Size::Fill)
             .with_layout_direction(Layout::Vertical)
             .with_gap(Size::ppx(20.0))
             .with_padding(Spacing::all(Size::ppx(50.0)))
@@ -336,6 +340,8 @@ impl App {
 
         // Root: Stack layout with debug panel on top
         Node::new()
+            .with_height(Size::Fill)
+            .with_width(Size::Fill)
             .with_layout_direction(Layout::Stack)
             .with_padding(Spacing::top(Size::lpx(1.0)) + Spacing::bottom(Size::lpx(1.0)))
             .with_children(vec![content_grid, debug_panel])
