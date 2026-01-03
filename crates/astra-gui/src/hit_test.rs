@@ -110,9 +110,15 @@ fn hit_test_recursive(
         node_rect.max[1] - node_rect.min[1],
     ];
 
+    // Calculate accumulated zoom for this node
+    let current_zoom = node.zoom().unwrap_or(parent_zoom);
+
     // Build local transform from node properties
+    // Use current_zoom when resolving translations so they match the layout
     let local_transform = Transform2D {
-        translation: node.translation().resolve(rect_size[0], rect_size[1], 1.0),
+        translation: node
+            .translation()
+            .resolve(rect_size[0], rect_size[1], current_zoom),
         rotation: node.rotation(),
         scale: node.scale(),
         origin: node.transform_origin(),
@@ -148,9 +154,6 @@ fn hit_test_recursive(
     if !node_rect.contains(local_test_point) {
         return; // Point is outside this node, skip it and children
     }
-
-    // Calculate accumulated zoom for this node
-    let current_zoom = node.zoom().unwrap_or(parent_zoom);
 
     // Skip disabled nodes - they should not receive interaction events
     // However, we still need to test their children (they might not be disabled)
