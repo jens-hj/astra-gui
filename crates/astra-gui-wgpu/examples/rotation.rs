@@ -8,6 +8,8 @@
 //! - Toggle switches work even when rotated
 //! - ESC: quit
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 mod shared;
 
 use astra_gui::{

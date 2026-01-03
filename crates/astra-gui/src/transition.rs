@@ -132,33 +132,15 @@ pub fn lerp_style(from: &Style, to: &Style, t: f32) -> Style {
             (Some(a), None) => Some(a),
             (None, None) => None,
         },
-        stroke_color: match (from.stroke_color, to.stroke_color) {
-            (Some(a), Some(b)) => Some(lerp_color(a, b, t)),
-            (None, Some(b)) => Some(b),
-            (Some(a), None) => Some(a),
-            (None, None) => None,
-        },
         stroke: match (from.stroke, to.stroke) {
             (Some(a), Some(b)) => Some(lerp_stroke(a, b, t)),
             (None, Some(b)) => Some(b),
             (Some(a), None) => Some(a),
             (None, None) => None,
         },
-        stroke_width: match (from.stroke_width, to.stroke_width) {
-            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
-            (None, Some(b)) => Some(b),
-            (Some(a), None) => Some(a),
-            (None, None) => None,
-        },
+
         corner_shape: match (from.corner_shape, to.corner_shape) {
             (Some(a), Some(b)) => Some(lerp_corner_shape(a, b, t)),
-            (None, Some(b)) => Some(b),
-            (Some(a), None) => Some(a),
-            (None, None) => None,
-        },
-        #[allow(deprecated)]
-        corner_radius: match (from.corner_radius, to.corner_radius) {
-            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
             (None, Some(b)) => Some(b),
             (Some(a), None) => Some(a),
             (None, None) => None,
@@ -202,20 +184,6 @@ pub fn lerp_style(from: &Style, to: &Style, t: f32) -> Style {
         transform_origin: match (from.transform_origin, to.transform_origin) {
             // For transform origin, we don't interpolate - just snap to the target
             (_, Some(b)) => Some(b),
-            (Some(a), None) => Some(a),
-            (None, None) => None,
-        },
-        #[allow(deprecated)]
-        offset_x: match (from.offset_x, to.offset_x) {
-            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
-            (None, Some(b)) => Some(b),
-            (Some(a), None) => Some(a),
-            (None, None) => None,
-        },
-        #[allow(deprecated)]
-        offset_y: match (from.offset_y, to.offset_y) {
-            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
-            (None, Some(b)) => Some(b),
             (Some(a), None) => Some(a),
             (None, None) => None,
         },

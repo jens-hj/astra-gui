@@ -98,7 +98,7 @@ pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &Toggle
         .with_transition(Transition::quick())
         .with_child(
             // Knob (sliding circle with smooth offset animation)
-            // Note: we use style offset instead of with_offset() so it can be animated
+            // Note: we use style translation instead of with_translation() so it can be animated
             // The knob needs an ID so InteractiveStateManager can track its transitions
             Node::new()
                 .with_id(NodeId::new(format!("{}_knob", id_str)))

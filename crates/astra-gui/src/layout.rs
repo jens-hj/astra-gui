@@ -230,10 +230,6 @@ impl Vector2 {
     }
 }
 
-/// Backward compatibility alias
-#[deprecated(since = "0.2.0", note = "Use Translation instead")]
-pub type Offset = Translation;
-
 /// Transform origin for rotation (CSS-like percentage + pixel offset)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TransformOrigin {
@@ -492,7 +488,7 @@ impl Spacing {
     ///
     /// ```
     /// # use astra_gui::{Spacing, Size};
-    /// let spacing = Spacing::symmetric(Size::px(10.0), Size::px(20.0));
+    /// let spacing = Spacing::symmetric(Size::lpx(10.0), Size::lpx(20.0));
     /// ```
     pub const fn symmetric(horizontal: Size, vertical: Size) -> Self {
         Self {
@@ -507,7 +503,7 @@ impl Spacing {
     ///
     /// ```
     /// # use astra_gui::{Spacing, Size};
-    /// let spacing = Spacing::trbl(Size::px(10.0), Size::px(20.0), Size::px(30.0), Size::px(40.0));
+    /// let spacing = Spacing::trbl(Size::lpx(10.0), Size::lpx(20.0), Size::lpx(30.0), Size::lpx(40.0));
     /// ```
     pub const fn trbl(top: Size, right: Size, bottom: Size, left: Size) -> Self {
         Self {

@@ -10,6 +10,8 @@
 //!
 //! Note: Debug controls are shared across examples via `shared::debug_controls`.
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 mod shared;
 
 use astra_gui::{
@@ -97,7 +99,6 @@ impl ExampleApp for TranslationExample {
                 // Main content area with horizontal layout
                 Node::new()
                     .with_width(Size::Fill)
-                    .with_height(Size::Fill)
                     .with_layout_direction(Layout::Horizontal)
                     .with_gap(Size::lpx(40.0))
                     .with_children(vec![
@@ -246,7 +247,6 @@ impl ExampleApp for TranslationExample {
                                 // Counter display
                                 Node::new()
                                     .with_width(Size::Fill)
-                                    .with_height(Size::Fill)
                                     .with_layout_direction(Layout::Vertical)
                                     .with_gap(Size::lpx(10.0))
                                     .with_children(vec![
@@ -282,7 +282,6 @@ impl ExampleApp for TranslationExample {
                         // Right side - Translated containers with interactive elements
                         Node::new()
                             .with_width(Size::Fill)
-                            .with_height(Size::Fill)
                             .with_children(vec![
                                 // Outer translated container (lavender border)
                                 Node::new()

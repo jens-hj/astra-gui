@@ -29,13 +29,6 @@ impl InteractiveState {
         self.input_state.begin_frame();
     }
 
-    /// DEPRECATED: Do not use - split into begin_frame_transitions() and end_frame()
-    #[deprecated(note = "Use begin_frame_transitions() at start and end_frame() at end")]
-    pub fn begin_frame(&mut self) {
-        self.begin_frame_transitions();
-        self.end_frame();
-    }
-
     /// Calculate delta time since last frame
     pub fn delta_time(&mut self) -> std::time::Duration {
         let now = std::time::Instant::now();

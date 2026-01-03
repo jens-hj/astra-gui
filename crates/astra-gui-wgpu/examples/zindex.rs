@@ -13,6 +13,8 @@
 //! - M/P/B/C/G/D: Debug visualizations
 //! - ESC: Exit
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 use astra_gui::{
     catppuccin::mocha, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Size,
     Spacing, Stroke, TextContent, Translation, VerticalAlign, ZIndex,

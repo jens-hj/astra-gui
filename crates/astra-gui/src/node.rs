@@ -225,13 +225,6 @@ impl Node {
         self
     }
 
-    /// Set the offset (deprecated, use with_translation)
-    #[deprecated(since = "0.2.0", note = "Use with_translation instead")]
-    pub fn with_offset(mut self, offset: Translation) -> Self {
-        self.translation = offset;
-        self
-    }
-
     /// Set the rotation in radians (clockwise positive, CSS convention)
     pub fn with_rotation(mut self, rotation: f32) -> Self {
         self.rotation = rotation;

@@ -8,6 +8,8 @@
 //! - S: Toggle render mode (SDF/Mesh)
 //! - ESC: Exit
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 mod shared;
 
 use astra_gui::{
@@ -318,7 +320,7 @@ fn main() {
             // Update app state
             if let Some(interactive) = self.app.interactive_state() {
                 let _delta_time = interactive.delta_time();
-                interactive.begin_frame();
+                interactive.begin_frame_transitions();
             }
 
             // Get window size

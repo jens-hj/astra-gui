@@ -1,5 +1,7 @@
 //! Demonstrates the node-based layout system with nested elements
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 mod shared;
 
 use astra_gui::{

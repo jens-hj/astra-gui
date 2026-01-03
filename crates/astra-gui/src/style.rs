@@ -13,22 +13,11 @@ pub struct Style {
     /// Background fill color (for shapes)
     pub fill_color: Option<Color>,
 
-    /// Stroke color (for shapes with borders)
-    pub stroke_color: Option<Color>,
-
     /// Stroke configuration (width and color)
     pub stroke: Option<Stroke>,
 
-    /// Stroke width (deprecated in favor of stroke, kept for backward compatibility)
-    pub stroke_width: Option<f32>,
-
     /// Corner shape (supports all variants: None, Round, Cut, InverseRound, Squircle)
     pub corner_shape: Option<CornerShape>,
-
-    /// Corner radius (deprecated, use corner_shape instead)
-    /// Maps to CornerShape::Round(radius)
-    #[deprecated(since = "0.2.0", note = "Use corner_shape instead")]
-    pub corner_radius: Option<f32>,
 
     /// Node opacity (0.0 = transparent, 1.0 = opaque)
     pub opacity: Option<f32>,
@@ -55,14 +44,6 @@ pub struct Style {
 
     /// Transform origin for rotation
     pub transform_origin: Option<TransformOrigin>,
-
-    /// Deprecated: use translation_x
-    #[deprecated(since = "0.2.0", note = "Use translation_x instead")]
-    pub offset_x: Option<f32>,
-
-    /// Deprecated: use translation_y
-    #[deprecated(since = "0.2.0", note = "Use translation_y instead")]
-    pub offset_y: Option<f32>,
 }
 
 impl Style {
@@ -102,12 +83,8 @@ impl Style {
     pub fn merge(&self, other: &Style) -> Style {
         Style {
             fill_color: other.fill_color.or(self.fill_color),
-            stroke_color: other.stroke_color.or(self.stroke_color),
             stroke: other.stroke.or(self.stroke),
-            stroke_width: other.stroke_width.or(self.stroke_width),
             corner_shape: other.corner_shape.or(self.corner_shape),
-            #[allow(deprecated)]
-            corner_radius: other.corner_radius.or(self.corner_radius),
             opacity: other.opacity.or(self.opacity),
             text_color: other.text_color.or(self.text_color),
             cursor_color: other.cursor_color.or(self.cursor_color),
@@ -115,10 +92,6 @@ impl Style {
             translation_y: other.translation_y.or(self.translation_y),
             rotation: other.rotation.or(self.rotation),
             transform_origin: other.transform_origin.or(self.transform_origin),
-            #[allow(deprecated)]
-            offset_x: other.offset_x.or(self.offset_x),
-            #[allow(deprecated)]
-            offset_y: other.offset_y.or(self.offset_y),
         }
     }
 
@@ -138,31 +111,14 @@ impl Style {
                     rect.fill = color;
                 }
 
-                // Apply stroke (new unified field takes precedence)
+                // Apply stroke via unified field only.
                 if let Some(stroke) = self.stroke {
                     rect.stroke = Some(stroke);
-                } else {
-                    // Backward compatibility: apply stroke_color and stroke_width separately
-                    if let Some(color) = self.stroke_color {
-                        if let Some(ref mut stroke) = rect.stroke {
-                            stroke.color = color;
-                        }
-                    }
-                    if let Some(width) = self.stroke_width {
-                        if let Some(ref mut stroke) = rect.stroke {
-                            stroke.width = crate::layout::Size::lpx(width);
-                        }
-                    }
                 }
 
-                // Apply corner shape (new field takes precedence over deprecated corner_radius)
+                // Apply corner shape
                 if let Some(corner_shape) = self.corner_shape {
                     rect.corner_shape = corner_shape;
-                } else {
-                    #[allow(deprecated)]
-                    if let Some(radius) = self.corner_radius {
-                        rect.corner_shape = CornerShape::Round(crate::layout::Size::lpx(radius));
-                    }
                 }
             }
         }
@@ -175,25 +131,13 @@ impl Style {
             }
         }
 
-        // Apply translation if present (check both new and deprecated fields)
-        #[allow(deprecated)]
-        let has_translation = self.translation_x.is_some()
-            || self.translation_y.is_some()
-            || self.offset_x.is_some()
-            || self.offset_y.is_some();
+        // Apply translation if present
+        let has_translation = self.translation_x.is_some() || self.translation_y.is_some();
 
         if has_translation {
             let current_translation = node.translation();
-            #[allow(deprecated)]
-            let new_x = self
-                .translation_x
-                .or(self.offset_x.map(crate::layout::Size::lpx))
-                .unwrap_or(current_translation.x);
-            #[allow(deprecated)]
-            let new_y = self
-                .translation_y
-                .or(self.offset_y.map(crate::layout::Size::lpx))
-                .unwrap_or(current_translation.y);
+            let new_x = self.translation_x.unwrap_or(current_translation.x);
+            let new_y = self.translation_y.unwrap_or(current_translation.y);
             node.set_translation(Translation::new(new_x, new_y));
         }
 

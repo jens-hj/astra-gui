@@ -3,6 +3,8 @@
 //! This example exercises the `astra-gui-wgpu` backend's `Shape::Text` rendering path,
 //! including alignment, padding/content rect behavior, and scissor-based clipping.
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 mod shared;
 
 use astra_gui::{
