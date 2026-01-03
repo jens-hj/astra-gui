@@ -1,5 +1,7 @@
 words = [
     "rects",
+    "smoothstep",
+    "tri",
     "wgpu",
     "winit",
 ]

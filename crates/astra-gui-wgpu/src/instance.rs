@@ -25,15 +25,122 @@ pub struct RectInstance {
     pub stroke_color: [u8; 4],
     /// Stroke width in pixels (0 = no stroke)
     pub stroke_width: f32,
-    /// Corner type: 0=None, 1=Round, 2=Cut, 3=InverseRound, 4=Squircle
-    pub corner_type: u32,
-    /// First corner parameter (radius or extent)
-    pub corner_param1: f32,
-    /// Second corner parameter (smoothness for squircle, unused for others)
-    pub corner_param2: f32,
+    /// Shape/corner type:
+    /// For rectangles: 0=None, 1=Round, 2=Cut, 3=InverseRound, 4=Squircle
+    /// For triangles: 100 = Triangle
+    pub shape_corner_type: u32,
+    /// Parameter 1: corner radius for rects, or triangle v0.x for triangles
+    pub param1: f32,
+    /// Parameter 2: corner smoothness for rects, or triangle v0.y for triangles
+    pub param2: f32,
+    /// Parameter 3: unused for rects, or triangle v1.x for triangles
+    pub param3: f32,
+    /// Parameter 4: unused for rects, or triangle v1.y for triangles
+    pub param4: f32,
+    /// Parameter 5: unused for rects, or triangle v2.x for triangles
+    pub param5: f32,
+    /// Parameter 6: unused for rects, or triangle v2.y for triangles
+    pub param6: f32,
+    /// Padding for alignment
+    pub _padding: f32,
 }
 
 impl RectInstance {
+    /// Create a triangle instance from a ClippedShape containing a triangle
+    pub fn from_triangle(clipped: &ClippedShape) -> Self {
+        let triangle = match &clipped.shape {
+            Shape::Triangle(tri) => tri,
+            _ => panic!("from_triangle can only be created from Shape::Triangle"),
+        };
+
+        // Get triangle vertices in world space
+        let vertices = triangle.vertices();
+
+        // Calculate bounding box for the triangle
+        let min_x = vertices[0][0].min(vertices[1][0]).min(vertices[2][0]);
+        let max_x = vertices[0][0].max(vertices[1][0]).max(vertices[2][0]);
+        let min_y = vertices[0][1].min(vertices[1][1]).min(vertices[2][1]);
+        let max_y = vertices[0][1].max(vertices[1][1]).max(vertices[2][1]);
+
+        // Center and half-size of bounding box
+        let center = [(min_x + max_x) * 0.5, (min_y + max_y) * 0.5];
+        let half_size = [(max_x - min_x) * 0.5, (max_y - min_y) * 0.5];
+
+        // Convert vertices to world space (they already are from triangle.vertices())
+        let tri_v0 = vertices[0];
+        let tri_v1 = vertices[1];
+        let tri_v2 = vertices[2];
+
+        // Apply opacity to colors
+        let fill_color = [
+            (triangle.fill.r * 255.0).round().clamp(0.0, 255.0) as u8,
+            (triangle.fill.g * 255.0).round().clamp(0.0, 255.0) as u8,
+            (triangle.fill.b * 255.0).round().clamp(0.0, 255.0) as u8,
+            ((triangle.fill.a * clipped.opacity) * 255.0)
+                .round()
+                .clamp(0.0, 255.0) as u8,
+        ];
+
+        let (stroke_color, stroke_width) = if let Some(stroke) = &triangle.stroke {
+            let width = max_x - min_x;
+            let resolved_width = stroke
+                .width
+                .try_resolve_with_scale(width, 1.0)
+                .unwrap_or(0.0);
+
+            (
+                [
+                    (stroke.color.r * 255.0).round().clamp(0.0, 255.0) as u8,
+                    (stroke.color.g * 255.0).round().clamp(0.0, 255.0) as u8,
+                    (stroke.color.b * 255.0).round().clamp(0.0, 255.0) as u8,
+                    ((stroke.color.a * clipped.opacity) * 255.0)
+                        .round()
+                        .clamp(0.0, 255.0) as u8,
+                ],
+                resolved_width,
+            )
+        } else {
+            ([0, 0, 0, 0], 0.0)
+        };
+
+        // Extract transform data
+        let translation = [
+            clipped.transform.translation.x,
+            clipped.transform.translation.y,
+        ];
+        let rotation = clipped.transform.rotation;
+        let scale = clipped.transform.scale;
+
+        let transform_origin = if let Some(abs_origin) = clipped.transform.absolute_origin {
+            abs_origin
+        } else {
+            let width = max_x - min_x;
+            let height = max_y - min_y;
+            let (origin_x, origin_y) = clipped.transform.origin.resolve(width, height);
+            [min_x + origin_x, min_y + origin_y]
+        };
+
+        Self {
+            center,
+            half_size,
+            translation,
+            rotation,
+            scale,
+            transform_origin,
+            fill_color,
+            stroke_color,
+            stroke_width,
+            shape_corner_type: 100, // 100 = Triangle
+            param1: tri_v0[0],
+            param2: tri_v0[1],
+            param3: tri_v1[0],
+            param4: tri_v1[1],
+            param5: tri_v2[0],
+            param6: tri_v2[1],
+            _padding: 0.0,
+        }
+    }
+
     /// Vertex buffer layout for instance attributes
     pub const fn desc() -> wgpu::VertexBufferLayout<'static> {
         const ATTRIBUTES: &[wgpu::VertexAttribute] = &[
@@ -91,23 +198,29 @@ impl RectInstance {
                 shader_location: 9,
                 format: wgpu::VertexFormat::Float32,
             },
-            // corner_type: u32 at location 10
+            // shape_corner_type: u32 at location 10
             wgpu::VertexAttribute {
                 offset: 52,
                 shader_location: 10,
                 format: wgpu::VertexFormat::Uint32,
             },
-            // corner_param1: f32 at location 11
+            // params12: vec2<f32> (param1, param2) at location 11
             wgpu::VertexAttribute {
                 offset: 56,
                 shader_location: 11,
-                format: wgpu::VertexFormat::Float32,
+                format: wgpu::VertexFormat::Float32x2,
             },
-            // corner_param2: f32 at location 12
+            // params34: vec2<f32> (param3, param4) at location 12
             wgpu::VertexAttribute {
-                offset: 60,
+                offset: 64,
                 shader_location: 12,
-                format: wgpu::VertexFormat::Float32,
+                format: wgpu::VertexFormat::Float32x2,
+            },
+            // params56: vec2<f32> (param5, param6) at location 13
+            wgpu::VertexAttribute {
+                offset: 72,
+                shader_location: 13,
+                format: wgpu::VertexFormat::Float32x2,
             },
         ];
 
@@ -115,6 +228,118 @@ impl RectInstance {
             array_stride: std::mem::size_of::<RectInstance>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: ATTRIBUTES,
+        }
+    }
+}
+
+/// Instance data for SDF-based triangle rendering.
+///
+/// Each instance represents a single triangle with its 3 vertices already
+/// transformed to world space. The fragment shader computes signed distance
+/// to the triangle for analytical anti-aliasing.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct TriangleInstance {
+    /// Vertex 0 in screen-space pixels
+    pub v0: [f32; 2],
+    /// Vertex 1 in screen-space pixels
+    pub v1: [f32; 2],
+    /// Vertex 2 in screen-space pixels
+    pub v2: [f32; 2],
+    /// Fill color (RGBA, normalized to 0-255)
+    pub fill_color: [u8; 4],
+    /// Stroke color (RGBA, normalized to 0-255)
+    pub stroke_color: [u8; 4],
+    /// Stroke width in pixels (0 = no stroke)
+    pub stroke_width: f32,
+    /// Padding to align to 16-byte boundary
+    pub _padding: [f32; 2],
+}
+
+impl TriangleInstance {
+    /// Vertex buffer layout for instance attributes
+    pub const fn desc() -> wgpu::VertexBufferLayout<'static> {
+        const ATTRIBUTES: &[wgpu::VertexAttribute] = &[
+            // v0: vec2<f32> at location 0
+            wgpu::VertexAttribute {
+                offset: 0,
+                shader_location: 0,
+                format: wgpu::VertexFormat::Float32x2,
+            },
+            // v1: vec2<f32> at location 1
+            wgpu::VertexAttribute {
+                offset: 8,
+                shader_location: 1,
+                format: wgpu::VertexFormat::Float32x2,
+            },
+            // v2: vec2<f32> at location 2
+            wgpu::VertexAttribute {
+                offset: 16,
+                shader_location: 2,
+                format: wgpu::VertexFormat::Float32x2,
+            },
+            // fill_color: vec4<f32> at location 3 (Unorm8x4)
+            wgpu::VertexAttribute {
+                offset: 24,
+                shader_location: 3,
+                format: wgpu::VertexFormat::Unorm8x4,
+            },
+            // stroke_color: vec4<f32> at location 4 (Unorm8x4)
+            wgpu::VertexAttribute {
+                offset: 28,
+                shader_location: 4,
+                format: wgpu::VertexFormat::Unorm8x4,
+            },
+            // stroke_width: f32 at location 5
+            wgpu::VertexAttribute {
+                offset: 32,
+                shader_location: 5,
+                format: wgpu::VertexFormat::Float32,
+            },
+        ];
+
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: ATTRIBUTES,
+        }
+    }
+
+    /// Create a triangle instance from a triangle shape
+    pub fn from_triangle(triangle: &astra_gui::StyledTriangle) -> Self {
+        let vertices = triangle.vertices();
+
+        // Convert fill color to u8 RGBA
+        let fill_color = [
+            (triangle.fill.r * 255.0).round().clamp(0.0, 255.0) as u8,
+            (triangle.fill.g * 255.0).round().clamp(0.0, 255.0) as u8,
+            (triangle.fill.b * 255.0).round().clamp(0.0, 255.0) as u8,
+            (triangle.fill.a * 255.0).round().clamp(0.0, 255.0) as u8,
+        ];
+
+        // Convert stroke (if present)
+        let (stroke_color, stroke_width) = if let Some(stroke) = &triangle.stroke {
+            (
+                [
+                    (stroke.color.r * 255.0).round().clamp(0.0, 255.0) as u8,
+                    (stroke.color.g * 255.0).round().clamp(0.0, 255.0) as u8,
+                    (stroke.color.b * 255.0).round().clamp(0.0, 255.0) as u8,
+                    (stroke.color.a * 255.0).round().clamp(0.0, 255.0) as u8,
+                ],
+                stroke.width.resolve_physical_or_zero(1.0),
+            )
+        } else {
+            ([0, 0, 0, 0], 0.0)
+        };
+
+        Self {
+            v0: vertices[0],
+            v1: vertices[1],
+            v2: vertices[2],
+            fill_color,
+            stroke_color,
+            stroke_width,
+            _padding: [0.0; 2],
         }
     }
 }
@@ -215,9 +440,14 @@ impl From<&ClippedShape> for RectInstance {
             fill_color,
             stroke_color,
             stroke_width,
-            corner_type,
-            corner_param1: param1,
-            corner_param2: param2,
+            shape_corner_type: corner_type,
+            param1,
+            param2,
+            param3: 0.0,
+            param4: 0.0,
+            param5: 0.0,
+            param6: 0.0,
+            _padding: 0.0,
         }
     }
 }

@@ -25,9 +25,10 @@ struct InstanceInput {
     @location(7) fill_color: vec4<f32>,
     @location(8) stroke_color: vec4<f32>,
     @location(9) stroke_width: f32,
-    @location(10) corner_type: u32,
-    @location(11) corner_param1: f32,
-    @location(12) corner_param2: f32,
+    @location(10) shape_corner_type: u32,
+    @location(11) params12: vec2<f32>,  // param1, param2
+    @location(12) params34: vec2<f32>,  // param3, param4
+    @location(13) params56: vec2<f32>,  // param5, param6
 }
 
 struct VertexOutput {
@@ -37,11 +38,12 @@ struct VertexOutput {
     @location(2) fill_color: vec4<f32>,
     @location(3) stroke_color: vec4<f32>,
     @location(4) stroke_width: f32,
-    @location(5) @interpolate(flat) corner_type: u32,
-    @location(6) corner_param1: f32,
-    @location(7) corner_param2: f32,
+    @location(5) @interpolate(flat) shape_corner_type: u32,
+    @location(6) params12: vec2<f32>,
+    @location(7) params34: vec2<f32>,
     @location(8) half_size: vec2<f32>,
     @location(9) scale: f32,
+    @location(10) params56: vec2<f32>,
 }
 
 @group(0) @binding(0)
@@ -94,11 +96,12 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     out.fill_color = inst.fill_color;
     out.stroke_color = inst.stroke_color;
     out.stroke_width = inst.stroke_width;
-    out.corner_type = inst.corner_type;
-    out.corner_param1 = inst.corner_param1;
-    out.corner_param2 = inst.corner_param2;
+    out.shape_corner_type = inst.shape_corner_type;
+    out.params12 = inst.params12;
+    out.params34 = inst.params34;
     out.half_size = inst.half_size;
     out.scale = inst.scale;
+    out.params56 = inst.params56;
 
     return out;
 }
@@ -195,34 +198,70 @@ fn sd_squircle_box(p: vec2<f32>, size: vec2<f32>, radius: f32, smoothness: f32) 
     return power_dist - radius;
 }
 
+/// Signed distance to a triangle defined by 3 vertices
+/// Based on Inigo Quilez's formula: https://iquilezles.org/articles/distfunctions2d/
+fn sd_triangle(p: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>) -> f32 {
+    let e0 = p1 - p0;
+    let e1 = p2 - p1;
+    let e2 = p0 - p2;
+    let v0 = p - p0;
+    let v1 = p - p1;
+    let v2 = p - p2;
+
+    let pq0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0.0, 1.0);
+    let pq1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0.0, 1.0);
+    let pq2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0.0, 1.0);
+
+    let s = sign(e0.x * e2.y - e0.y * e2.x);
+    let d0 = vec2<f32>(dot(pq0, pq0), s * (v0.x * e0.y - v0.y * e0.x));
+    let d1 = vec2<f32>(dot(pq1, pq1), s * (v1.x * e1.y - v1.y * e1.x));
+    let d2 = vec2<f32>(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x));
+
+    let d = min(min(d0, d1), d2);
+    return -sqrt(d.x) * sign(d.y);
+}
+
 // ============================================================================
 // Fragment Shader
 // ============================================================================
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Compute signed distance based on corner type
+    // Compute signed distance based on shape type
     var dist: f32;
 
-    switch in.corner_type {
-        case 0u: {  // None (sharp corners)
-            dist = sd_box(in.local_pos, in.half_size - in.stroke_width / 2.0);
-        }
-        case 1u: {  // Round (circular arcs)
-            dist = sd_rounded_box(in.local_pos, in.half_size - in.stroke_width / 2.0, in.corner_param1);
-        }
-        case 2u: {  // Cut (chamfered at 45°)
-            dist = sd_chamfer_box(in.local_pos, in.half_size - in.stroke_width / 2.0, in.corner_param1);
-        }
-        case 3u: {  // InverseRound (concave arcs)
-            dist = sd_inverse_round_box(in.local_pos, in.half_size - in.stroke_width / 2.0, in.corner_param1, in.stroke_width);
-        }
-        case 4u: {  // Squircle (superellipse)
-            dist = sd_squircle_box(in.local_pos, in.half_size - in.stroke_width / 2.0, in.corner_param1, in.corner_param2);
-        }
-        default: {
-            // Fallback to sharp corners
-            dist = sd_box(in.local_pos, in.half_size - in.stroke_width / 2.0);
+    if in.shape_corner_type == 100u {
+        // Triangle - vertices stored in params as world-space coordinates
+        let tri_v0 = in.params12;
+        let tri_v1 = in.params34;
+        let tri_v2 = in.params56;
+        dist = sd_triangle(in.world_pos, tri_v0, tri_v1, tri_v2);
+    } else {
+        // Rectangle - compute distance based on corner type
+        let corner_type = in.shape_corner_type;
+        let corner_param1 = in.params12.x;
+        let corner_param2 = in.params12.y;
+
+        switch corner_type {
+            case 0u: {  // None (sharp corners)
+                dist = sd_box(in.local_pos, in.half_size - in.stroke_width / 2.0);
+            }
+            case 1u: {  // Round (circular arcs)
+                dist = sd_rounded_box(in.local_pos, in.half_size - in.stroke_width / 2.0, corner_param1);
+            }
+            case 2u: {  // Cut (chamfered at 45°)
+                dist = sd_chamfer_box(in.local_pos, in.half_size - in.stroke_width / 2.0, corner_param1);
+            }
+            case 3u: {  // InverseRound (concave arcs)
+                dist = sd_inverse_round_box(in.local_pos, in.half_size - in.stroke_width / 2.0, corner_param1, in.stroke_width);
+            }
+            case 4u: {  // Squircle (superellipse)
+                dist = sd_squircle_box(in.local_pos, in.half_size - in.stroke_width / 2.0, corner_param1, corner_param2);
+            }
+            default: {
+                // Fallback to sharp corners
+                dist = sd_box(in.local_pos, in.half_size - in.stroke_width / 2.0);
+            }
         }
     }
 

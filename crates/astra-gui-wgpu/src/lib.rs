@@ -105,7 +105,7 @@ pub struct Renderer {
     // Rendering mode configuration
     render_mode: RenderMode,
 
-    // SDF rendering pipeline (analytic anti-aliasing)
+    // SDF rendering pipeline (analytic anti-aliasing for both rects and triangles)
     sdf_pipeline: wgpu::RenderPipeline,
     sdf_instance_buffer: wgpu::Buffer,
     sdf_instance_capacity: usize,
@@ -932,7 +932,7 @@ impl Renderer {
         // Track draw commands for each layer to enable interleaved rendering
         #[derive(Debug, Clone, Copy, PartialEq)]
         enum DrawCommand {
-            Sdf(usize),  // Index into sdf_draws
+            Sdf(usize),  // Index into sdf_draws (handles both rects and triangles)
             Text(usize), // Index into text_draws
         }
 
@@ -1021,8 +1021,70 @@ impl Renderer {
                         }
                     }
                     Shape::Triangle(_triangle) => {
-                        // Triangles are always rendered using mesh tessellation
-                        // They will be processed by the tessellator below
+                        if self.render_mode == RenderMode::Sdf
+                            || self.render_mode == RenderMode::Auto
+                        {
+                            // Use SDF rendering - same pipeline as rectangles
+                            // Compute scissor rect
+                            let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
+                            let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
+                            let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
+                            let sc_max_y =
+                                clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
+
+                            let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
+                            let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
+
+                            if sc_w > 0 && sc_h > 0 {
+                                let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
+                                let instance_index = self.sdf_instances.len() as u32;
+
+                                self.sdf_instances
+                                    .push(RectInstance::from_triangle(*clipped));
+
+                                // Try to batch with previous draw if same scissor
+                                let can_batch = if let Some(DrawCommand::Sdf(last_idx)) =
+                                    current_layer_commands.last()
+                                {
+                                    *last_idx == self.sdf_draws.len() - 1
+                                } else {
+                                    false
+                                };
+
+                                if can_batch {
+                                    if let Some(last_draw) = self.sdf_draws.last_mut() {
+                                        if last_draw.scissor == scissor
+                                            && last_draw.instance_start + last_draw.instance_count
+                                                == instance_index
+                                        {
+                                            // Extend existing batch
+                                            last_draw.instance_count += 1;
+                                        } else {
+                                            // Start new batch (different scissor or non-consecutive)
+                                            self.sdf_draws.push(SdfDraw {
+                                                scissor,
+                                                instance_start: instance_index,
+                                                instance_count: 1,
+                                            });
+                                            current_layer_commands
+                                                .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
+                                        }
+                                    }
+                                } else {
+                                    // First draw in this layer or switched from Text
+                                    self.sdf_draws.push(SdfDraw {
+                                        scissor,
+                                        instance_start: instance_index,
+                                        instance_count: 1,
+                                    });
+                                    current_layer_commands
+                                        .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
+                                }
+                            }
+                        } else {
+                            // Use mesh tessellation - collect for batch processing
+                            // (Tessellator processes all shapes at once)
+                        }
                     }
                     Shape::Text(text_shape) => {
                         #[cfg(feature = "text-cosmic")]
