@@ -40,6 +40,7 @@ pub const DEBUG_HELP_TEXT: &str = "Debug controls:
   T - Toggle text line bounds (cyan outline)
   D - Toggle all debug visualizations
   S - Toggle render mode (SDF/Mesh)
+  F - Toggle frame profiling
   ESC - Exit";
 
 /// Single-line help text suitable for an in-app HUD/footer label.
@@ -48,7 +49,7 @@ pub const DEBUG_HELP_TEXT: &str = "Debug controls:
 /// wants to show an always-visible hint.
 #[allow(dead_code)]
 pub const DEBUG_HELP_TEXT_ONELINE: &str =
-    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | T:Text | D:All | S:RenderMode | ESC:Exit";
+    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | T:Text | D:All | S:RenderMode | F:Profiling | ESC:Exit";
 
 /// Handles shared debug keybinds for examples.
 ///
