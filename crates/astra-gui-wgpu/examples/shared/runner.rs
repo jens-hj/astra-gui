@@ -94,7 +94,7 @@ impl<T: ExampleApp> AppRunner<T> {
             ui = ui.with_zoom(zoom);
         }
 
-        // Compute layout
+        // Compute layout (needed for event dispatch hit testing)
         let layout_start = Instant::now();
         let window_rect = Rect::from_min_size([0.0, 0.0], [size.width as f32, size.height as f32]);
 
@@ -125,23 +125,14 @@ impl<T: ExampleApp> AppRunner<T> {
         // Let app handle events (after releasing the borrow on interactive_state)
         self.app.handle_events(&events);
 
-        // Generate output
+        // Generate output (using from_laid_out_node since we already computed layout)
         let output_start = Instant::now();
         let debug_options = self.app.debug_options_mut().copied();
-        let output = if let Some(text_measurer) = self.app.text_measurer() {
-            FullOutput::from_node_with_debug_and_measurer(
-                ui,
-                (size.width as f32, size.height as f32),
-                debug_options,
-                Some(text_measurer),
-            )
-        } else {
-            FullOutput::from_node_with_debug(
-                ui,
-                (size.width as f32, size.height as f32),
-                debug_options,
-            )
-        };
+        let output = FullOutput::from_laid_out_node(
+            ui,
+            (size.width as f32, size.height as f32),
+            debug_options,
+        );
         let output_time = output_start.elapsed();
 
         // Render

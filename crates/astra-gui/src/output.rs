@@ -122,6 +122,25 @@ impl FullOutput {
             root.compute_layout_with_scale_factor(window_rect, effective_scale_factor);
         }
 
+        Self::from_laid_out_node(root, window_size, debug_options)
+    }
+
+    /// Create output from an already-laid-out node tree
+    ///
+    /// This is an optimization for cases where layout has already been computed.
+    /// The node tree must have had `compute_layout` called on it before calling this.
+    ///
+    /// `window_size` is the (width, height) of the window
+    /// `debug_options` configures which debug visualizations to show
+    pub fn from_laid_out_node(
+        root: Node,
+        window_size: (f32, f32),
+        debug_options: Option<crate::debug::DebugOptions>,
+    ) -> Self {
+        // Get the effective scale factor from the root node
+        let effective_scale_factor = root.zoom().unwrap_or(1.0);
+        let window_rect = Rect::new([0.0, 0.0], [window_size.0, window_size.1]);
+
         // Convert to ClippedShapes (including optional debug shapes), with overflow-aware clip rects.
         //
         // We derive `clip_rect` from the node tree's overflow policy:
