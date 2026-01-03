@@ -56,7 +56,7 @@ impl<T: ExampleApp> AppRunner<T> {
             app,
             last_frame_time: Instant::now(),
             frame_stats: FrameStats::default(),
-            enable_profiling: false,
+            enable_profiling: std::env::var("PROFILE").is_ok(),
         }
     }
 
@@ -182,8 +182,13 @@ impl<T: ExampleApp> AppRunner<T> {
 
         // Print stats if profiling enabled
         if self.enable_profiling {
+            let shape_count = if let Some(gpu) = &self.gpu_state {
+                gpu.last_shape_count()
+            } else {
+                0
+            };
             println!(
-                "Frame: {:.2}ms ({:.1} FPS) | Build: {:.2}ms | Layout: {:.2}ms | Events: {:.2}ms | Output: {:.2}ms | Render: {:.2}ms",
+                "Frame: {:.2}ms ({:.1} FPS) | Build: {:.2}ms | Layout: {:.2}ms | Events: {:.2}ms | Output: {:.2}ms | Render: {:.2}ms | Shapes: {}",
                 self.frame_stats.total_frame_time_ms,
                 self.frame_stats.fps,
                 self.frame_stats.build_ui_ms,
@@ -191,6 +196,7 @@ impl<T: ExampleApp> AppRunner<T> {
                 self.frame_stats.event_dispatch_ms,
                 self.frame_stats.output_generation_ms,
                 self.frame_stats.render_ms,
+                shape_count,
             );
         }
     }

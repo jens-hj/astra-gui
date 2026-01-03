@@ -9,6 +9,7 @@ pub struct GpuState {
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
     pub renderer: Renderer,
+    last_shape_count: usize,
 }
 
 impl GpuState {
@@ -72,6 +73,7 @@ impl GpuState {
             queue,
             config,
             renderer,
+            last_shape_count: 0,
         }
     }
 
@@ -83,7 +85,13 @@ impl GpuState {
         }
     }
 
+    pub fn last_shape_count(&self) -> usize {
+        self.last_shape_count
+    }
+
     pub fn render(&mut self, ui_output: &FullOutput) -> Result<(), wgpu::SurfaceError> {
+        self.last_shape_count = ui_output.shapes.len();
+
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture

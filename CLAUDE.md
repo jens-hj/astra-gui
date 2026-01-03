@@ -2,3 +2,4 @@
 - Debug visualisations: padding (blue), margin (red), border (green), gap (purple), clip rect (red), content-area (yellow)
 - Always use conventional commit messages
 - Always make commit messages short and precise
+- Aim for extremely performant, should always run above 500 FPS unless it's a very complex scene.
