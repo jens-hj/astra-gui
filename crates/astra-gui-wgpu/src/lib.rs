@@ -1020,6 +1020,10 @@ impl Renderer {
                             // (Tessellator processes all shapes at once)
                         }
                     }
+                    Shape::Triangle(_triangle) => {
+                        // Triangles are always rendered using mesh tessellation
+                        // They will be processed by the tessellator below
+                    }
                     Shape::Text(text_shape) => {
                         #[cfg(feature = "text-cosmic")]
                         {

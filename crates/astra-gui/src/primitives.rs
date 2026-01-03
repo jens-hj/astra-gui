@@ -50,7 +50,7 @@ impl Stroke {
 }
 
 /// Axis-aligned rectangle defined by min and max corners
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Rect {
     pub min: [f32; 2],
     pub max: [f32; 2],
@@ -110,6 +110,64 @@ impl Rect {
     pub fn max_point(&self) -> Point {
         Point::new(self.max[0], self.max[1])
     }
+}
+
+/// Orientation for triangles (which direction the apex points)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Orientation {
+    /// Apex points upward
+    Up,
+    /// Apex points downward
+    Down,
+    /// Apex points left
+    Left,
+    /// Apex points right
+    Right,
+}
+
+/// Corner position for right-angled triangles
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Corner {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+/// Specification for how a triangle is defined within its bounding rect
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum TriangleSpec {
+    /// Isosceles triangle with two equal sides
+    /// Fills bounding rect completely - base on one edge, apex centered on opposite edge
+    Isosceles { orientation: Orientation },
+
+    /// Equilateral triangle with all equal sides
+    /// Inscribed to fill maximum dimension (width for Up/Down, height for Left/Right)
+    Equilateral { orientation: Orientation },
+
+    /// Right-angled triangle with 90-degree corner
+    /// Fills bounding rect completely - right angle at specified corner
+    RightAngled {
+        corner: Corner,
+        orientation: Orientation,
+    },
+
+    /// Triangle defined by three explicit points
+    /// Points are relative coordinates (0.0-1.0) of bounding rect
+    /// (0,0) = top-left, (1,1) = bottom-right
+    Points {
+        p1: [f32; 2], // [x, y] where 0.0-1.0
+        p2: [f32; 2],
+        p3: [f32; 2],
+    },
+
+    /// Isosceles triangle with configurable apex angle
+    /// Apex angle in degrees (30-150 recommended range)
+    /// Base always on the edge opposite to orientation direction
+    ApexAngle {
+        angle_degrees: f32,
+        orientation: Orientation,
+    },
 }
 
 /// Corner shape for rectangles
@@ -179,6 +237,208 @@ impl StyledRect {
     }
 }
 
+/// Triangle with fill, stroke, and specification
+#[derive(Clone, Debug, PartialEq)]
+pub struct StyledTriangle {
+    pub rect: Rect,
+    pub spec: TriangleSpec,
+    pub fill: Color,
+    pub stroke: Option<Stroke>,
+}
+
+impl StyledTriangle {
+    pub fn new(rect: Rect, spec: TriangleSpec, fill: Color) -> Self {
+        Self {
+            rect,
+            spec,
+            fill,
+            stroke: None,
+        }
+    }
+
+    pub fn with_stroke(mut self, stroke: Stroke) -> Self {
+        self.stroke = Some(stroke);
+        self
+    }
+
+    /// Apply opacity by multiplying fill and stroke alpha values
+    pub fn apply_opacity(&mut self, opacity: f32) {
+        self.fill.a *= opacity;
+        if let Some(stroke) = &mut self.stroke {
+            stroke.color.a *= opacity;
+        }
+    }
+
+    /// Compute the three vertices of this triangle in world coordinates
+    pub fn vertices(&self) -> [[f32; 2]; 3] {
+        compute_triangle_vertices(&self.rect, &self.spec)
+    }
+}
+
+/// Compute triangle vertices from bounding rect and specification
+fn compute_triangle_vertices(rect: &Rect, spec: &TriangleSpec) -> [[f32; 2]; 3] {
+    let min_x = rect.min[0];
+    let min_y = rect.min[1];
+    let max_x = rect.max[0];
+    let max_y = rect.max[1];
+    let width = max_x - min_x;
+    let height = max_y - min_y;
+    let center_x = (min_x + max_x) * 0.5;
+    let center_y = (min_y + max_y) * 0.5;
+
+    match spec {
+        TriangleSpec::Isosceles { orientation } => match orientation {
+            Orientation::Up => [
+                [center_x, min_y], // Top apex
+                [max_x, max_y],    // Bottom-right
+                [min_x, max_y],    // Bottom-left
+            ],
+            Orientation::Down => [
+                [center_x, max_y], // Bottom apex
+                [min_x, min_y],    // Top-left
+                [max_x, min_y],    // Top-right
+            ],
+            Orientation::Left => [
+                [min_x, center_y], // Left apex
+                [max_x, min_y],    // Top-right
+                [max_x, max_y],    // Bottom-right
+            ],
+            Orientation::Right => [
+                [max_x, center_y], // Right apex
+                [min_x, max_y],    // Bottom-left
+                [min_x, min_y],    // Top-left
+            ],
+        },
+
+        TriangleSpec::Equilateral { orientation } => {
+            const SQRT_3: f32 = 1.732050807568877293527446341505872367_f32;
+            match orientation {
+                Orientation::Up | Orientation::Down => {
+                    // For Up/Down: fit to width, center vertically
+                    let side = width;
+                    let tri_height = side * SQRT_3 / 2.0;
+                    let offset_y = (height - tri_height) / 2.0;
+
+                    if *orientation == Orientation::Up {
+                        [
+                            [center_x, min_y + offset_y],           // Top apex
+                            [max_x, min_y + offset_y + tri_height], // Bottom-right
+                            [min_x, min_y + offset_y + tri_height], // Bottom-left
+                        ]
+                    } else {
+                        [
+                            [center_x, max_y - offset_y],           // Bottom apex
+                            [min_x, max_y - offset_y - tri_height], // Top-left
+                            [max_x, max_y - offset_y - tri_height], // Top-right
+                        ]
+                    }
+                }
+                Orientation::Left | Orientation::Right => {
+                    // For Left/Right: fit to height, center horizontally
+                    let side = height;
+                    let tri_width = side * SQRT_3 / 2.0;
+                    let offset_x = (width - tri_width) / 2.0;
+
+                    if *orientation == Orientation::Left {
+                        [
+                            [min_x + offset_x, center_y],          // Left apex
+                            [min_x + offset_x + tri_width, min_y], // Top-right
+                            [min_x + offset_x + tri_width, max_y], // Bottom-right
+                        ]
+                    } else {
+                        [
+                            [max_x - offset_x, center_y],          // Right apex
+                            [max_x - offset_x - tri_width, max_y], // Bottom-left
+                            [max_x - offset_x - tri_width, min_y], // Top-left
+                        ]
+                    }
+                }
+            }
+        }
+
+        TriangleSpec::RightAngled {
+            corner,
+            orientation,
+        } => {
+            use Corner::*;
+            use Orientation::*;
+            match (corner, orientation) {
+                (TopLeft, Right) => [[min_x, min_y], [max_x, center_y], [min_x, max_y]],
+                (TopLeft, Down) => [[min_x, min_y], [max_x, max_y], [min_x, max_y]],
+                (TopRight, Left) => [[max_x, min_y], [min_x, center_y], [max_x, max_y]],
+                (TopRight, Down) => [[max_x, min_y], [min_x, max_y], [max_x, max_y]],
+                (BottomLeft, Right) => [[min_x, max_y], [max_x, center_y], [min_x, min_y]],
+                (BottomLeft, Up) => [[min_x, max_y], [max_x, min_y], [min_x, min_y]],
+                (BottomRight, Left) => [[max_x, max_y], [min_x, center_y], [max_x, min_y]],
+                (BottomRight, Up) => [[max_x, max_y], [min_x, min_y], [max_x, min_y]],
+                // Default cases for other orientations
+                _ => [[center_x, center_y], [max_x, max_y], [min_x, max_y]],
+            }
+        }
+
+        TriangleSpec::Points { p1, p2, p3 } => {
+            // Convert relative coordinates (0.0-1.0) to absolute
+            let to_abs = |p: [f32; 2]| [min_x + p[0] * width, min_y + p[1] * height];
+            [to_abs(*p1), to_abs(*p2), to_abs(*p3)]
+        }
+
+        TriangleSpec::ApexAngle {
+            angle_degrees,
+            orientation,
+        } => {
+            let angle_rad = angle_degrees.to_radians();
+            let half_angle = angle_rad / 2.0;
+
+            match orientation {
+                Orientation::Up => {
+                    let apex_x = center_x;
+                    let apex_y = min_y;
+                    let base_y = max_y;
+                    let half_base = height * half_angle.tan();
+                    [
+                        [apex_x, apex_y],
+                        [apex_x + half_base, base_y],
+                        [apex_x - half_base, base_y],
+                    ]
+                }
+                Orientation::Down => {
+                    let apex_x = center_x;
+                    let apex_y = max_y;
+                    let base_y = min_y;
+                    let half_base = height * half_angle.tan();
+                    [
+                        [apex_x, apex_y],
+                        [apex_x - half_base, base_y],
+                        [apex_x + half_base, base_y],
+                    ]
+                }
+                Orientation::Left => {
+                    let apex_x = min_x;
+                    let apex_y = center_y;
+                    let base_x = max_x;
+                    let half_base = width * half_angle.tan();
+                    [
+                        [apex_x, apex_y],
+                        [base_x, apex_y + half_base],
+                        [base_x, apex_y - half_base],
+                    ]
+                }
+                Orientation::Right => {
+                    let apex_x = max_x;
+                    let apex_y = center_y;
+                    let base_x = min_x;
+                    let half_base = width * half_angle.tan();
+                    [
+                        [apex_x, apex_y],
+                        [base_x, apex_y - half_base],
+                        [base_x, apex_y + half_base],
+                    ]
+                }
+            }
+        }
+    }
+}
+
 /// Text shape for rendering text content
 #[derive(Clone, Debug)]
 pub struct TextShape {
@@ -226,6 +486,7 @@ impl TextShape {
 pub enum Shape {
     Rect(StyledRect),
     Text(TextShape),
+    Triangle(StyledTriangle),
     // Future: Circle, Line, Mesh, etc.
 }
 
@@ -243,11 +504,34 @@ impl Shape {
         })
     }
 
+    /// Create a triangle shape pointing in the specified direction
+    ///
+    /// Default: Isosceles, transparent fill (use Style for visual properties)
+    pub fn triangle(orientation: Orientation) -> Self {
+        Shape::Triangle(StyledTriangle {
+            rect: Rect::default(),
+            spec: TriangleSpec::Isosceles { orientation },
+            fill: Color::transparent(),
+            stroke: None,
+        })
+    }
+
+    /// Create a triangle with explicit specification
+    pub fn triangle_with_spec(spec: TriangleSpec) -> Self {
+        Shape::Triangle(StyledTriangle {
+            rect: Rect::default(),
+            spec,
+            fill: Color::transparent(),
+            stroke: None,
+        })
+    }
+
     /// Apply opacity to this shape by multiplying all color alpha values
     pub fn apply_opacity(&mut self, opacity: f32) {
         match self {
             Shape::Rect(rect) => rect.apply_opacity(opacity),
             Shape::Text(text) => text.apply_opacity(opacity),
+            Shape::Triangle(tri) => tri.apply_opacity(opacity),
         }
     }
 }
@@ -269,6 +553,7 @@ impl ClippedShape {
         // Backward compatibility - extract rect from shape if it's a Rect
         let node_rect = match &shape {
             Shape::Rect(styled_rect) => styled_rect.rect,
+            Shape::Triangle(styled_triangle) => styled_triangle.rect,
             Shape::Text(text_shape) => text_shape.rect,
         };
 

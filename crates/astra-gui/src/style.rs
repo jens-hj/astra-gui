@@ -106,19 +106,34 @@ impl Style {
 
         // Apply to shape if present
         if let Some(shape) = node.shape_mut() {
-            if let Shape::Rect(ref mut rect) = shape {
-                if let Some(color) = self.fill_color {
-                    rect.fill = color;
-                }
+            match shape {
+                Shape::Rect(ref mut rect) => {
+                    if let Some(color) = self.fill_color {
+                        rect.fill = color;
+                    }
 
-                // Apply stroke via unified field only.
-                if let Some(stroke) = self.stroke {
-                    rect.stroke = Some(stroke);
-                }
+                    // Apply stroke via unified field only.
+                    if let Some(stroke) = self.stroke {
+                        rect.stroke = Some(stroke);
+                    }
 
-                // Apply corner shape
-                if let Some(corner_shape) = self.corner_shape {
-                    rect.corner_shape = corner_shape;
+                    // Apply corner shape
+                    if let Some(corner_shape) = self.corner_shape {
+                        rect.corner_shape = corner_shape;
+                    }
+                }
+                Shape::Triangle(ref mut tri) => {
+                    if let Some(color) = self.fill_color {
+                        tri.fill = color;
+                    }
+
+                    // Apply stroke
+                    if let Some(stroke) = self.stroke {
+                        tri.stroke = Some(stroke);
+                    }
+                }
+                Shape::Text(_) => {
+                    // Text shapes don't have fill/stroke
                 }
             }
         }

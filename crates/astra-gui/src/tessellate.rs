@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::mesh::{Mesh, Vertex};
-use crate::primitives::{ClippedShape, CornerShape, Shape, StyledRect};
+use crate::primitives::{ClippedShape, CornerShape, Shape, StyledRect, StyledTriangle};
 use std::f32::consts::PI;
 
 // NOTE: This file intentionally remains geometry-only. Text is rendered by backend crates.
@@ -22,6 +22,7 @@ impl Tessellator {
         for clipped in shapes {
             match &clipped.shape {
                 Shape::Rect(r) => self.tessellate_rect(r),
+                Shape::Triangle(t) => self.tessellate_triangle(t),
                 Shape::Text(_text) => {
                     // Text rendering is handled by the backend.
                     //
@@ -905,6 +906,106 @@ impl Tessellator {
             self.mesh.indices.push(idx + 1);
             self.mesh.indices.push(idx + 2);
 
+            self.mesh.indices.push(idx + 1);
+            self.mesh.indices.push(idx + 3);
+            self.mesh.indices.push(idx + 2);
+        }
+    }
+
+    fn tessellate_triangle(&mut self, triangle: &StyledTriangle) {
+        // Tessellate fill
+        if triangle.fill.a > 0.0 {
+            self.add_triangle_fill(triangle);
+        }
+
+        // Tessellate stroke
+        if let Some(stroke) = &triangle.stroke {
+            if stroke.width.is_non_zero() && stroke.color.a > 0.0 {
+                self.add_triangle_stroke(triangle, stroke);
+            }
+        }
+    }
+
+    fn add_triangle_fill(&mut self, triangle: &StyledTriangle) {
+        let vertices = triangle.vertices();
+        let base_idx = self.mesh.vertices.len() as u32;
+
+        // Add the three vertices
+        for v in &vertices {
+            self.mesh.vertices.push(Vertex::new(*v, triangle.fill));
+        }
+
+        // Create triangle indices
+        self.mesh.indices.push(base_idx);
+        self.mesh.indices.push(base_idx + 1);
+        self.mesh.indices.push(base_idx + 2);
+    }
+
+    fn add_triangle_stroke(
+        &mut self,
+        triangle: &StyledTriangle,
+        stroke: &crate::primitives::Stroke,
+    ) {
+        let vertices = triangle.vertices();
+        let stroke_width = stroke.width.resolve_physical_or_zero(1.0);
+        let stroke_half_width = stroke_width / 2.0;
+
+        let base_idx = self.mesh.vertices.len() as u32;
+
+        // Generate outer and inner vertices for each edge
+        for i in 0..3 {
+            let v0 = vertices[i];
+            let v1 = vertices[(i + 1) % 3];
+
+            // Calculate edge direction and normal
+            let dx = v1[0] - v0[0];
+            let dy = v1[1] - v0[1];
+            let len = (dx * dx + dy * dy).sqrt();
+
+            if len > 0.0 {
+                // Perpendicular normal (outward)
+                let nx = -dy / len;
+                let ny = dx / len;
+
+                // Outer vertices (offset outward)
+                let outer_v0 = [
+                    v0[0] + nx * stroke_half_width,
+                    v0[1] + ny * stroke_half_width,
+                ];
+                let outer_v1 = [
+                    v1[0] + nx * stroke_half_width,
+                    v1[1] + ny * stroke_half_width,
+                ];
+
+                // Inner vertices (offset inward)
+                let inner_v0 = [
+                    v0[0] - nx * stroke_half_width,
+                    v0[1] - ny * stroke_half_width,
+                ];
+                let inner_v1 = [
+                    v1[0] - nx * stroke_half_width,
+                    v1[1] - ny * stroke_half_width,
+                ];
+
+                // Add vertices
+                self.mesh.vertices.push(Vertex::new(outer_v0, stroke.color));
+                self.mesh.vertices.push(Vertex::new(inner_v0, stroke.color));
+                self.mesh.vertices.push(Vertex::new(outer_v1, stroke.color));
+                self.mesh.vertices.push(Vertex::new(inner_v1, stroke.color));
+            }
+        }
+
+        // Create quad strip indices for each edge
+        let edge_count = 3;
+        for i in 0..edge_count {
+            let idx = base_idx + i * 4;
+
+            // First triangle
+            self.mesh.indices.push(idx);
+            self.mesh.indices.push(idx + 1);
+            self.mesh.indices.push(idx + 2);
+
+            // Second triangle
             self.mesh.indices.push(idx + 1);
             self.mesh.indices.push(idx + 3);
             self.mesh.indices.push(idx + 2);

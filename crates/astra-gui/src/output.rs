@@ -172,6 +172,10 @@ impl FullOutput {
                             styled_rect.rect = rect;
                             Shape::Rect(styled_rect)
                         }
+                        Shape::Triangle(mut styled_triangle) => {
+                            styled_triangle.rect = rect;
+                            Shape::Triangle(styled_triangle)
+                        }
                         Shape::Text(text_shape) => Shape::Text(text_shape),
                     };
 
@@ -360,6 +364,22 @@ fn collect_clipped_shapes_with_opacity(
                 };
 
                 Shape::Rect(scaled_rect)
+            }
+            Shape::Triangle(styled_triangle) => {
+                let mut scaled_triangle = styled_triangle.clone();
+                let width = node_rect.max[0] - node_rect.min[0];
+
+                if let Some(ref stroke) = scaled_triangle.stroke {
+                    // Resolve stroke width with scale_factor
+                    let scaled_width = stroke
+                        .width
+                        .try_resolve_with_scale(width, scale_factor)
+                        .unwrap_or(1.0);
+                    scaled_triangle.stroke =
+                        Some(Stroke::new(Size::ppx(scaled_width), stroke.color));
+                }
+
+                Shape::Triangle(scaled_triangle)
             }
             Shape::Text(_) => shape.clone(),
         };
