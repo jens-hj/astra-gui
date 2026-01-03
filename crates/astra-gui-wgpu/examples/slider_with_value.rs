@@ -243,7 +243,6 @@ impl ExampleApp for SliderWithValueExample {
             0.0..=100.0,
             0.1, // speed
             None,
-            1.0, // No zoom
         ) {
             println!("Basic value: {:.2}", self.basic_slider.value);
             changed = true;
@@ -264,7 +263,6 @@ impl ExampleApp for SliderWithValueExample {
             0.0..=100.0,
             0.1, // speed
             None,
-            1.0, // No zoom
         ) {
             println!("Clamped value: {:.2}", self.clamped_slider.value);
             changed = true;
@@ -285,7 +283,6 @@ impl ExampleApp for SliderWithValueExample {
             0.0..=100.0,
             0.1,       // speed
             Some(5.0), // step
-            1.0,       // No zoom
         ) {
             println!("Stepped value: {:.1}", self.stepped_slider.value);
             changed = true;

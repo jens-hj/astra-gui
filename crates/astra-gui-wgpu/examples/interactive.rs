@@ -370,7 +370,6 @@ impl ExampleApp for Interactive {
             events,
             &SliderStyle::default(),
             Some(7.0), // Step by 7.0
-            1.0,       // No zoom
         ) {
             println!("Stepped slider value: {:.1}", self.slider_value);
             changed = true;
@@ -384,7 +383,6 @@ impl ExampleApp for Interactive {
             events,
             &SliderStyle::default(),
             None, // No stepping - continuous
-            1.0,  // No zoom
         ) {
             println!(
                 "Continuous slider value: {:.1}",

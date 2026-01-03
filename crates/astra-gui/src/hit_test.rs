@@ -16,6 +16,8 @@ pub struct HitTestResult {
     pub local_pos: Point,
     /// The computed rectangle of the hit node
     pub node_rect: Rect,
+    /// The accumulated zoom/scale factor at this node
+    pub zoom: f32,
 }
 
 /// Hit-test a point against a node tree
@@ -51,7 +53,15 @@ pub fn hit_test_point(root: &Node, point: Point) -> Vec<HitTestResult> {
     };
 
     let mut results = Vec::new();
-    hit_test_recursive(root, point, None, initial_transform, &mut results);
+    let initial_zoom = root.zoom().unwrap_or(1.0);
+    hit_test_recursive(
+        root,
+        point,
+        None,
+        initial_transform,
+        initial_zoom,
+        &mut results,
+    );
     results
 }
 
@@ -77,12 +87,14 @@ pub fn hit_test_deepest(root: &Node, point: Point) -> Option<HitTestResult> {
 /// * `point` - The point in world screen coordinates
 /// * `clip_rect` - The current clipping rectangle (None means no clipping)
 /// * `parent_transform` - Accumulated transform from parent nodes
+/// * `parent_zoom` - Accumulated zoom from parent nodes
 /// * `results` - Accumulator for hit test results
 fn hit_test_recursive(
     node: &Node,
     point: Point,
     clip_rect: Option<Rect>,
     parent_transform: Transform2D,
+    parent_zoom: f32,
     results: &mut Vec<HitTestResult>,
 ) {
     // Get the computed layout for this node (untransformed rect)
@@ -137,6 +149,9 @@ fn hit_test_recursive(
         return; // Point is outside this node, skip it and children
     }
 
+    // Calculate accumulated zoom for this node
+    let current_zoom = node.zoom().unwrap_or(parent_zoom);
+
     // Skip disabled nodes - they should not receive interaction events
     // However, we still need to test their children (they might not be disabled)
     if !node.is_disabled() {
@@ -151,6 +166,7 @@ fn hit_test_recursive(
             node_id: node.id().cloned(),
             local_pos,
             node_rect,
+            zoom: current_zoom,
         });
     }
 
@@ -205,8 +221,15 @@ fn hit_test_recursive(
         }
     };
 
-    // Recursively test children with accumulated transform
+    // Recursively test children with accumulated transform and zoom
     for child in node.children() {
-        hit_test_recursive(child, point, child_clip_rect, world_transform, results);
+        hit_test_recursive(
+            child,
+            point,
+            child_clip_rect,
+            world_transform,
+            current_zoom,
+            results,
+        );
     }
 }

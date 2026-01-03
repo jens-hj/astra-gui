@@ -483,7 +483,6 @@ impl ExampleApp for TranslationExample {
             events,
             &SliderStyle::default(),
             Some(1.0),
-            1.0, // No zoom
         ) {
             println!("Outer X: {:.1}", self.outer_translation_x);
             changed = true;
@@ -496,7 +495,6 @@ impl ExampleApp for TranslationExample {
             events,
             &SliderStyle::default(),
             Some(1.0),
-            1.0, // No zoom
         ) {
             println!("Outer Y: {:.1}", self.outer_translation_y);
             changed = true;
@@ -509,7 +507,6 @@ impl ExampleApp for TranslationExample {
             events,
             &SliderStyle::default(),
             Some(1.0),
-            1.0, // No zoom
         ) {
             println!("Inner X: {:.1}", self.inner_translation_x);
             changed = true;
@@ -522,7 +519,6 @@ impl ExampleApp for TranslationExample {
             events,
             &SliderStyle::default(),
             Some(1.0),
-            1.0, // No zoom
         ) {
             println!("Inner Y: {:.1}", self.inner_translation_y);
             changed = true;

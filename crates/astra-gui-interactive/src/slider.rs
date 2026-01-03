@@ -175,7 +175,6 @@ pub fn slider(
 /// * `events` - Slice of targeted events from this frame
 /// * `style` - The slider style (needed for track width calculation)
 /// * `step` - Optional step size. If provided, values will snap to multiples of this increment
-/// * `zoom` - Zoom level to compensate for (1.0 = no zoom). Mouse positions will be divided by this value.
 ///
 /// # Returns
 /// `true` if the value was changed, `false` otherwise
@@ -186,7 +185,6 @@ pub fn slider_drag(
     events: &[TargetedEvent],
     style: &SliderStyle,
     step: Option<f32>,
-    zoom: f32,
 ) -> bool {
     let container_id = format!("{}_hitbox", slider_id);
 
@@ -205,7 +203,7 @@ pub fn slider_drag(
             | InteractionEvent::DragStart { .. }
             | InteractionEvent::DragMove { .. } => {
                 // Divide by zoom to get logical coordinates
-                let local_x = event.local_position.x / zoom;
+                let local_x = event.local_position.x / event.zoom;
 
                 // Adjust for thumb half-width so clicking centers the thumb at cursor
                 let usable_width = style.track_width - style.thumb_size;

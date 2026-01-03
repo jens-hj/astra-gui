@@ -52,6 +52,9 @@ pub struct TargetedEvent {
     pub target: NodeId,
     /// Position relative to the target node's top-left corner
     pub local_position: Point,
+    /// The accumulated zoom/scale factor at this node (from root to node)
+    /// This is 1.0 for no zoom, 2.0 for 2x zoom, etc.
+    pub zoom: f32,
 }
 
 /// State tracking for drag operations
@@ -117,6 +120,7 @@ impl EventDispatcher {
                     event: InteractionEvent::Blur,
                     target: old_focus.clone(),
                     local_position: Point { x: 0.0, y: 0.0 },
+                    zoom: 1.0, // Blur events don't have position context
                 });
             }
         }
@@ -128,6 +132,7 @@ impl EventDispatcher {
                     event: InteractionEvent::Focus,
                     target: new_focus.clone(),
                     local_position: Point { x: 0.0, y: 0.0 },
+                    zoom: 1.0, // Focus events don't have position context
                 });
             }
         }
@@ -221,6 +226,7 @@ impl EventDispatcher {
                         x: drag.last_pos.x - drag.start_pos.x,
                         y: drag.last_pos.y - drag.start_pos.y,
                     },
+                    zoom: 1.0, // No hit test available when cursor leaves window
                 });
             }
             return (events, interaction_states);
@@ -237,14 +243,14 @@ impl EventDispatcher {
             .and_then(|hit| {
                 hit.node_id
                     .as_ref()
-                    .map(|id| (id.clone(), hit.local_pos, hit.node_rect))
+                    .map(|id| (id.clone(), hit.local_pos, hit.node_rect, hit.zoom))
             });
 
         // Update hover state and generate hover events
         let new_hovered: Vec<NodeId> = hits.iter().filter_map(|hit| hit.node_id.clone()).collect();
 
         // Only generate hover event for the deepest target
-        if let Some((target_id, local_pos, _)) = &deepest_target {
+        if let Some((target_id, local_pos, _, zoom)) = &deepest_target {
             if !self.hovered_nodes.contains(target_id) {
                 events.push(TargetedEvent {
                     event: InteractionEvent::Hover {
@@ -252,6 +258,7 @@ impl EventDispatcher {
                     },
                     target: target_id.clone(),
                     local_position: *local_pos,
+                    zoom: *zoom,
                 });
             }
         }
@@ -285,12 +292,13 @@ impl EventDispatcher {
                 };
 
                 // Hit-test to get local position relative to the drag target
-                let local_pos = hits
+                let hit = hits
                     .iter()
                     .rev()
-                    .find(|hit| hit.node_id.as_ref() == Some(&drag.target))
-                    .map(|hit| hit.local_pos)
-                    .unwrap_or(Point { x: 0.0, y: 0.0 });
+                    .find(|hit| hit.node_id.as_ref() == Some(&drag.target));
+
+                let local_pos = hit.map(|h| h.local_pos).unwrap_or(Point { x: 0.0, y: 0.0 });
+                let zoom = hit.map(|h| h.zoom).unwrap_or(1.0);
 
                 events.push(TargetedEvent {
                     event: InteractionEvent::DragMove {
@@ -299,12 +307,22 @@ impl EventDispatcher {
                     },
                     target: drag.target.clone(),
                     local_position: local_pos,
+                    zoom,
                 });
 
                 drag.last_pos = cursor_pos;
             } else {
                 // Button released - end drag
                 let completed_drag = self.drag_state.take().unwrap();
+
+                // Try to get zoom from hit test
+                let zoom = hits
+                    .iter()
+                    .rev()
+                    .find(|hit| hit.node_id.as_ref() == Some(&completed_drag.target))
+                    .map(|h| h.zoom)
+                    .unwrap_or(1.0);
+
                 events.push(TargetedEvent {
                     event: InteractionEvent::DragEnd {
                         button: completed_drag.button,
@@ -315,13 +333,14 @@ impl EventDispatcher {
                         x: cursor_pos.x - completed_drag.start_pos.x,
                         y: cursor_pos.y - completed_drag.start_pos.y,
                     },
+                    zoom,
                 });
             }
         }
 
         // Check for new clicks (only if not currently dragging)
         if self.drag_state.is_none() {
-            if let Some((target_id, local_pos, _)) = &deepest_target {
+            if let Some((target_id, local_pos, _, zoom)) = &deepest_target {
                 // Check for left-click
                 if input.is_button_just_pressed(MouseButton::Left) {
                     events.push(TargetedEvent {
@@ -331,6 +350,7 @@ impl EventDispatcher {
                         },
                         target: target_id.clone(),
                         local_position: *local_pos,
+                        zoom: *zoom,
                     });
 
                     // Start drag state for potential drag
@@ -349,6 +369,7 @@ impl EventDispatcher {
                         },
                         target: target_id.clone(),
                         local_position: *local_pos,
+                        zoom: *zoom,
                     });
                 }
 
@@ -361,6 +382,7 @@ impl EventDispatcher {
                         },
                         target: target_id.clone(),
                         local_position: *local_pos,
+                        zoom: *zoom,
                     });
                 }
             }
@@ -368,7 +390,7 @@ impl EventDispatcher {
 
         // Handle scroll events - apply to deepest scrollable container
         if input.scroll_delta != (0.0, 0.0) {
-            if let Some((target_id, local_pos, _)) = &deepest_target {
+            if let Some((target_id, local_pos, _, zoom)) = &deepest_target {
                 events.push(TargetedEvent {
                     event: InteractionEvent::Scroll {
                         delta: input.scroll_delta,
@@ -376,6 +398,7 @@ impl EventDispatcher {
                     },
                     target: target_id.clone(),
                     local_position: *local_pos,
+                    zoom: *zoom,
                 });
 
                 // Automatically process scroll events for nodes with Overflow::Scroll
