@@ -19,10 +19,21 @@ impl InteractiveState {
         }
     }
 
-    /// Call at the beginning of each frame
-    pub fn begin_frame(&mut self) {
+    /// Call at START of frame for transition timing
+    pub fn begin_frame_transitions(&mut self) {
         self.state_manager.begin_frame();
+    }
+
+    /// Call at END of frame to clear input state
+    pub fn end_frame(&mut self) {
         self.input_state.begin_frame();
+    }
+
+    /// DEPRECATED: Do not use - split into begin_frame_transitions() and end_frame()
+    #[deprecated(note = "Use begin_frame_transitions() at start and end_frame() at end")]
+    pub fn begin_frame(&mut self) {
+        self.begin_frame_transitions();
+        self.end_frame();
     }
 
     /// Calculate delta time since last frame
