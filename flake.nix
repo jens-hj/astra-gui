@@ -62,6 +62,11 @@
           packages = with pkgs; [
             rustToolchain
             cargo-watch
+
+            # For scripts (e.g. line counting / reporting)
+            python3
+            python3Packages.polars
+            python3Packages.tabulate
           ];
 
           # Environment variables for wgpu (Linux only)
