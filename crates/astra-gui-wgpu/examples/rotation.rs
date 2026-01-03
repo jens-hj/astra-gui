@@ -401,6 +401,7 @@ impl ExampleApp for RotationExample {
             events,
             &SliderStyle::default(),
             Some(1.0),
+            1.0, // No zoom
         ) {
             println!("Outer rotation: {:.1}°", self.outer_rotation);
             changed = true;
@@ -413,6 +414,7 @@ impl ExampleApp for RotationExample {
             events,
             &SliderStyle::default(),
             Some(1.0),
+            1.0, // No zoom
         ) {
             println!("Inner rotation: {:.1}°", self.inner_rotation);
             changed = true;

@@ -92,6 +92,7 @@ pub fn slider_with_value(
 /// * `range` - Range to clamp values
 /// * `speed` - Base drag speed for drag value (pixels to value multiplier)
 /// * `step` - Optional step size for snapping
+/// * `zoom` - Zoom level to compensate for (1.0 = no zoom). Only affects slider, not drag value.
 ///
 /// # Returns
 /// `true` if the value was changed, `false` otherwise
@@ -110,6 +111,7 @@ pub fn slider_with_value_update(
     range: RangeInclusive<f32>,
     speed: f32,
     step: Option<f32>,
+    zoom: f32,
 ) -> bool {
     let mut changed = false;
 
@@ -121,6 +123,7 @@ pub fn slider_with_value_update(
         events,
         &SliderStyle::default(),
         step,
+        zoom,
     ) {
         *drag_accumulator = *value; // Sync accumulator with slider value
         changed = true;

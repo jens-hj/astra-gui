@@ -68,7 +68,7 @@ impl ExampleApp for Interactive {
 
     fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
         Node::new()
-            // .with_zoom(2.0)
+            .with_zoom(2.0)
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_layout_direction(Layout::Vertical)
@@ -370,6 +370,7 @@ impl ExampleApp for Interactive {
             events,
             &SliderStyle::default(),
             Some(7.0), // Step by 7.0
+            1.0,       // No zoom
         ) {
             println!("Stepped slider value: {:.1}", self.slider_value);
             changed = true;
@@ -383,6 +384,7 @@ impl ExampleApp for Interactive {
             events,
             &SliderStyle::default(),
             None, // No stepping - continuous
+            1.0,  // No zoom
         ) {
             println!(
                 "Continuous slider value: {:.1}",
