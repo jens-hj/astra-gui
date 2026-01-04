@@ -147,23 +147,23 @@ pub fn button(
             corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
                 style.border_radius,
             ))),
-            stroke: Some(Stroke::new(Size::lpx(2.0), style.idle_stroke_color)),
+            stroke: Some(Stroke::new(Size::lpx(1.0), style.idle_stroke_color)),
             ..Default::default()
         })
         .with_hover_style(Style {
             fill_color: Some(style.hover_color),
-            stroke: Some(Stroke::new(Size::lpx(3.0), style.hover_stroke_color)),
+            stroke: Some(Stroke::new(Size::lpx(2.0), style.hover_stroke_color)),
             ..Default::default()
         })
         .with_active_style(Style {
             fill_color: Some(style.pressed_color),
-            stroke: Some(Stroke::new(Size::lpx(2.0), style.pressed_stroke_color)),
+            stroke: Some(Stroke::new(Size::lpx(1.0), style.pressed_stroke_color)),
             ..Default::default()
         })
         .with_disabled_style(Style {
             fill_color: Some(style.disabled_color),
             text_color: Some(style.disabled_text_color),
-            stroke: Some(Stroke::new(Size::lpx(2.0), style.disabled_stroke_color)),
+            stroke: Some(Stroke::new(Size::lpx(1.0), style.disabled_stroke_color)),
             ..Default::default()
         })
         .with_disabled(disabled)

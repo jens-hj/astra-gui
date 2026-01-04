@@ -71,7 +71,7 @@ impl ExampleApp for CollapsibleExample {
 
     fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
         Node::new()
-            .with_zoom(2.0)
+            .with_zoom(1.5)
             .with_width(Size::Fill)
             .with_height(Size::Fill)
             .with_layout_direction(Layout::Vertical)
@@ -91,6 +91,7 @@ impl ExampleApp for CollapsibleExample {
                 // Subtitle
                 Node::new()
                     .with_width(Size::Fill)
+                    .with_margin(Spacing::bottom(Size::lpx(50.0)))
                     .with_content(Content::Text(
                         TextContent::new("Click headers to expand/collapse".to_string())
                             .with_font_size(Size::lpx(20.0))
@@ -98,7 +99,6 @@ impl ExampleApp for CollapsibleExample {
                             .with_h_align(HorizontalAlign::Center)
                             .with_v_align(VerticalAlign::Center),
                     )),
-                Node::new().with_height(Size::lpx(8.0)),
                 // Section 1: Basic Collapsible
                 collapsible(
                     "section1",

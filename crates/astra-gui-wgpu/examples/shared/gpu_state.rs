@@ -105,6 +105,7 @@ impl GpuState {
 
         // Clear the screen with mocha::BASE background
         {
+            let background_color = mocha::BASE;
             let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -112,9 +113,9 @@ impl GpuState {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: mocha::BASE.r as f64,
-                            g: mocha::BASE.g as f64,
-                            b: mocha::BASE.b as f64,
+                            r: background_color.r as f64,
+                            g: background_color.g as f64,
+                            b: background_color.b as f64,
                             a: 1.0,
                         }),
                         store: wgpu::StoreOp::Store,

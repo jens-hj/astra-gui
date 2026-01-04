@@ -12,7 +12,7 @@ use astra_gui::{
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
-/// Visual styling for a collapsible container
+/// Visual styling for a collapsible container<
 #[derive(Debug, Clone)]
 pub struct CollapsibleStyle {
     // Header styling
@@ -86,10 +86,10 @@ impl Default for CollapsibleStyle {
             header_stroke_disabled_color: mocha::SURFACE0.with_alpha(0.8),
 
             // Header stroke widths
-            stroke_idle_width: 2.0,
-            stroke_hover_width: 3.0,
-            stroke_active_width: 3.0,
-            stroke_disabled_width: 2.0,
+            stroke_idle_width: 1.0,
+            stroke_hover_width: 2.0,
+            stroke_active_width: 2.0,
+            stroke_disabled_width: 1.0,
 
             // Indicator colors
             indicator_color: mocha::LAVENDER,
