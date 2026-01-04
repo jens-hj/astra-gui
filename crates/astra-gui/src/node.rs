@@ -478,12 +478,12 @@ impl Node {
     }
 
     /// Set the width override (used by transition system)
-    pub(crate) fn set_width_override(&mut self, width: f32) {
+    pub fn set_width_override(&mut self, width: f32) {
         self.width_override = Some(width);
     }
 
     /// Set the height override (used by transition system)
-    pub(crate) fn set_height_override(&mut self, height: f32) {
+    pub fn set_height_override(&mut self, height: f32) {
         self.height_override = Some(height);
     }
 
@@ -677,114 +677,129 @@ impl Node {
     /// NOTE: This always measures content size, regardless of the node's Size type.
     /// The Size type only matters when the parent is aggregating children for FitContent sizing.
     fn measure_node(&self, measurer: &mut dyn ContentMeasurer, scale_factor: f32) -> IntrinsicSize {
+        // Check for dimension overrides from transition system FIRST
+        if let (Some(w_override), Some(h_override)) = (self.width_override, self.height_override) {
+            return IntrinsicSize::new(w_override, h_override);
+        }
+
         // Short-circuit: if both dimensions are Fixed, we can return immediately
         if let (Size::Logical(w), Size::Logical(h)) = (self.width, self.height) {
             return IntrinsicSize::new(w * scale_factor, h * scale_factor);
         }
 
-        // Measure width - only FitContent measures children
-        let width = match self.width {
-            Size::Logical(w) => w * scale_factor,
-            Size::Physical(w) => w,
-            Size::FitContent => {
-                let content_width = if let Some(content) = &self.content {
-                    match content {
-                        Content::Text(text_content) => {
-                            let mut request = MeasureTextRequest::from_text_content(text_content);
-                            request.font_size *= scale_factor;
-                            // Note: measure_node doesn't have width constraints - use None for max_width
-                            measurer.measure_text(request).width
+        // Measure width - check override first, then FitContent measures children
+        let width = if let Some(w_override) = self.width_override {
+            w_override
+        } else {
+            match self.width {
+                Size::Logical(w) => w * scale_factor,
+                Size::Physical(w) => w,
+                Size::FitContent => {
+                    let content_width = if let Some(content) = &self.content {
+                        match content {
+                            Content::Text(text_content) => {
+                                let mut request =
+                                    MeasureTextRequest::from_text_content(text_content);
+                                request.font_size *= scale_factor;
+                                // Note: measure_node doesn't have width constraints - use None for max_width
+                                measurer.measure_text(request).width
+                            }
                         }
-                    }
-                } else if !self.children.is_empty() {
-                    self.measure_children(measurer, scale_factor).width
-                } else {
+                    } else if !self.children.is_empty() {
+                        self.measure_children(measurer, scale_factor).width
+                    } else {
+                        0.0
+                    };
+                    let padding_left = self
+                        .padding
+                        .left
+                        .try_resolve_with_scale(content_width, scale_factor)
+                        .unwrap_or(0.0);
+                    let padding_right = self
+                        .padding
+                        .right
+                        .try_resolve_with_scale(content_width, scale_factor)
+                        .unwrap_or(0.0);
+                    content_width + padding_left + padding_right
+                }
+                _ => {
+                    // Fill/Relative: don't measure children, no intrinsic size
                     0.0
-                };
-                let padding_left = self
-                    .padding
-                    .left
-                    .try_resolve_with_scale(content_width, scale_factor)
-                    .unwrap_or(0.0);
-                let padding_right = self
-                    .padding
-                    .right
-                    .try_resolve_with_scale(content_width, scale_factor)
-                    .unwrap_or(0.0);
-                content_width + padding_left + padding_right
-            }
-            _ => {
-                // Fill/Relative: don't measure children, no intrinsic size
-                0.0
+                }
             }
         };
 
-        // Measure height - only FitContent measures children
-        let height = match self.height {
-            Size::Logical(h) => h * scale_factor,
-            Size::Physical(h) => h,
-            Size::FitContent => {
-                let content_height = if let Some(content) = &self.content {
-                    match content {
-                        Content::Text(text_content) => {
-                            let mut request = MeasureTextRequest::from_text_content(text_content);
-                            request.font_size *= scale_factor;
+        // Measure height - check override first, then FitContent measures children
+        let height = if let Some(h_override) = self.height_override {
+            h_override
+        } else {
+            match self.height {
+                Size::Logical(h) => h * scale_factor,
+                Size::Physical(h) => h,
+                Size::FitContent => {
+                    let content_height = if let Some(content) = &self.content {
+                        match content {
+                            Content::Text(text_content) => {
+                                let mut request =
+                                    MeasureTextRequest::from_text_content(text_content);
+                                request.font_size *= scale_factor;
 
-                            // If this node has an absolute width, use it as a constraint for text wrapping
-                            request.max_width = match self.width {
-                                Size::Logical(w) => {
-                                    let width_px = w * scale_factor;
-                                    let padding_left = self
-                                        .padding
-                                        .left
-                                        .try_resolve_with_scale(width_px, scale_factor)
-                                        .unwrap_or(0.0);
-                                    let padding_right = self
-                                        .padding
-                                        .right
-                                        .try_resolve_with_scale(width_px, scale_factor)
-                                        .unwrap_or(0.0);
-                                    Some((width_px - padding_left - padding_right).max(0.0))
-                                }
-                                Size::Physical(w) => {
-                                    let padding_left = self
-                                        .padding
-                                        .left
-                                        .try_resolve_with_scale(w, scale_factor)
-                                        .unwrap_or(0.0);
-                                    let padding_right = self
-                                        .padding
-                                        .right
-                                        .try_resolve_with_scale(w, scale_factor)
-                                        .unwrap_or(0.0);
-                                    Some((w - padding_left - padding_right).max(0.0))
-                                }
-                                _ => None, // FitContent/Fill/Relative: no width constraint known yet
-                            };
+                                // If this node has an absolute width, use it as a constraint for text wrapping
+                                request.max_width = match self.width {
+                                    Size::Logical(w) => {
+                                        let width_px = w * scale_factor;
+                                        let padding_left = self
+                                            .padding
+                                            .left
+                                            .try_resolve_with_scale(width_px, scale_factor)
+                                            .unwrap_or(0.0);
+                                        let padding_right = self
+                                            .padding
+                                            .right
+                                            .try_resolve_with_scale(width_px, scale_factor)
+                                            .unwrap_or(0.0);
+                                        Some((width_px - padding_left - padding_right).max(0.0))
+                                    }
+                                    Size::Physical(w) => {
+                                        let padding_left = self
+                                            .padding
+                                            .left
+                                            .try_resolve_with_scale(w, scale_factor)
+                                            .unwrap_or(0.0);
+                                        let padding_right = self
+                                            .padding
+                                            .right
+                                            .try_resolve_with_scale(w, scale_factor)
+                                            .unwrap_or(0.0);
+                                        Some((w - padding_left - padding_right).max(0.0))
+                                    }
+                                    _ => None, // FitContent/Fill/Relative: no width constraint known yet
+                                };
 
-                            measurer.measure_text(request).height
+                                measurer.measure_text(request).height
+                            }
                         }
-                    }
-                } else if !self.children.is_empty() {
-                    self.measure_children(measurer, scale_factor).height
-                } else {
+                    } else if !self.children.is_empty() {
+                        self.measure_children(measurer, scale_factor).height
+                    } else {
+                        0.0
+                    };
+                    let padding_top = self
+                        .padding
+                        .top
+                        .try_resolve_with_scale(content_height, scale_factor)
+                        .unwrap_or(0.0);
+                    let padding_bottom = self
+                        .padding
+                        .bottom
+                        .try_resolve_with_scale(content_height, scale_factor)
+                        .unwrap_or(0.0);
+                    content_height + padding_top + padding_bottom
+                }
+                _ => {
+                    // Fill/Relative: don't measure children, no intrinsic size
                     0.0
-                };
-                let padding_top = self
-                    .padding
-                    .top
-                    .try_resolve_with_scale(content_height, scale_factor)
-                    .unwrap_or(0.0);
-                let padding_bottom = self
-                    .padding
-                    .bottom
-                    .try_resolve_with_scale(content_height, scale_factor)
-                    .unwrap_or(0.0);
-                content_height + padding_top + padding_bottom
-            }
-            _ => {
-                // Fill/Relative: don't measure children, no intrinsic size
-                0.0
+                }
             }
         };
 

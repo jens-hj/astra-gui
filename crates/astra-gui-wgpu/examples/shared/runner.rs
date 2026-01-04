@@ -94,14 +94,24 @@ impl<T: ExampleApp> AppRunner<T> {
             ui = ui.with_zoom(zoom);
         }
 
-        // Compute layout (needed for event dispatch hit testing)
+        // Inject dimension overrides from previous frame's transitions BEFORE layout
+        if let Some(interactive) = self.app.interactive_state() {
+            interactive
+                .state_manager
+                .inject_dimension_overrides(&mut ui);
+        }
+
+        // Compute layout (single pass, uses injected overrides)
         let layout_start = Instant::now();
         let window_rect = Rect::from_min_size([0.0, 0.0], [size.width as f32, size.height as f32]);
 
-        if let Some(text_measurer) = self.app.text_measurer() {
-            ui.compute_layout_with_measurer(window_rect, text_measurer);
-        } else {
-            ui.compute_layout(window_rect);
+        {
+            let mut text_measurer = self.app.text_measurer();
+            if let Some(measurer) = text_measurer.as_deref_mut() {
+                ui.compute_layout_with_measurer(window_rect, measurer);
+            } else {
+                ui.compute_layout(window_rect);
+            }
         }
         let layout_time = layout_start.elapsed();
 
@@ -112,16 +122,10 @@ impl<T: ExampleApp> AppRunner<T> {
                 .event_dispatcher
                 .dispatch(&interactive.input_state, &mut ui);
 
+            // Update transitions and capture dimensions for next frame
             interactive
                 .state_manager
-                .apply_styles(&mut ui, &interaction_states);
-
-            // Recompute layout after applying style overrides (for transitions)
-            if let Some(text_measurer) = self.app.text_measurer() {
-                ui.compute_layout_with_measurer(window_rect, text_measurer);
-            } else {
-                ui.compute_layout(window_rect);
-            }
+                .update_transitions(&mut ui, &interaction_states);
 
             events
         } else {

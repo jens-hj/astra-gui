@@ -210,6 +210,15 @@ impl InteractiveStateManager {
             .unwrap_or(true);
 
         if state_changed || style_changed || dimensions_changed {
+            if node_id.as_str().contains("content") {
+                eprintln!("DEBUG: [{}] Starting transition! state_changed={}, style_changed={}, dimensions_changed={}",
+                    node_id.as_str(), state_changed, style_changed, dimensions_changed);
+                eprintln!(
+                    "  from_height={:?} -> to_height={:?}",
+                    entry.last_height, current_height
+                );
+            }
+
             entry.previous_state = entry.current_state;
             entry.current_state = new_state;
             entry.previous_base_style = Some(base_style.clone());
@@ -272,11 +281,52 @@ impl InteractiveStateManager {
         self.states.values().any(|s| s.transition_start.is_some())
     }
 
-    /// Apply interactive styles to a node tree
+    /// Inject dimension overrides from transition state BEFORE layout
     ///
-    /// This traverses the tree and applies computed styles to nodes with IDs.
-    /// Auto-IDs should have been assigned via `assign_auto_ids()` before calling this.
-    pub fn apply_styles(
+    /// This applies interpolated width/height from the PREVIOUS frame's transition state,
+    /// ensuring siblings see the correct animated dimensions during layout.
+    pub fn inject_dimension_overrides(&self, node: &mut Node) {
+        let node_id = node.id().cloned();
+        if let Some(node_id) = node_id {
+            if let Some(state) = self.states.get(&node_id) {
+                // ONLY inject overrides if actively transitioning
+                if state.transition_start.is_some() {
+                    if let Some(current_style) = &state.current_style {
+                        if let Some(width) = current_style.width_override {
+                            node.set_width_override(width);
+                        }
+                        if let Some(height) = current_style.height_override {
+                            if node_id.as_str().contains("content") {
+                                eprintln!(
+                                    "DEBUG inject: [{}] setting height_override = {} (transitioning)",
+                                    node_id.as_str(),
+                                    height
+                                );
+                            }
+                            node.set_height_override(height);
+                        }
+                    }
+                } else if node_id.as_str().contains("content") {
+                    eprintln!(
+                        "DEBUG inject: [{}] NOT transitioning, skipping override",
+                        node_id.as_str()
+                    );
+                }
+            }
+        }
+
+        // Recursively inject for children
+        for child in node.children_mut() {
+            self.inject_dimension_overrides(child);
+        }
+    }
+
+    /// Update transition state and apply non-dimension styles
+    ///
+    /// Captures current dimensions from layout for use in NEXT frame's transitions.
+    /// Applies non-dimension styles (colors, opacity) immediately for instant visual feedback.
+    /// Dimension overrides are stored but not applied (used next frame by inject_dimension_overrides).
+    pub fn update_transitions(
         &mut self,
         node: &mut Node,
         interaction_states: &HashMap<NodeId, InteractionState>,
@@ -284,13 +334,21 @@ impl InteractiveStateManager {
         // Apply styles if node has an ID and base style
         if let Some(node_id) = node.id() {
             if let Some(base_style) = node.base_style() {
-                // Capture resolved dimensions AFTER layout
+                // Capture resolved dimensions from current layout
                 let resolved_width = node
                     .computed_layout()
                     .map(|layout| layout.rect.max[0] - layout.rect.min[0]);
                 let resolved_height = node
                     .computed_layout()
                     .map(|layout| layout.rect.max[1] - layout.rect.min[1]);
+
+                if node_id.as_str().contains("content") {
+                    eprintln!(
+                        "DEBUG update_transitions: [{}] resolved_height = {:?}",
+                        node_id.as_str(),
+                        resolved_height
+                    );
+                }
 
                 // Check if node is disabled - if so, force Disabled state
                 let state = if node.is_disabled() {
@@ -302,7 +360,7 @@ impl InteractiveStateManager {
                         .unwrap_or(InteractionState::Idle)
                 };
 
-                // Compute the current style with transitions
+                // Compute the target style for NEXT frame
                 let computed_style = self.update_state(
                     node_id,
                     state,
@@ -315,14 +373,18 @@ impl InteractiveStateManager {
                     resolved_height,
                 );
 
-                // Apply the computed style to the node
-                computed_style.apply_to_node(node);
+                // Apply NON-DIMENSION styles immediately for instant visual feedback
+                // Dimension overrides are stored in state but not applied (used next frame)
+                let mut immediate_style = computed_style.clone();
+                immediate_style.width_override = None;
+                immediate_style.height_override = None;
+                immediate_style.apply_to_node(node);
             }
         }
 
-        // Recursively apply to children
+        // Recursively update transitions for children
         for child in node.children_mut() {
-            self.apply_styles(child, interaction_states);
+            self.update_transitions(child, interaction_states);
         }
     }
 }
