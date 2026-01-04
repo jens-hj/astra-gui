@@ -18,6 +18,8 @@ pub struct HitTestResult {
     pub node_rect: Rect,
     /// The accumulated zoom/scale factor at this node
     pub zoom: f32,
+    /// The z-index of the node for layering
+    pub z_index: crate::layout::ZIndex,
 }
 
 /// Hit-test a point against a node tree
@@ -62,6 +64,11 @@ pub fn hit_test_point(root: &Node, point: Point) -> Vec<HitTestResult> {
         initial_zoom,
         &mut results,
     );
+
+    // Sort results by z-index to ensure higher z-index nodes come later
+    // This makes them the "deepest" target for event dispatch
+    results.sort_by_key(|hit| hit.z_index.0);
+
     results
 }
 
@@ -170,6 +177,7 @@ fn hit_test_recursive(
             local_pos,
             node_rect,
             zoom: current_zoom,
+            z_index: node.z_index().unwrap_or(crate::layout::ZIndex::DEFAULT),
         });
     }
 

@@ -272,9 +272,11 @@ pub fn collapsible(
 
     // Wrapper with overflow clipping for smooth height animation
     // NOTE: No hover/active styles to prevent mouse interaction from interrupting animation
+    // Z-index below header so translated overlap doesn't intercept clicks
     let content_wrapper = Node::new()
         .with_id(NodeId::new(format!("{}_content", id_str)))
         .with_width(Size::Fill)
+        .with_z_index(ZIndex(0)) // Below header's ZIndex(1)
         .with_translation(Translation::y(Size::lpx(-style.border_radius * 2.0)))
         .with_padding(Spacing::top(Size::lpx(style.border_radius * 2.0)))
         .with_style(Style {
