@@ -212,15 +212,36 @@ impl InteractiveStateManager {
             target_style.height_override = entry.to_style.as_ref().and_then(|s| s.height_override);
         }
 
-        // Detect state change OR style property change OR dimension change
-        let state_changed = new_state != entry.current_state;
+        // Detect style property change OR dimension change
         let style_changed = entry
             .previous_base_style
             .as_ref()
             .map(|prev| styles_differ(prev, base_style))
             .unwrap_or(true);
 
-        if state_changed || style_changed || dimensions_changed {
+        // Check if target style actually differs from current to_style
+        // This prevents restarting transitions on state changes when there are no hover/active styles
+        let target_style_changed = entry
+            .to_style
+            .as_ref()
+            .map(|prev_target| {
+                // Compare non-dimension properties only (dimensions are handled separately)
+                let mut prev = prev_target.clone();
+                prev.width_override = None;
+                prev.height_override = None;
+                let mut curr = target_style.clone();
+                curr.width_override = None;
+                curr.height_override = None;
+                styles_differ(&prev, &curr)
+            })
+            .unwrap_or(true);
+
+        // Only restart transition if:
+        // 1. Target style actually changed (not just state), OR
+        // 2. Base style properties changed, OR
+        // 3. Dimensions changed
+        // This prevents mouse hover from interrupting dimension-only animations
+        if target_style_changed || style_changed || dimensions_changed {
             entry.previous_state = entry.current_state;
             entry.current_state = new_state;
             entry.previous_base_style = Some(base_style.clone());
