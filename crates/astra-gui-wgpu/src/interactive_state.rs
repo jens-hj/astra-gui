@@ -183,8 +183,19 @@ impl InteractiveStateManager {
         // (to avoid capturing interpolated values during transitions)
         let is_transitioning = entry.transition_start.is_some();
         let dimensions_changed = if !is_transitioning {
-            let width_changed = entry.last_width != current_width;
-            let height_changed = entry.last_height != current_height;
+            const EPSILON: f32 = 0.01; // Ignore changes smaller than 0.01px
+            let width_changed = match (entry.last_width, current_width) {
+                (Some(last), Some(curr)) => (last - curr).abs() > EPSILON,
+                (None, Some(_)) => false, // First measurement, not a change
+                (Some(_), None) => true,  // Dimension disappeared
+                (None, None) => false,
+            };
+            let height_changed = match (entry.last_height, current_height) {
+                (Some(last), Some(curr)) => (last - curr).abs() > EPSILON,
+                (None, Some(_)) => false, // First measurement, not a change
+                (Some(_), None) => true,  // Dimension disappeared
+                (None, None) => false,
+            };
             width_changed || height_changed
         } else {
             false // Don't detect changes during transitions
@@ -210,15 +221,6 @@ impl InteractiveStateManager {
             .unwrap_or(true);
 
         if state_changed || style_changed || dimensions_changed {
-            if node_id.as_str().contains("content") {
-                eprintln!("DEBUG: [{}] Starting transition! state_changed={}, style_changed={}, dimensions_changed={}",
-                    node_id.as_str(), state_changed, style_changed, dimensions_changed);
-                eprintln!(
-                    "  from_height={:?} -> to_height={:?}",
-                    entry.last_height, current_height
-                );
-            }
-
             entry.previous_state = entry.current_state;
             entry.current_state = new_state;
             entry.previous_base_style = Some(base_style.clone());
@@ -296,21 +298,9 @@ impl InteractiveStateManager {
                             node.set_width_override(width);
                         }
                         if let Some(height) = current_style.height_override {
-                            if node_id.as_str().contains("content") {
-                                eprintln!(
-                                    "DEBUG inject: [{}] setting height_override = {} (transitioning)",
-                                    node_id.as_str(),
-                                    height
-                                );
-                            }
                             node.set_height_override(height);
                         }
                     }
-                } else if node_id.as_str().contains("content") {
-                    eprintln!(
-                        "DEBUG inject: [{}] NOT transitioning, skipping override",
-                        node_id.as_str()
-                    );
                 }
             }
         }
@@ -332,7 +322,8 @@ impl InteractiveStateManager {
         interaction_states: &HashMap<NodeId, InteractionState>,
     ) {
         // Apply styles if node has an ID and base style
-        if let Some(node_id) = node.id() {
+        let node_id = node.id().cloned();
+        if let Some(node_id) = node_id {
             if let Some(base_style) = node.base_style() {
                 // Capture resolved dimensions from current layout
                 let resolved_width = node
@@ -355,14 +346,14 @@ impl InteractiveStateManager {
                     InteractionState::Disabled
                 } else {
                     interaction_states
-                        .get(node_id)
+                        .get(&node_id)
                         .copied()
                         .unwrap_or(InteractionState::Idle)
                 };
 
                 // Compute the target style for NEXT frame
                 let computed_style = self.update_state(
-                    node_id,
+                    &node_id,
                     state,
                     base_style,
                     node.hover_style(),
