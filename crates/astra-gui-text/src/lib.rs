@@ -259,6 +259,36 @@ pub mod cosmic {
 
     use astra_gui::{ContentMeasurer, IntrinsicSize, MeasureTextRequest, Rect, Wrap};
     use cosmic_text::{fontdb, Attrs, Buffer, FontSystem, Metrics, Shaping};
+    use std::collections::HashMap;
+    use std::hash::{Hash, Hasher};
+
+    /// Cache key for text measurements.
+    /// Uses hash of text content + measurement parameters.
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    struct MeasurementCacheKey {
+        text_hash: u64,
+        font_size_scaled: u32, // font_size * 1000 to avoid float in hash
+        max_width_scaled: Option<u32>, // max_width * 1000
+        wrap: Wrap,
+        line_height_scaled: u32, // line_height_multiplier * 1000
+    }
+
+    impl MeasurementCacheKey {
+        fn from_request(request: &MeasureTextRequest<'_>) -> Self {
+            // Hash the text content
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            request.text.hash(&mut hasher);
+            let text_hash = hasher.finish();
+
+            Self {
+                text_hash,
+                font_size_scaled: (request.font_size * 1000.0) as u32,
+                max_width_scaled: request.max_width.map(|w| (w * 1000.0) as u32),
+                wrap: request.wrap,
+                line_height_scaled: (request.line_height_multiplier * 1000.0) as u32,
+            }
+        }
+    }
 
     /// Concrete engine backed by `cosmic-text`.
     pub struct CosmicEngine {
@@ -270,6 +300,11 @@ pub mod cosmic {
         // NOTE: For now we treat font identity as a single default font. We'll expand this to
         // multiple faces/families later once we define a stable mapping from family/style -> fontdb::ID.
         default_font_id: FontId,
+
+        /// Measurement cache: (text_hash, font_size, max_width, wrap) -> IntrinsicSize
+        /// This caches the expensive text measurement operation to avoid re-measuring
+        /// unchanged text on every frame.
+        measurement_cache: HashMap<MeasurementCacheKey, IntrinsicSize>,
     }
 
     impl CosmicEngine {
@@ -297,12 +332,29 @@ pub mod cosmic {
                 font_system,
                 swash_cache: cosmic_text::SwashCache::new(),
                 default_font_id,
+                measurement_cache: HashMap::new(),
             }
         }
 
         /// Access the underlying `FontSystem` if callers want to customize further.
         pub fn font_system_mut(&mut self) -> &mut FontSystem {
             &mut self.font_system
+        }
+
+        /// Clear the measurement cache.
+        ///
+        /// Call this when:
+        /// - Window is resized (scale factor changes)
+        /// - Clearing memory is needed
+        ///
+        /// The cache will automatically rebuild on subsequent measurements.
+        pub fn clear_measurement_cache(&mut self) {
+            self.measurement_cache.clear();
+        }
+
+        /// Get the current size of the measurement cache.
+        pub fn measurement_cache_size(&self) -> usize {
+            self.measurement_cache.len()
         }
 
         fn make_attrs(&self, req: &ShapeLineRequest<'_>) -> Attrs<'static> {
@@ -613,6 +665,13 @@ pub mod cosmic {
 
     impl ContentMeasurer for CosmicEngine {
         fn measure_text(&mut self, request: MeasureTextRequest<'_>) -> IntrinsicSize {
+            // Check cache first
+            let cache_key = MeasurementCacheKey::from_request(&request);
+            if let Some(cached) = self.measurement_cache.get(&cache_key) {
+                return *cached;
+            }
+
+            // Cache miss - perform actual measurement
             // Determine wrap mode for measurement
             // If no width constraint is provided, disable wrapping for measurement
             // to get the natural text dimensions
@@ -644,6 +703,15 @@ pub mod cosmic {
             let width = shaped_text.total_width + 0.001;
 
             let result = IntrinsicSize::new(width, shaped_text.total_height);
+
+            // Store in cache for future frames
+            // Simple cache size limit: clear if we exceed 1000 entries
+            // This prevents unbounded growth while keeping the common case fast
+            const MAX_CACHE_SIZE: usize = 1000;
+            if self.measurement_cache.len() >= MAX_CACHE_SIZE {
+                self.measurement_cache.clear();
+            }
+            self.measurement_cache.insert(cache_key, result);
 
             result
         }

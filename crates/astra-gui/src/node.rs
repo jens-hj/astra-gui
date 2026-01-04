@@ -1180,203 +1180,210 @@ impl Node {
         let mut current_x = content_x;
         let mut current_y = content_y;
 
-        // Calculate total spacing in the layout direction (margins + gaps)
-        // Resolve gap and child margins with effective_scale_factor (logical -> physical pixels)
+        // OPTIMIZATION: Combined single-pass child analysis
+        // Previously: 4 separate loops (spacing, fill allocation, total size, positioning)
+        // Now: 1 loop that computes everything + caches measurements
+
+        // Resolve gap once
         let scaled_gap = self
             .gap
             .try_resolve_with_scale(content_width.max(content_height), effective_scale_factor)
             .unwrap_or(0.0);
-        let (total_horizontal_spacing, total_vertical_spacing) = match self.layout_direction {
-            Layout::Horizontal => {
-                let mut total = 0.0f32;
-                for (i, child) in self.children.iter().enumerate() {
+
+        // Accumulation struct for single-pass traversal
+        struct ChildAnalysis {
+            spacing: f32,
+            fill_count: usize,
+            non_fill_size: f32,
+            // Cache measurements: child_index -> (width, height)
+            measured_sizes: Vec<Option<(f32, f32)>>,
+            // Cache resolved margins: child_index -> (left, right, top, bottom)
+            resolved_margins: Vec<(f32, f32, f32, f32)>,
+        }
+
+        let mut analysis = ChildAnalysis {
+            spacing: 0.0,
+            fill_count: 0,
+            non_fill_size: 0.0,
+            measured_sizes: vec![None; self.children.len()],
+            resolved_margins: Vec::with_capacity(self.children.len()),
+        };
+
+        // Single pass through children
+        for (i, child) in self.children.iter().enumerate() {
+            // Resolve margins once for this child and cache them
+            let margin_left = child
+                .margin
+                .left
+                .try_resolve_with_scale(content_width, effective_scale_factor)
+                .unwrap_or(0.0);
+            let margin_right = child
+                .margin
+                .right
+                .try_resolve_with_scale(content_width, effective_scale_factor)
+                .unwrap_or(0.0);
+            let margin_top = child
+                .margin
+                .top
+                .try_resolve_with_scale(content_height, effective_scale_factor)
+                .unwrap_or(0.0);
+            let margin_bottom = child
+                .margin
+                .bottom
+                .try_resolve_with_scale(content_height, effective_scale_factor)
+                .unwrap_or(0.0);
+
+            analysis
+                .resolved_margins
+                .push((margin_left, margin_right, margin_top, margin_bottom));
+            // 1. Calculate spacing (margins + gaps) using cached margins
+            match self.layout_direction {
+                Layout::Horizontal => {
                     if i == 0 {
-                        // First child: left margin doesn't collapse with parent padding
-                        total += child
-                            .margin
-                            .left
-                            .try_resolve_with_scale(content_width, effective_scale_factor)
-                            .unwrap_or(0.0);
+                        analysis.spacing += margin_left;
                     }
 
-                    // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
+                        // Peek at next child's margins (will be resolved in next iteration)
                         let next_child = &self.children[i + 1];
-                        // Collapsed margin is the max of the two adjacent margins (scaled)
-                        let child_right = child
-                            .margin
-                            .right
-                            .try_resolve_with_scale(content_width, effective_scale_factor)
-                            .unwrap_or(0.0);
                         let next_left = next_child
                             .margin
                             .left
                             .try_resolve_with_scale(content_width, effective_scale_factor)
                             .unwrap_or(0.0);
-                        let collapsed_margin = child_right.max(next_left);
-                        // Collapse gap with margin - use the larger of gap or collapsed margin
-                        total += scaled_gap.max(collapsed_margin);
+                        let collapsed_margin = margin_right.max(next_left);
+                        analysis.spacing += scaled_gap.max(collapsed_margin);
                     } else {
-                        // Last child: just add its right margin
-                        total += child
-                            .margin
-                            .right
-                            .try_resolve_with_scale(content_width, effective_scale_factor)
-                            .unwrap_or(0.0);
+                        analysis.spacing += margin_right;
                     }
                 }
-                (total, 0.0)
-            }
-            Layout::Vertical => {
-                let mut total = 0.0f32;
-                for (i, child) in self.children.iter().enumerate() {
+                Layout::Vertical => {
                     if i == 0 {
-                        // First child: top margin doesn't collapse with parent padding
-                        total += child
-                            .margin
-                            .top
-                            .try_resolve_with_scale(content_height, effective_scale_factor)
-                            .unwrap_or(0.0);
+                        analysis.spacing += margin_top;
                     }
 
-                    // Between this child and the next, collapse gap with margins
                     if i + 1 < self.children.len() {
+                        // Peek at next child's margins (will be resolved in next iteration)
                         let next_child = &self.children[i + 1];
-                        // Collapsed margin is the max of the two adjacent margins (scaled)
-                        let child_bottom = child
-                            .margin
-                            .bottom
-                            .try_resolve_with_scale(content_height, effective_scale_factor)
-                            .unwrap_or(0.0);
                         let next_top = next_child
                             .margin
                             .top
                             .try_resolve_with_scale(content_height, effective_scale_factor)
                             .unwrap_or(0.0);
-                        let collapsed_margin = child_bottom.max(next_top);
-                        // Collapse gap with margin - use the larger of gap or collapsed margin
-                        total += scaled_gap.max(collapsed_margin);
+                        let collapsed_margin = margin_bottom.max(next_top);
+                        analysis.spacing += scaled_gap.max(collapsed_margin);
                     } else {
-                        // Last child: just add its bottom margin
-                        total += child
-                            .margin
-                            .bottom
-                            .try_resolve_with_scale(content_height, effective_scale_factor)
-                            .unwrap_or(0.0);
+                        analysis.spacing += margin_bottom;
                     }
                 }
-                (0.0, total)
+                Layout::Stack => {}
             }
-            Layout::Stack => {
-                // In Stack layout, children don't take up space linearly, so no spacing
-                (0.0, 0.0)
-            }
+
+            // 2. Measure and accumulate child sizes (for Fill calculation and total size)
+            let (_child_width, _child_height) = match self.layout_direction {
+                Layout::Horizontal => {
+                    let width = if child.width.is_fill() {
+                        analysis.fill_count += 1;
+                        0.0 // Will be calculated after knowing remaining space
+                    } else if child.width.is_fit_content() {
+                        // Measure once and cache
+                        let measured = child.measure_node(measurer, effective_scale_factor);
+                        analysis.measured_sizes[i] = Some((measured.width, measured.height));
+                        measured.width
+                    } else {
+                        child
+                            .width
+                            .try_resolve_with_scale(
+                                content_width - analysis.spacing,
+                                effective_scale_factor,
+                            )
+                            .unwrap()
+                    };
+
+                    if !child.width.is_fill() {
+                        analysis.non_fill_size += width;
+                    }
+
+                    (width, 0.0) // Height not needed for horizontal
+                }
+                Layout::Vertical => {
+                    let height = if child.height.is_fill() {
+                        analysis.fill_count += 1;
+                        0.0
+                    } else if child.height.is_fit_content() {
+                        let measured = child.measure_node(measurer, effective_scale_factor);
+                        analysis.measured_sizes[i] = Some((measured.width, measured.height));
+                        measured.height
+                    } else {
+                        child
+                            .height
+                            .try_resolve_with_scale(
+                                content_height - analysis.spacing,
+                                effective_scale_factor,
+                            )
+                            .unwrap()
+                    };
+
+                    if !child.height.is_fill() {
+                        analysis.non_fill_size += height;
+                    }
+
+                    (0.0, height) // Width not needed for vertical
+                }
+                Layout::Stack => (0.0, 0.0), // Stack doesn't accumulate
+            };
+        }
+
+        // Calculate spacing and available space
+        let (total_horizontal_spacing, total_vertical_spacing) = match self.layout_direction {
+            Layout::Horizontal => (analysis.spacing, 0.0),
+            Layout::Vertical => (0.0, analysis.spacing),
+            Layout::Stack => (0.0, 0.0),
         };
 
-        // Space available for children after subtracting spacing (margins + gaps)
         let available_width = (content_width - total_horizontal_spacing).max(0.0);
         let available_height = (content_height - total_vertical_spacing).max(0.0);
 
-        // Calculate remaining space for Fill children
+        // Calculate Fill size
         let (fill_size_width, fill_size_height) = match self.layout_direction {
             Layout::Horizontal => {
-                let mut fill_count = 0;
-                let mut used_width = 0.0;
-
-                for child in &self.children {
-                    if child.width.is_fill() {
-                        fill_count += 1;
-                    } else if child.width.is_fit_content() {
-                        used_width += child.measure_node(measurer, effective_scale_factor).width;
-                    } else {
-                        // Must be Fixed or Relative
-                        used_width += child
-                            .width
-                            .try_resolve_with_scale(available_width, effective_scale_factor)
-                            .unwrap();
-                    }
-                }
-
-                let remaining_width = (available_width - used_width).max(0.0);
-                let fill_width = if fill_count > 0 {
-                    remaining_width / fill_count as f32
+                let remaining_width = (available_width - analysis.non_fill_size).max(0.0);
+                let fill_width = if analysis.fill_count > 0 {
+                    remaining_width / analysis.fill_count as f32
                 } else {
                     0.0
                 };
-
                 (fill_width, available_height)
             }
             Layout::Vertical => {
-                let mut fill_count = 0;
-                let mut used_height = 0.0;
-
-                for child in &self.children {
-                    if child.height.is_fill() {
-                        fill_count += 1;
-                    } else if child.height.is_fit_content() {
-                        used_height += child.measure_node(measurer, effective_scale_factor).height;
-                    } else {
-                        // Must be Fixed or Relative
-                        used_height += child
-                            .height
-                            .try_resolve_with_scale(available_height, effective_scale_factor)
-                            .unwrap();
-                    }
-                }
-
-                let remaining_height = (available_height - used_height).max(0.0);
-                let fill_height = if fill_count > 0 {
-                    remaining_height / fill_count as f32
+                let remaining_height = (available_height - analysis.non_fill_size).max(0.0);
+                let fill_height = if analysis.fill_count > 0 {
+                    remaining_height / analysis.fill_count as f32
                 } else {
                     0.0
                 };
-
                 (available_width, fill_height)
             }
-            Layout::Stack => {
-                // In Stack layout, all children get full available space
-                (available_width, available_height)
-            }
+            Layout::Stack => (available_width, available_height),
         };
 
-        // Calculate total size of children for alignment
+        // Calculate total children size for alignment
         let (total_children_width, total_children_height) = match self.layout_direction {
             Layout::Horizontal => {
-                let mut total_width = total_horizontal_spacing;
-                for child in &self.children {
-                    if child.width.is_fill() {
-                        total_width += fill_size_width;
-                    } else if child.width.is_fit_content() {
-                        total_width += child.measure_node(measurer, effective_scale_factor).width;
-                    } else {
-                        total_width += child
-                            .width
-                            .try_resolve_with_scale(available_width, effective_scale_factor)
-                            .unwrap_or(0.0);
-                    }
-                }
-                (total_width, content_height)
+                let fill_total = fill_size_width * analysis.fill_count as f32;
+                (
+                    total_horizontal_spacing + analysis.non_fill_size + fill_total,
+                    content_height,
+                )
             }
             Layout::Vertical => {
-                let mut total_height = total_vertical_spacing;
-                for child in &self.children {
-                    if child.height.is_fill() {
-                        total_height += fill_size_height;
-                    } else if child.height.is_fit_content() {
-                        total_height += child.measure_node(measurer, effective_scale_factor).height;
-                    } else {
-                        total_height += child
-                            .height
-                            .try_resolve_with_scale(available_height, effective_scale_factor)
-                            .unwrap_or(0.0);
-                    }
-                }
-                (content_width, total_height)
+                let fill_total = fill_size_height * analysis.fill_count as f32;
+                (
+                    content_width,
+                    total_vertical_spacing + analysis.non_fill_size + fill_total,
+                )
             }
-            Layout::Stack => {
-                // For stack, use content dimensions
-                (content_width, content_height)
-            }
+            Layout::Stack => (content_width, content_height),
         };
 
         // Apply alignment offset
@@ -1471,27 +1478,9 @@ impl Node {
                 }
             };
 
-            // Resolve child margins with effective_scale_factor before calculating parent dimensions
-            let child_margin_left = self.children[i]
-                .margin
-                .left
-                .try_resolve_with_scale(content_width, effective_scale_factor)
-                .unwrap_or(0.0);
-            let child_margin_right = self.children[i]
-                .margin
-                .right
-                .try_resolve_with_scale(content_width, effective_scale_factor)
-                .unwrap_or(0.0);
-            let child_margin_top = self.children[i]
-                .margin
-                .top
-                .try_resolve_with_scale(content_height, effective_scale_factor)
-                .unwrap_or(0.0);
-            let child_margin_bottom = self.children[i]
-                .margin
-                .bottom
-                .try_resolve_with_scale(content_height, effective_scale_factor)
-                .unwrap_or(0.0);
+            // Use cached child margins from earlier resolution
+            let (child_margin_left, child_margin_right, child_margin_top, child_margin_bottom) =
+                analysis.resolved_margins[i];
 
             let child_parent_width = if self.children[i].width.is_fill() {
                 fill_size_width + child_margin_left + child_margin_right
@@ -1573,33 +1562,17 @@ impl Node {
                 if i + 1 < num_children {
                     match self.layout_direction {
                         Layout::Horizontal => {
-                            // Collapse margins with effective_scale_factor applied
-                            let child_right = self.children[i]
-                                .margin
-                                .right
-                                .try_resolve_with_scale(content_width, effective_scale_factor)
-                                .unwrap_or(0.0);
-                            let next_left = self.children[i + 1]
-                                .margin
-                                .left
-                                .try_resolve_with_scale(content_width, effective_scale_factor)
-                                .unwrap_or(0.0);
+                            // Use cached margins for collapse calculation
+                            let child_right = analysis.resolved_margins[i].1;
+                            let next_left = analysis.resolved_margins[i + 1].0;
                             let collapsed_margin = child_right.max(next_left);
                             let spacing = scaled_gap.max(collapsed_margin);
                             current_x = child_rect.max[0] + spacing;
                         }
                         Layout::Vertical => {
-                            // Collapse margins with effective_scale_factor applied
-                            let child_bottom = self.children[i]
-                                .margin
-                                .bottom
-                                .try_resolve_with_scale(content_height, effective_scale_factor)
-                                .unwrap_or(0.0);
-                            let next_top = self.children[i + 1]
-                                .margin
-                                .top
-                                .try_resolve_with_scale(content_height, effective_scale_factor)
-                                .unwrap_or(0.0);
+                            // Use cached margins for collapse calculation
+                            let child_bottom = analysis.resolved_margins[i].3;
+                            let next_top = analysis.resolved_margins[i + 1].2;
                             let collapsed_margin = child_bottom.max(next_top);
                             let spacing = scaled_gap.max(collapsed_margin);
                             current_y = child_rect.max[1] + spacing;
