@@ -568,6 +568,26 @@ impl Spacing {
         }
     }
 
+    /// Get the top spacing
+    pub fn get_top(&self) -> f32 {
+        self.top.try_resolve(1.0).unwrap_or(0.0)
+    }
+
+    /// Get the left spacing
+    pub fn get_left(&self) -> f32 {
+        self.left.try_resolve(1.0).unwrap_or(0.0)
+    }
+
+    /// Get the right spacing
+    pub fn get_right(&self) -> f32 {
+        self.right.try_resolve(1.0).unwrap_or(0.0)
+    }
+
+    /// Get the bottom spacing
+    pub fn get_bottom(&self) -> f32 {
+        self.bottom.try_resolve(1.0).unwrap_or(0.0)
+    }
+
     /// Get the sum of horizontal spacing (left + right)
     ///
     /// Resolves Size values to f32. For Fill or FitContent, returns 0.0.

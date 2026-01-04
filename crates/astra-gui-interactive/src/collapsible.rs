@@ -8,7 +8,7 @@ use std::f32::consts::PI;
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, NodeId,
     Orientation, Overflow, Shape, Size, Spacing, Stroke, Style, TextContent, Transition,
-    Translation, TriangleSpec, VerticalAlign, ZIndex,
+    TriangleSpec, VerticalAlign, ZIndex,
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
@@ -277,8 +277,12 @@ pub fn collapsible(
         .with_id(NodeId::new(format!("{}_content", id_str)))
         .with_width(Size::Fill)
         .with_z_index(ZIndex(0)) // Below header's ZIndex(1)
-        .with_translation(Translation::y(Size::lpx(-style.border_radius * 2.0)))
-        .with_padding(Spacing::top(Size::lpx(style.border_radius * 2.0)))
+        // .with_translation(Translation::y(Size::lpx(-style.border_radius * 2.0)))
+        .with_padding(Spacing::top(Size::lpx(
+            style.header_padding.get_vertical()
+                + style.title_font_size
+                + style.content_padding.get_top(),
+        )))
         .with_style(Style {
             fill_color: Some(style.header_idle_color),
             stroke: Some(Stroke::new(
@@ -301,7 +305,7 @@ pub fn collapsible(
     Node::new()
         .with_width(Size::Fill)
         .with_height(Size::FitContent)
-        .with_layout_direction(Layout::Vertical)
+        .with_layout_direction(Layout::Stack)
         .with_children(vec![header, content_wrapper])
 }
 

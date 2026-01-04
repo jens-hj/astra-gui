@@ -364,7 +364,7 @@ fn main() {
 
                 interactive
                     .state_manager
-                    .apply_styles(&mut ui, &interaction_states);
+                    .update_transitions(&mut ui, &interaction_states);
 
                 // Let app handle events
                 self.app.handle_events(&events);
