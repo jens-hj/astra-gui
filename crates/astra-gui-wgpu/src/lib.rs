@@ -10,8 +10,6 @@ mod interactive_state;
 #[cfg(feature = "text-cosmic")]
 mod text;
 
-mod vertex;
-
 pub use events::*;
 pub use input::*;
 pub use interactive_state::*;
@@ -22,23 +20,9 @@ pub use winit::keyboard::{Key, NamedKey};
 
 use astra_gui::{
     ClippedShape, Color, CornerShape, FullOutput, HorizontalAlign, Rect, Shape, Size, Stroke,
-    StyledRect, Tessellator, Transform2D, VerticalAlign, ZIndex,
+    StyledRect, Transform2D, VerticalAlign, ZIndex,
 };
 use instance::RectInstance;
-use vertex::WgpuVertex;
-
-/// Rendering mode for rectangles
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RenderMode {
-    /// Use SDF (Signed Distance Field) rendering for analytical anti-aliasing.
-    /// Best quality, especially for strokes and rounded corners.
-    Sdf,
-    /// Use mesh tessellation for rendering.
-    /// More compatible but lower quality anti-aliasing.
-    Mesh,
-    /// Automatically choose based on shape complexity (currently defaults to SDF).
-    Auto,
-}
 
 #[cfg(feature = "text-cosmic")]
 use astra_gui_text as gui_text;
@@ -69,9 +53,6 @@ struct RenderLayer<'a> {
     shapes: Vec<&'a astra_gui::ClippedShape>,
 }
 
-const INITIAL_VERTEX_CAPACITY: usize = 1024;
-const INITIAL_INDEX_CAPACITY: usize = 2048;
-
 #[cfg(feature = "text-cosmic")]
 const INITIAL_TEXT_VERTEX_CAPACITY: usize = 4096;
 #[cfg(feature = "text-cosmic")]
@@ -84,26 +65,8 @@ const ATLAS_PADDING_PX: u32 = 1;
 
 /// WGPU renderer for astra-gui
 pub struct Renderer {
-    pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
-    tessellator: Tessellator,
-    vertex_capacity: usize,
-    index_capacity: usize,
-    wgpu_vertices: Vec<WgpuVertex>,
-
-    // Performance optimization: track previous frame sizes to pre-allocate buffers
-    last_frame_vertex_count: usize,
-    last_frame_index_count: usize,
-
-    // Persistent buffers reused across frames
-    frame_indices: Vec<u32>,
-    frame_geometry_draws: Vec<ClippedDraw>,
-
-    // Rendering mode configuration
-    render_mode: RenderMode,
 
     // SDF rendering pipeline (analytic anti-aliasing for both rects and triangles)
     sdf_pipeline: wgpu::RenderPipeline,
@@ -187,23 +150,8 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    /// Create a new renderer with the default render mode (Auto/SDF)
+    /// Create a new renderer using SDF (Signed Distance Field) rendering for analytical anti-aliasing
     pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
-        Self::with_render_mode(device, surface_format, RenderMode::Auto)
-    }
-
-    /// Create a new renderer with a specific render mode
-    pub fn with_render_mode(
-        device: &wgpu::Device,
-        surface_format: wgpu::TextureFormat,
-        render_mode: RenderMode,
-    ) -> Self {
-        // Load shader
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Astra UI Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/ui.wgsl").into()),
-        });
-
         // Create uniform buffer (screen size)
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Astra UI Uniform Buffer"),
@@ -238,61 +186,11 @@ impl Renderer {
             }],
         });
 
-        // Create pipeline layout (geometry)
+        // Create pipeline layout for SDF rendering
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Astra UI Pipeline Layout"),
             bind_group_layouts: &[&globals_bind_group_layout],
             immediate_size: 0,
-        });
-
-        // Create render pipeline (geometry)
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Astra UI Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[WgpuVertex::desc()],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
-
-        // Create initial buffers (geometry)
-        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Astra UI Vertex Buffer"),
-            size: (INITIAL_VERTEX_CAPACITY * std::mem::size_of::<WgpuVertex>()) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Astra UI Index Buffer"),
-            size: (INITIAL_INDEX_CAPACITY * std::mem::size_of::<u32>()) as u64,
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
         });
 
         // Create SDF pipeline and buffers
@@ -548,22 +446,8 @@ impl Renderer {
         };
 
         Self {
-            pipeline,
-            vertex_buffer,
-            index_buffer,
             uniform_buffer,
             uniform_bind_group,
-            tessellator: Tessellator::new(),
-            vertex_capacity: INITIAL_VERTEX_CAPACITY,
-            index_capacity: INITIAL_INDEX_CAPACITY,
-            wgpu_vertices: Vec::new(),
-            last_frame_vertex_count: 0,
-            last_frame_index_count: 0,
-
-            frame_indices: Vec::new(),
-            frame_geometry_draws: Vec::new(),
-
-            render_mode,
 
             sdf_pipeline,
             sdf_instance_buffer,
@@ -619,16 +503,6 @@ impl Renderer {
             #[cfg(feature = "text-cosmic")]
             atlas_at_gpu_limit: false,
         }
-    }
-
-    /// Get the current render mode
-    pub fn render_mode(&self) -> RenderMode {
-        self.render_mode
-    }
-
-    /// Set the render mode
-    pub fn set_render_mode(&mut self, mode: RenderMode) {
-        self.render_mode = mode;
     }
 
     /// Get mutable access to the text engine for measurement
@@ -911,14 +785,6 @@ impl Renderer {
             .reserve(self.last_frame_sdf_instance_count);
         self.sdf_draws.clear();
 
-        self.wgpu_vertices.clear();
-        self.wgpu_vertices.reserve(self.last_frame_vertex_count);
-
-        self.frame_indices.clear();
-        self.frame_indices.reserve(self.last_frame_index_count);
-
-        self.frame_geometry_draws.clear();
-
         // Text buffers
         self.text_vertices.clear();
         self.text_vertices
@@ -949,141 +815,120 @@ impl Renderer {
             for clipped in &layer.shapes {
                 match &clipped.shape {
                     Shape::Rect(_rect) => {
-                        // Decide whether to use SDF or mesh rendering based on render_mode
-                        let use_sdf = match self.render_mode {
-                            RenderMode::Sdf => true,
-                            RenderMode::Mesh => false,
-                            RenderMode::Auto => true, // Default to SDF for best quality
-                        };
+                        // Use SDF rendering (analytical anti-aliasing)
+                        // Compute scissor rect for this shape
+                        let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
+                        let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
+                        let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
+                        let sc_max_y = clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
 
-                        if use_sdf {
-                            // Use SDF rendering (analytical anti-aliasing)
-                            // Compute scissor rect for this shape
-                            let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
-                            let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
-                            let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
-                            let sc_max_y =
-                                clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
+                        let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
+                        let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
 
-                            let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
-                            let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
+                        // Skip if fully clipped
+                        if sc_w > 0 && sc_h > 0 {
+                            let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
+                            let instance_index = self.sdf_instances.len() as u32;
 
-                            // Skip if fully clipped
-                            if sc_w > 0 && sc_h > 0 {
-                                let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
-                                let instance_index = self.sdf_instances.len() as u32;
+                            self.sdf_instances.push(RectInstance::from(*clipped));
 
-                                self.sdf_instances.push(RectInstance::from(*clipped));
+                            // Try to batch with previous draw if same scissor
+                            // IMPORTANT: Only batch if the previous command was also SDF and from this layer
+                            let can_batch = if let Some(DrawCommand::Sdf(last_idx)) =
+                                current_layer_commands.last()
+                            {
+                                *last_idx == self.sdf_draws.len() - 1
+                            } else {
+                                false
+                            };
 
-                                // Try to batch with previous draw if same scissor
-                                // IMPORTANT: Only batch if the previous command was also SDF and from this layer
-                                let can_batch = if let Some(DrawCommand::Sdf(last_idx)) =
-                                    current_layer_commands.last()
-                                {
-                                    *last_idx == self.sdf_draws.len() - 1
-                                } else {
-                                    false
-                                };
-
-                                if can_batch {
-                                    if let Some(last_draw) = self.sdf_draws.last_mut() {
-                                        if last_draw.scissor == scissor
-                                            && last_draw.instance_start + last_draw.instance_count
-                                                == instance_index
-                                        {
-                                            // Extend existing batch
-                                            last_draw.instance_count += 1;
-                                        } else {
-                                            // Start new batch (different scissor or non-consecutive)
-                                            self.sdf_draws.push(SdfDraw {
-                                                scissor,
-                                                instance_start: instance_index,
-                                                instance_count: 1,
-                                            });
-                                            current_layer_commands
-                                                .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
-                                        }
+                            if can_batch {
+                                if let Some(last_draw) = self.sdf_draws.last_mut() {
+                                    if last_draw.scissor == scissor
+                                        && last_draw.instance_start + last_draw.instance_count
+                                            == instance_index
+                                    {
+                                        // Extend existing batch
+                                        last_draw.instance_count += 1;
+                                    } else {
+                                        // Start new batch (different scissor or non-consecutive)
+                                        self.sdf_draws.push(SdfDraw {
+                                            scissor,
+                                            instance_start: instance_index,
+                                            instance_count: 1,
+                                        });
+                                        current_layer_commands
+                                            .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
                                     }
-                                } else {
-                                    // First draw in this layer or switched from Text
-                                    self.sdf_draws.push(SdfDraw {
-                                        scissor,
-                                        instance_start: instance_index,
-                                        instance_count: 1,
-                                    });
-                                    current_layer_commands
-                                        .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
                                 }
+                            } else {
+                                // First draw in this layer or switched from Text
+                                self.sdf_draws.push(SdfDraw {
+                                    scissor,
+                                    instance_start: instance_index,
+                                    instance_count: 1,
+                                });
+                                current_layer_commands
+                                    .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
                             }
-                        } else {
-                            // Use mesh tessellation - collect for batch processing
-                            // (Tessellator processes all shapes at once)
                         }
                     }
                     Shape::Triangle(_triangle) => {
-                        if self.render_mode == RenderMode::Sdf
-                            || self.render_mode == RenderMode::Auto
-                        {
-                            // Use SDF rendering - same pipeline as rectangles
-                            // Compute scissor rect
-                            let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
-                            let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
-                            let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
-                            let sc_max_y =
-                                clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
+                        // Use SDF rendering - same pipeline as rectangles
+                        // Compute scissor rect
+                        let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
+                        let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
+                        let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
+                        let sc_max_y = clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
 
-                            let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
-                            let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
+                        let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
+                        let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
 
-                            if sc_w > 0 && sc_h > 0 {
-                                let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
-                                let instance_index = self.sdf_instances.len() as u32;
+                        if sc_w > 0 && sc_h > 0 {
+                            let scissor = (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h);
+                            let instance_index = self.sdf_instances.len() as u32;
 
-                                self.sdf_instances
-                                    .push(RectInstance::from_triangle(*clipped));
+                            self.sdf_instances
+                                .push(RectInstance::from_triangle(*clipped));
 
-                                // Try to batch with previous draw if same scissor
-                                let can_batch = if let Some(DrawCommand::Sdf(last_idx)) =
-                                    current_layer_commands.last()
-                                {
-                                    *last_idx == self.sdf_draws.len() - 1
-                                } else {
-                                    false
-                                };
+                            // Try to batch with previous draw if same scissor
+                            let can_batch = if let Some(DrawCommand::Sdf(last_idx)) =
+                                current_layer_commands.last()
+                            {
+                                *last_idx == self.sdf_draws.len() - 1
+                            } else {
+                                false
+                            };
 
-                                if can_batch {
-                                    if let Some(last_draw) = self.sdf_draws.last_mut() {
-                                        if last_draw.scissor == scissor
-                                            && last_draw.instance_start + last_draw.instance_count
-                                                == instance_index
-                                        {
-                                            // Extend existing batch
-                                            last_draw.instance_count += 1;
-                                        } else {
-                                            // Start new batch (different scissor or non-consecutive)
-                                            self.sdf_draws.push(SdfDraw {
-                                                scissor,
-                                                instance_start: instance_index,
-                                                instance_count: 1,
-                                            });
-                                            current_layer_commands
-                                                .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
-                                        }
+                            if can_batch {
+                                if let Some(last_draw) = self.sdf_draws.last_mut() {
+                                    if last_draw.scissor == scissor
+                                        && last_draw.instance_start + last_draw.instance_count
+                                            == instance_index
+                                    {
+                                        // Extend existing batch
+                                        last_draw.instance_count += 1;
+                                    } else {
+                                        // Start new batch (different scissor or non-consecutive)
+                                        self.sdf_draws.push(SdfDraw {
+                                            scissor,
+                                            instance_start: instance_index,
+                                            instance_count: 1,
+                                        });
+                                        current_layer_commands
+                                            .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
                                     }
-                                } else {
-                                    // First draw in this layer or switched from Text
-                                    self.sdf_draws.push(SdfDraw {
-                                        scissor,
-                                        instance_start: instance_index,
-                                        instance_count: 1,
-                                    });
-                                    current_layer_commands
-                                        .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
                                 }
+                            } else {
+                                // First draw in this layer or switched from Text
+                                self.sdf_draws.push(SdfDraw {
+                                    scissor,
+                                    instance_start: instance_index,
+                                    instance_count: 1,
+                                });
+                                current_layer_commands
+                                    .push(DrawCommand::Sdf(self.sdf_draws.len() - 1));
                             }
-                        } else {
-                            // Use mesh tessellation - collect for batch processing
-                            // (Tessellator processes all shapes at once)
                         }
                     }
                     Shape::Text(text_shape) => {
@@ -1555,87 +1400,7 @@ impl Renderer {
         // Store layer count for later use in render pass
         let layer_count = layer_draw_commands.len();
 
-        // Process mesh shapes if using Mesh render mode
-        if self.render_mode == RenderMode::Mesh {
-            // Tessellate all shapes using mesh rendering
-            let mesh = self.tessellator.tessellate(&output.shapes);
-
-            if !mesh.vertices.is_empty() {
-                // Convert mesh vertices to WgpuVertex format
-                for vertex in &mesh.vertices {
-                    self.wgpu_vertices.push(WgpuVertex {
-                        pos: vertex.pos,
-                        color: [
-                            (vertex.color[0] * 255.0).round().clamp(0.0, 255.0) as u8,
-                            (vertex.color[1] * 255.0).round().clamp(0.0, 255.0) as u8,
-                            (vertex.color[2] * 255.0).round().clamp(0.0, 255.0) as u8,
-                            (vertex.color[3] * 255.0).round().clamp(0.0, 255.0) as u8,
-                        ],
-                    });
-                }
-
-                // Copy indices
-                self.frame_indices.extend_from_slice(&mesh.indices);
-
-                // Create draw calls with scissor rects
-                for clipped in &output.shapes {
-                    let sc_min_x = clipped.clip_rect.min[0].max(0.0).floor() as i32;
-                    let sc_min_y = clipped.clip_rect.min[1].max(0.0).floor() as i32;
-                    let sc_max_x = clipped.clip_rect.max[0].min(screen_width).ceil() as i32;
-                    let sc_max_y = clipped.clip_rect.max[1].min(screen_height).ceil() as i32;
-
-                    let sc_w = (sc_max_x - sc_min_x).max(0) as u32;
-                    let sc_h = (sc_max_y - sc_min_y).max(0) as u32;
-
-                    if sc_w > 0 && sc_h > 0 {
-                        // Use the entire mesh for now (TODO: track per-shape indices)
-                        self.frame_geometry_draws.push(ClippedDraw {
-                            scissor: (sc_min_x as u32, sc_min_y as u32, sc_w, sc_h),
-                            index_start: 0,
-                            index_end: self.frame_indices.len() as u32,
-                        });
-                    }
-                }
-            }
-        }
-
-        // Resize vertex buffer if needed
-        if self.wgpu_vertices.len() > self.vertex_capacity {
-            self.vertex_capacity = (self.wgpu_vertices.len() * 2).next_power_of_two();
-            self.vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Astra UI Vertex Buffer"),
-                size: (self.vertex_capacity * std::mem::size_of::<WgpuVertex>()) as u64,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-        }
-
-        // Resize index buffer if needed
-        if self.frame_indices.len() > self.index_capacity {
-            self.index_capacity = (self.frame_indices.len() * 2).next_power_of_two();
-            self.index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Astra UI Index Buffer"),
-                size: (self.index_capacity * std::mem::size_of::<u32>()) as u64,
-                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-        }
-
-        // Upload geometry
-        if !self.frame_indices.is_empty() {
-            queue.write_buffer(
-                &self.vertex_buffer,
-                0,
-                bytemuck::cast_slice(&self.wgpu_vertices),
-            );
-            queue.write_buffer(
-                &self.index_buffer,
-                0,
-                bytemuck::cast_slice(&self.frame_indices),
-            );
-        }
-
-        // Update uniforms (used by both passes)
+        // Update uniforms
         let uniforms = [screen_width, screen_height];
         queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&uniforms));
 
@@ -1784,48 +1549,7 @@ impl Renderer {
             }
         } // End layer loop
 
-        // Draw geometry with batched scissor clipping
-        // OPTIMIZATION: Batch consecutive draws with the same scissor rect to reduce draw calls
-        if !self.frame_geometry_draws.is_empty() {
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-
-            // Batch consecutive draws with the same scissor rect
-            let mut current_scissor = self.frame_geometry_draws[0].scissor;
-            let mut batch_start = self.frame_geometry_draws[0].index_start;
-            let mut batch_end = self.frame_geometry_draws[0].index_end;
-
-            for draw in &self.frame_geometry_draws[1..] {
-                if draw.scissor == current_scissor && draw.index_start == batch_end {
-                    // Extend current batch (consecutive indices, same scissor)
-                    batch_end = draw.index_end;
-                } else {
-                    // Flush current batch
-                    let (x, y, w, h) = current_scissor;
-                    render_pass.set_scissor_rect(x, y, w, h);
-                    render_pass.draw_indexed(batch_start..batch_end, 0, 0..1);
-
-                    // Start new batch
-                    current_scissor = draw.scissor;
-                    batch_start = draw.index_start;
-                    batch_end = draw.index_end;
-                }
-            }
-
-            // Flush final batch
-            let (x, y, w, h) = current_scissor;
-            render_pass.set_scissor_rect(x, y, w, h);
-            render_pass.draw_indexed(batch_start..batch_end, 0, 0..1);
-
-            // Reset scissor to full screen
-            render_pass.set_scissor_rect(0, 0, screen_width as u32, screen_height as u32);
-        }
-
-        // Update frame tracking for geometry buffers
-        self.last_frame_vertex_count = self.wgpu_vertices.len();
-        self.last_frame_index_count = self.frame_indices.len();
+        // Update frame tracking
         self.last_frame_sdf_instance_count = self.sdf_instances.len();
     }
 }

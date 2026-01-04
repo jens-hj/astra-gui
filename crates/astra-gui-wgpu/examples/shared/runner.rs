@@ -295,10 +295,9 @@ impl<T: ExampleApp> ApplicationHandler for AppRunner<T> {
 
             _ => {
                 // Debug keybinds
-                let renderer = self.gpu_state.as_mut().map(|s| &mut s.renderer);
                 let debug_options = self.app.debug_options_mut();
                 if let Some(debug_opts) = debug_options {
-                    let _handled = handle_debug_keybinds(&event, debug_opts, renderer);
+                    let _handled = handle_debug_keybinds(&event, debug_opts);
                 }
             }
         }

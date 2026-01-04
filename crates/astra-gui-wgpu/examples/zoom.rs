@@ -297,12 +297,10 @@ fn main() {
                 _ => {
                     // Debug keybinds
                     if !custom_handled {
-                        let renderer = self.gpu_state.as_mut().map(|s| &mut s.renderer);
                         let debug_options = self.app.debug_options_mut();
                         if let Some(debug_opts) = debug_options {
-                            let _handled = shared::debug_controls::handle_debug_keybinds(
-                                &event, debug_opts, renderer,
-                            );
+                            let _handled =
+                                shared::debug_controls::handle_debug_keybinds(&event, debug_opts);
                         }
                     }
                 }

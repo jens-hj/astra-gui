@@ -13,15 +13,13 @@
 //! - O: transform origins (orange crosshair)
 //! - T: text line bounds (cyan outline)
 //! - D: toggle all debug visualizations
-//! - S: toggle render mode (SDF/Mesh)
 //!
 //! Usage (in an example):
 //! - Print `DEBUG_HELP_TEXT` once at startup
-//! - Call `handle_debug_keybinds(&event, &mut debug_options, Some(&mut renderer))`
+//! - Call `handle_debug_keybinds(&event, &mut debug_options)`
 //!   early in `window_event` and return if it handled the key.
 
 use astra_gui::DebugOptions;
-use astra_gui_wgpu::{RenderMode, Renderer};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 
 /// Multi-line help text suitable for printing in the console at startup.
@@ -39,7 +37,6 @@ pub const DEBUG_HELP_TEXT: &str = "Debug controls:
   O - Toggle transform origins (orange crosshair)
   T - Toggle text line bounds (cyan outline)
   D - Toggle all debug visualizations
-  S - Toggle render mode (SDF/Mesh)
   F - Toggle frame profiling
   ESC - Exit";
 
@@ -49,20 +46,13 @@ pub const DEBUG_HELP_TEXT: &str = "Debug controls:
 /// wants to show an always-visible hint.
 #[allow(dead_code)]
 pub const DEBUG_HELP_TEXT_ONELINE: &str =
-    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | T:Text | D:All | S:RenderMode | F:Profiling | ESC:Exit";
+    "M:Margins | P:Padding | B:Borders | C:Content | R:ClipRects | G:Gaps | O:Origins | T:Text | D:All | F:Profiling | ESC:Exit";
 
 /// Handles shared debug keybinds for examples.
 ///
 /// Returns `true` if the event was handled (and callers should early-return),
 /// otherwise `false`.
-///
-/// Notes:
-/// - If you pass `None` for `renderer`, the `S` key will be ignored.
-pub fn handle_debug_keybinds(
-    event: &WindowEvent,
-    debug_options: &mut DebugOptions,
-    mut renderer: Option<&mut Renderer>,
-) -> bool {
+pub fn handle_debug_keybinds(event: &WindowEvent, debug_options: &mut DebugOptions) -> bool {
     let WindowEvent::KeyboardInput {
         event:
             KeyEvent {
@@ -128,19 +118,6 @@ pub fn handle_debug_keybinds(
                 *debug_options = DebugOptions::all();
                 println!("Debug: ALL ON");
             }
-            true
-        }
-        winit::keyboard::KeyCode::KeyS => {
-            let Some(renderer) = renderer.as_deref_mut() else {
-                return false;
-            };
-
-            let new_mode = match renderer.render_mode() {
-                RenderMode::Sdf | RenderMode::Auto => RenderMode::Mesh,
-                RenderMode::Mesh => RenderMode::Sdf,
-            };
-            renderer.set_render_mode(new_mode);
-            println!("Render mode: {:?}", new_mode);
             true
         }
         _ => false,

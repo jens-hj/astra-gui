@@ -19,7 +19,7 @@ use astra_gui::{
     catppuccin::mocha, CornerShape, DebugOptions, FullOutput, HorizontalAlign, Layout, Node, Size,
     Spacing, Stroke, TextContent, Translation, VerticalAlign, ZIndex,
 };
-use astra_gui_wgpu::{RenderMode, Renderer};
+use astra_gui_wgpu::Renderer;
 use std::sync::Arc;
 use winit::{
     application::ApplicationHandler,
@@ -31,11 +31,7 @@ use winit::{
 const DEBUG_HELP_TEXT: &str =
     "M:Margins | P:Padding | B:Borders | C:Content | G:Gaps | T:Text | D:All | S:RenderMode";
 
-fn handle_debug_keybinds(
-    event: &WindowEvent,
-    debug_options: &mut DebugOptions,
-    renderer: Option<&mut Renderer>,
-) -> bool {
+fn handle_debug_keybinds(event: &WindowEvent, debug_options: &mut DebugOptions) -> bool {
     let WindowEvent::KeyboardInput {
         event:
             KeyEvent {
@@ -84,19 +80,6 @@ fn handle_debug_keybinds(
                 println!("Debug: ALL ON");
             }
             true
-        }
-        winit::keyboard::KeyCode::KeyS => {
-            if let Some(renderer) = renderer {
-                let new_mode = match renderer.render_mode() {
-                    RenderMode::Sdf | RenderMode::Auto => RenderMode::Mesh,
-                    RenderMode::Mesh => RenderMode::Sdf,
-                };
-                renderer.set_render_mode(new_mode);
-                println!("Render mode: {:?}", new_mode);
-                true
-            } else {
-                false
-            }
         }
         _ => false,
     }
@@ -490,8 +473,7 @@ impl ApplicationHandler for App {
                 self.render();
             }
             _ => {
-                let renderer = self.gpu_state.as_mut().map(|s| &mut s.renderer);
-                let handled = handle_debug_keybinds(&event, &mut self.debug_options, renderer);
+                let handled = handle_debug_keybinds(&event, &mut self.debug_options);
 
                 if !handled && self.handle_input(&event) {
                     if let Some(gpu_state) = &self.gpu_state {
