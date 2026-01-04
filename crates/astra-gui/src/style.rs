@@ -44,6 +44,18 @@ pub struct Style {
 
     /// Transform origin for rotation
     pub transform_origin: Option<TransformOrigin>,
+
+    /// Override width in physical pixels (post-resolution, from transition system)
+    ///
+    /// When set, this bypasses the normal Size→pixels resolution during layout
+    /// and uses this value directly. Used for animating between different Size variants.
+    pub width_override: Option<f32>,
+
+    /// Override height in physical pixels (post-resolution, from transition system)
+    ///
+    /// When set, this bypasses the normal Size→pixels resolution during layout
+    /// and uses this value directly. Used for animating between different Size variants.
+    pub height_override: Option<f32>,
 }
 
 impl Style {
@@ -92,6 +104,8 @@ impl Style {
             translation_y: other.translation_y.or(self.translation_y),
             rotation: other.rotation.or(self.rotation),
             transform_origin: other.transform_origin.or(self.transform_origin),
+            width_override: other.width_override.or(self.width_override),
+            height_override: other.height_override.or(self.height_override),
         }
     }
 
@@ -164,6 +178,14 @@ impl Style {
         // Apply transform origin if present
         if let Some(origin) = self.transform_origin {
             node.set_transform_origin(origin);
+        }
+
+        // Apply width/height overrides if present
+        if let Some(width) = self.width_override {
+            node.set_width_override(width);
+        }
+        if let Some(height) = self.height_override {
+            node.set_height_override(height);
         }
     }
 }

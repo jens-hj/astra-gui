@@ -12,6 +12,8 @@ fn styles_differ(a: &Style, b: &Style) -> bool {
         || a.text_color != b.text_color
         || a.translation_x != b.translation_x
         || a.translation_y != b.translation_y
+        || a.width_override != b.width_override
+        || a.height_override != b.height_override
 }
 
 /// Current interaction state of a node
@@ -46,6 +48,12 @@ struct NodeTransitionState {
 
     /// Current computed style (result of interpolation)
     current_style: Option<Style>,
+
+    /// Last resolved width (for detecting dimension changes)
+    last_width: Option<f32>,
+
+    /// Last resolved height (for detecting dimension changes)
+    last_height: Option<f32>,
 }
 
 /// Manages interactive state and transitions for all nodes
@@ -121,6 +129,8 @@ impl InteractiveStateManager {
         active_style: Option<&Style>,
         disabled_style: Option<&Style>,
         transition: Option<&Transition>,
+        current_width: Option<f32>,
+        current_height: Option<f32>,
     ) -> Style {
         let entry = self
             .states
@@ -133,10 +143,12 @@ impl InteractiveStateManager {
                 from_style: None,
                 to_style: None,
                 current_style: Some(base_style.clone()),
+                last_width: current_width,
+                last_height: current_height,
             });
 
         // Determine target style based on state
-        let target_style = match new_state {
+        let mut target_style = match new_state {
             InteractionState::Idle => base_style.clone(),
             InteractionState::Hovered => {
                 let mut style = base_style.clone();
@@ -167,7 +179,29 @@ impl InteractiveStateManager {
             }
         };
 
-        // Detect state change OR style property change
+        // Only detect dimension changes when NOT currently transitioning
+        // (to avoid capturing interpolated values during transitions)
+        let is_transitioning = entry.transition_start.is_some();
+        let dimensions_changed = if !is_transitioning {
+            let width_changed = entry.last_width != current_width;
+            let height_changed = entry.last_height != current_height;
+            width_changed || height_changed
+        } else {
+            false // Don't detect changes during transitions
+        };
+
+        // Add current resolved dimensions to target style for interpolation
+        // During transitions, keep using the target dimensions we already set
+        if !is_transitioning {
+            target_style.width_override = current_width;
+            target_style.height_override = current_height;
+        } else {
+            // Keep the target dimensions from the ongoing transition
+            target_style.width_override = entry.to_style.as_ref().and_then(|s| s.width_override);
+            target_style.height_override = entry.to_style.as_ref().and_then(|s| s.height_override);
+        }
+
+        // Detect state change OR style property change OR dimension change
         let state_changed = new_state != entry.current_state;
         let style_changed = entry
             .previous_base_style
@@ -175,11 +209,20 @@ impl InteractiveStateManager {
             .map(|prev| styles_differ(prev, base_style))
             .unwrap_or(true);
 
-        if state_changed || style_changed {
+        if state_changed || style_changed || dimensions_changed {
             entry.previous_state = entry.current_state;
             entry.current_state = new_state;
             entry.previous_base_style = Some(base_style.clone());
-            entry.from_style = entry.current_style.clone();
+
+            // Create from_style with last known dimensions for smooth transition
+            let mut from_style = entry
+                .current_style
+                .clone()
+                .unwrap_or_else(|| base_style.clone());
+            from_style.width_override = entry.last_width;
+            from_style.height_override = entry.last_height;
+
+            entry.from_style = Some(from_style);
             entry.to_style = Some(target_style.clone());
             entry.transition_start = Some(self.current_time);
         }
@@ -197,15 +240,22 @@ impl InteractiveStateManager {
                 // Transition complete
                 entry.current_style = Some(to.clone());
                 entry.transition_start = None;
+                // Update last known dimensions after transition completes
+                entry.last_width = current_width;
+                entry.last_height = current_height;
             } else {
                 // Interpolate
                 let progress = elapsed / trans.duration;
                 let eased = (trans.easing)(progress);
-                entry.current_style = Some(lerp_style(from, to, eased));
+                let interpolated = lerp_style(from, to, eased);
+                entry.current_style = Some(interpolated);
             }
         } else {
             // No transition, use target directly
             entry.current_style = Some(target_style);
+            // Update last known dimensions when not transitioning
+            entry.last_width = current_width;
+            entry.last_height = current_height;
         }
 
         entry
@@ -234,6 +284,14 @@ impl InteractiveStateManager {
         // Apply styles if node has an ID and base style
         if let Some(node_id) = node.id() {
             if let Some(base_style) = node.base_style() {
+                // Capture resolved dimensions AFTER layout
+                let resolved_width = node
+                    .computed_layout()
+                    .map(|layout| layout.rect.max[0] - layout.rect.min[0]);
+                let resolved_height = node
+                    .computed_layout()
+                    .map(|layout| layout.rect.max[1] - layout.rect.min[1]);
+
                 // Check if node is disabled - if so, force Disabled state
                 let state = if node.is_disabled() {
                     InteractionState::Disabled
@@ -253,6 +311,8 @@ impl InteractiveStateManager {
                     node.active_style(),
                     node.disabled_style(),
                     node.transition(),
+                    resolved_width,
+                    resolved_height,
                 );
 
                 // Apply the computed style to the node

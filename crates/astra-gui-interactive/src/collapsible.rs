@@ -253,6 +253,7 @@ pub fn collapsible(
 
     // Wrapper with overflow clipping for smooth height animation
     let content_wrapper = Node::new()
+        .with_id(NodeId::new(format!("{}_content", id_str)))
         .with_width(Size::Fill)
         .with_height(if expanded {
             Size::FitContent
@@ -260,6 +261,8 @@ pub fn collapsible(
             Size::lpx(0.0)
         })
         .with_overflow(Overflow::Hidden)
+        .with_style(Style::new()) // Base style required for transitions
+        .with_transition(Transition::standard())
         .with_child(content_panel);
 
     // Main container

@@ -187,6 +187,18 @@ pub fn lerp_style(from: &Style, to: &Style, t: f32) -> Style {
             (Some(a), None) => Some(a),
             (None, None) => None,
         },
+        width_override: match (from.width_override, to.width_override) {
+            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
+            (None, Some(b)) => Some(b),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
+        },
+        height_override: match (from.height_override, to.height_override) {
+            (Some(a), Some(b)) => Some(lerp_f32(a, b, t)),
+            (None, Some(b)) => Some(b),
+            (Some(a), None) => Some(a),
+            (None, None) => None,
+        },
     }
 }
 

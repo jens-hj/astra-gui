@@ -136,6 +136,14 @@ pub struct Node {
     ///
     /// Higher values render on top. Default: None (inherits parent's z-index or 0)
     z_index: Option<ZIndex>,
+    /// Width override from transition system (physical pixels)
+    ///
+    /// When set, bypasses normal Size resolution during layout
+    width_override: Option<f32>,
+    /// Height override from transition system (physical pixels)
+    ///
+    /// When set, bypasses normal Size resolution during layout
+    height_override: Option<f32>,
 }
 
 impl Node {
@@ -174,6 +182,8 @@ impl Node {
             disabled: false,
             transition: None,
             z_index: None,
+            width_override: None,
+            height_override: None,
         }
     }
 
@@ -465,6 +475,16 @@ impl Node {
     /// Set the transform origin (used by style system)
     pub(crate) fn set_transform_origin(&mut self, origin: TransformOrigin) {
         self.transform_origin = origin;
+    }
+
+    /// Set the width override (used by transition system)
+    pub(crate) fn set_width_override(&mut self, width: f32) {
+        self.width_override = Some(width);
+    }
+
+    /// Set the height override (used by transition system)
+    pub(crate) fn set_height_override(&mut self, height: f32) {
+        self.height_override = Some(height);
     }
 
     /// Get the overflow policy
@@ -1106,7 +1126,10 @@ impl Node {
             None
         };
 
-        let width = if self.width.is_fit_content() {
+        let width = if let Some(override_width) = self.width_override {
+            // Use override from transition system (already in physical pixels)
+            override_width
+        } else if self.width.is_fit_content() {
             let measured_width = measured_size.as_ref().unwrap().width;
 
             if parent_overflow == Overflow::Visible {
@@ -1122,7 +1145,10 @@ impl Node {
                 .unwrap_or(available_width)
         };
 
-        let height = if self.height.is_fit_content() {
+        let height = if let Some(override_height) = self.height_override {
+            // Use override from transition system (already in physical pixels)
+            override_height
+        } else if self.height.is_fit_content() {
             let measured_height = measured_size.as_ref().unwrap().height;
 
             if parent_overflow == Overflow::Visible {

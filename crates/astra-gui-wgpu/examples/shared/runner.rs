@@ -116,6 +116,13 @@ impl<T: ExampleApp> AppRunner<T> {
                 .state_manager
                 .apply_styles(&mut ui, &interaction_states);
 
+            // Recompute layout after applying style overrides (for transitions)
+            if let Some(text_measurer) = self.app.text_measurer() {
+                ui.compute_layout_with_measurer(window_rect, text_measurer);
+            } else {
+                ui.compute_layout(window_rect);
+            }
+
             events
         } else {
             Vec::new()
