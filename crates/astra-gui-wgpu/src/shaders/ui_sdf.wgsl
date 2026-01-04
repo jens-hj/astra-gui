@@ -44,7 +44,6 @@ struct VertexOutput {
     @location(8) half_size: vec2<f32>,
     @location(9) scale: f32,
     @location(10) params56: vec2<f32>,
-    @location(11) aa_width: f32,  // Pre-computed AA width (Phase 1.1 optimization)
 }
 
 @group(0) @binding(0)
@@ -104,11 +103,6 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     out.half_size = inst.half_size;
     out.scale = inst.scale;
     out.params56 = inst.params56;
-
-    // Phase 1.1: Compute AA width analytically (once per vertex, not per fragment!)
-    // AA width = size of 1 pixel in local space
-    // This replaces the expensive dpdx/dpdy/length computation in the fragment shader
-    out.aa_width = 2.0 / (min(uniforms.screen_size.x, uniforms.screen_size.y) * inst.scale);
 
     return out;
 }
@@ -273,11 +267,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
-    // Phase 1.1: Use pre-computed analytical AA width from vertex shader
-    // This replaces the expensive dpdx/dpdy/length computation (30-40% faster!)
-    // OLD (EXPENSIVE): let aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist))) / in.scale;
-    // NEW (FAST): Just use the interpolated value computed once per vertex
-    let aa_width = in.aa_width;
+    // Compute AA width using screen-space derivatives for pixel-perfect antialiasing
+    // This accounts for rotation, non-uniform scaling, and perspective
+    // The gradient magnitude tells us how many pixels per unit of distance
+    let aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist)));
 
     // Phase 1.2: Early discard for pixels definitely outside shape (10-15% improvement)
     // If we're more than 1.5 AA widths away from the shape, we're fully transparent - discard early
