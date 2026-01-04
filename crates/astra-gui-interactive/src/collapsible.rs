@@ -3,10 +3,12 @@
 //! Provides an expandable/collapsible container with a clickable header,
 //! similar to egui's collapsing header. Supports smooth animations and nesting.
 
+use std::f32::consts::PI;
+
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, NodeId,
     Orientation, Overflow, Shape, Size, Spacing, Stroke, Style, TextContent, Transition,
-    VerticalAlign,
+    Translation, TriangleSpec, VerticalAlign, ZIndex,
 };
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
@@ -73,7 +75,7 @@ impl Default for CollapsibleStyle {
         Self {
             // Header colors
             header_idle_color: mocha::BASE,
-            header_hover_color: mocha::SURFACE0,
+            header_hover_color: mocha::MANTLE,
             header_active_color: mocha::CRUST,
             header_disabled_color: mocha::BASE.with_alpha(0.8),
 
@@ -92,7 +94,7 @@ impl Default for CollapsibleStyle {
             // Indicator colors
             indicator_color: mocha::LAVENDER,
             indicator_disabled_color: mocha::SURFACE2,
-            indicator_size: 12.0,
+            indicator_size: 24.0,
 
             // Text colors
             title_color: mocha::TEXT,
@@ -108,7 +110,7 @@ impl Default for CollapsibleStyle {
                 Size::lpx(16.0),
                 Size::lpx(16.0),
             ),
-            border_radius: 8.0,
+            border_radius: 24.0,
         }
     }
 }
@@ -167,17 +169,28 @@ pub fn collapsible(
         .with_id(NodeId::new(format!("{}_indicator", id_str)))
         .with_width(Size::lpx(style.indicator_size))
         .with_height(Size::lpx(style.indicator_size))
-        .with_shape(Shape::triangle(if expanded {
-            Orientation::Down
-        } else {
-            Orientation::Right
+        .with_shape(Shape::triangle_with_spec(TriangleSpec::Equilateral {
+            orientation: if expanded {
+                Orientation::Down
+            } else {
+                Orientation::Right
+            },
         }))
+        .with_rotation(if expanded { PI / 2.0 } else { 0.0 })
         .with_style(Style {
-            fill_color: Some(style.indicator_color),
+            fill_color: Some(style.header_idle_color),
+            stroke: Some(Stroke::new(
+                Size::lpx(style.stroke_idle_width),
+                style.indicator_color,
+            )),
             ..Default::default()
         })
         .with_disabled_style(Style {
-            fill_color: Some(style.indicator_disabled_color),
+            fill_color: Some(style.header_disabled_color),
+            stroke: Some(Stroke::new(
+                Size::lpx(style.stroke_disabled_width),
+                style.indicator_color,
+            )),
             ..Default::default()
         })
         .with_transition(Transition::quick());
@@ -202,15 +215,21 @@ pub fn collapsible(
         .with_width(Size::Fill)
         .with_height(Size::FitContent)
         .with_layout_direction(Layout::Horizontal)
+        .with_v_align(VerticalAlign::Center)
         .with_gap(Size::lpx(style.header_gap))
         .with_padding(style.header_padding)
+        .with_z_index(ZIndex(1))
         .with_style(Style {
             fill_color: Some(style.header_idle_color),
             text_color: Some(style.title_color),
             corner_shape: Some(CornerShape::Round(Size::lpx(style.border_radius))),
             stroke: Some(Stroke::new(
                 Size::lpx(style.stroke_idle_width),
-                style.header_stroke_idle_color,
+                if expanded {
+                    style.header_stroke_active_color
+                } else {
+                    style.header_stroke_idle_color
+                },
             )),
             ..Default::default()
         })
@@ -255,6 +274,17 @@ pub fn collapsible(
     let content_wrapper = Node::new()
         .with_id(NodeId::new(format!("{}_content", id_str)))
         .with_width(Size::Fill)
+        .with_translation(Translation::y(Size::lpx(-style.border_radius * 2.0)))
+        .with_padding(Spacing::top(Size::lpx(style.border_radius * 2.0)))
+        .with_style(Style {
+            fill_color: Some(style.header_idle_color),
+            stroke: Some(Stroke::new(
+                Size::lpx(style.stroke_idle_width),
+                style.header_stroke_active_color,
+            )),
+            corner_shape: Some(CornerShape::Round(Size::lpx(style.border_radius))),
+            ..Default::default()
+        })
         .with_height(if expanded {
             Size::FitContent
         } else {
