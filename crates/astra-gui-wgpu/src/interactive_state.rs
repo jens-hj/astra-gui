@@ -333,14 +333,6 @@ impl InteractiveStateManager {
                     .computed_layout()
                     .map(|layout| layout.rect.max[1] - layout.rect.min[1]);
 
-                if node_id.as_str().contains("content") {
-                    eprintln!(
-                        "DEBUG update_transitions: [{}] resolved_height = {:?}",
-                        node_id.as_str(),
-                        resolved_height
-                    );
-                }
-
                 // Check if node is disabled - if so, force Disabled state
                 let state = if node.is_disabled() {
                     InteractionState::Disabled
