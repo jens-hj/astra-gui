@@ -5,10 +5,11 @@
 use astra_gui::{
     catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Size, Spacing, Style, Transition,
 };
+use astra_gui_macros::WithBuilders;
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
 /// Visual styling for a toggle switch
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, WithBuilders)]
 pub struct ToggleStyle {
     /// Background color when toggle is off
     pub off_color: Color,

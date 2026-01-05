@@ -7,6 +7,7 @@ use astra_gui::{
     MeasureTextRequest, Node, NodeId, Overflow, Rect, Shape, Size, Spacing, Stroke, Style,
     StyledRect, TextContent, Transition, Translation, VerticalAlign,
 };
+use astra_gui_macros::WithBuilders;
 use astra_gui_wgpu::{
     EventDispatcher, InputState, InteractionEvent, Key, MouseButton, NamedKey, TargetedEvent,
 };
@@ -24,7 +25,7 @@ pub enum CursorShape {
 }
 
 /// Cursor/caret styling for text input
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, WithBuilders)]
 pub struct CursorStyle {
     /// Shape of the cursor
     pub shape: CursorShape,
@@ -48,7 +49,7 @@ impl Default for CursorStyle {
 }
 
 /// Visual styling for a text input
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, WithBuilders)]
 pub struct TextInputStyle {
     /// Background color when idle
     pub idle_color: Color,
