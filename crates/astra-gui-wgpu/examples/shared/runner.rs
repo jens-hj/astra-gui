@@ -45,6 +45,7 @@ pub struct AppRunner<T: ExampleApp> {
     app: T,
     last_frame_time: Instant,
     frame_stats: FrameStats,
+    #[cfg(feature = "profiling")]
     enable_profiling: bool,
 }
 
@@ -56,6 +57,7 @@ impl<T: ExampleApp> AppRunner<T> {
             app,
             last_frame_time: Instant::now(),
             frame_stats: FrameStats::default(),
+            #[cfg(feature = "profiling")]
             enable_profiling: std::env::var("PROFILE").is_ok(),
         }
     }
@@ -64,6 +66,7 @@ impl<T: ExampleApp> AppRunner<T> {
         &self.frame_stats
     }
 
+    #[cfg(feature = "profiling")]
     pub fn enable_profiling(&mut self, enable: bool) {
         self.enable_profiling = enable;
     }
@@ -192,14 +195,25 @@ impl<T: ExampleApp> AppRunner<T> {
         };
 
         // Print stats if profiling enabled
+        #[cfg(feature = "profiling")]
         if self.enable_profiling {
-            let shape_count = if let Some(gpu) = &self.gpu_state {
-                gpu.last_shape_count()
-            } else {
-                0
-            };
+            let (shape_count, acquire_ms, clear_submit_ms, ui_submit_ms, present_ms) =
+                if let Some(gpu) = &self.gpu_state {
+                    let (acquire_ms, clear_submit_ms, ui_submit_ms, present_ms, _total_ms) =
+                        gpu.last_phase_timings_ms();
+                    (
+                        gpu.last_shape_count(),
+                        acquire_ms,
+                        clear_submit_ms,
+                        ui_submit_ms,
+                        present_ms,
+                    )
+                } else {
+                    (0, 0.0, 0.0, 0.0, 0.0)
+                };
+
             println!(
-                "Frame: {:.2}ms ({:.1} FPS) | Build: {:.2}ms | Layout: {:.2}ms | Events: {:.2}ms | Output: {:.2}ms | Render: {:.2}ms | Shapes: {}",
+                "Frame: {:.2}ms ({:.1} FPS) | Build: {:.2}ms | Layout: {:.2}ms | Events: {:.2}ms | Output: {:.2}ms | Render: {:.2}ms | GPU: Acquire {:.2}ms | ClearSubmit {:.2}ms | UiSubmit {:.2}ms | Present {:.2}ms | Shapes: {}",
                 self.frame_stats.total_frame_time_ms,
                 self.frame_stats.fps,
                 self.frame_stats.build_ui_ms,
@@ -207,6 +221,10 @@ impl<T: ExampleApp> AppRunner<T> {
                 self.frame_stats.event_dispatch_ms,
                 self.frame_stats.output_generation_ms,
                 self.frame_stats.render_ms,
+                acquire_ms,
+                clear_submit_ms,
+                ui_submit_ms,
+                present_ms,
                 shape_count,
             );
         }
@@ -272,15 +290,23 @@ impl<T: ExampleApp> ApplicationHandler for AppRunner<T> {
             ) && key_event.state == ElementState::Pressed =>
             {
                 // Toggle profiling
-                self.enable_profiling = !self.enable_profiling;
-                println!(
-                    "Profiling {}",
-                    if self.enable_profiling {
-                        "enabled"
-                    } else {
-                        "disabled"
-                    }
-                );
+                #[cfg(feature = "profiling")]
+                {
+                    self.enable_profiling = !self.enable_profiling;
+                    println!(
+                        "Profiling {}",
+                        if self.enable_profiling {
+                            "enabled"
+                        } else {
+                            "disabled"
+                        }
+                    );
+                }
+
+                #[cfg(not(feature = "profiling"))]
+                {
+                    println!("Profiling is disabled (compile with feature \"profiling\")");
+                }
             }
 
             WindowEvent::Resized(physical_size) => {

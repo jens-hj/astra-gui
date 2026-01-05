@@ -8,6 +8,10 @@ description = "WGPU rendering backend for astra-gui"
 default = ["text-cosmic"]
 text-cosmic = ["dep:cosmic-text"]
 
+# Opt-in profiling for examples/debug builds.
+# When disabled, all profiling instrumentation should compile out to avoid affecting perf.
+profiling = []
+
 [dependencies]
 astra-gui = { workspace = true }
 astra-gui-text = { workspace = true }
