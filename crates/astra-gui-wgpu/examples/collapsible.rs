@@ -12,6 +12,7 @@
 
 mod shared;
 
+use astra_gui::CornerShape;
 use astra_gui::{
     catppuccin::mocha, Content, DebugOptions, HorizontalAlign, Layout, Node, Shape, Size, Spacing,
     TextContent, VerticalAlign,
@@ -131,7 +132,7 @@ impl ExampleApp for CollapsibleExample {
                                 .with_v_align(VerticalAlign::Center),
                             )),
                     ],
-                    &CollapsibleStyle::default(),
+                    &CollapsibleStyle::default().with_corners(CornerShape::Cut(Size::lpx(16.0))),
                 ),
                 // Section 2: Interactive Components
                 collapsible(
@@ -139,59 +140,56 @@ impl ExampleApp for CollapsibleExample {
                     "Interactive Components",
                     self.section2_expanded,
                     false,
-                    vec![
-                        Node::new()
-                            .with_width(Size::Fill)
-                            .with_layout_direction(Layout::Horizontal)
-                            .with_gap(Size::lpx(16.0))
-                            .with_children(vec![Node::new().with_width(Size::Fill).with_content(
-                                Content::Text(
+                    vec![Node::new()
+                        .with_width(Size::Fill)
+                        .with_layout_direction(Layout::Vertical)
+                        .with_h_align(HorizontalAlign::Center)
+                        .with_gap(Size::lpx(16.0))
+                        .with_children(vec![
+                            Node::new()
+                                .with_width(Size::Fill)
+                                .with_content(Content::Text(
                                     TextContent::new(format!("Counter: {}", self.counter))
                                         .with_font_size(Size::lpx(28.0))
                                         .with_color(mocha::LAVENDER)
                                         .with_h_align(HorizontalAlign::Center)
                                         .with_v_align(VerticalAlign::Center),
-                                ),
-                            )]),
-                        Node::new().with_height(Size::lpx(8.0)),
-                        Node::new()
-                            .with_width(Size::Fill)
-                            .with_layout_direction(Layout::Horizontal)
-                            .with_gap(Size::lpx(16.0))
-                            .with_children(vec![
-                                Node::new().with_width(Size::Fill),
-                                button("decrement", "-", false, &ButtonStyle::default()),
-                                button("increment", "+", false, &ButtonStyle::default()),
-                                Node::new().with_width(Size::Fill),
-                            ]),
-                        Node::new().with_height(Size::lpx(8.0)),
-                        Node::new()
-                            .with_width(Size::Fill)
-                            .with_layout_direction(Layout::Horizontal)
-                            .with_gap(Size::lpx(16.0))
-                            .with_children(vec![
-                                Node::new()
-                                    .with_width(Size::Fill)
-                                    .with_content(Content::Text(
+                                )),
+                            Node::new()
+                                .with_layout_direction(Layout::Horizontal)
+                                .with_gap(Size::lpx(16.0))
+                                .with_children(vec![
+                                    button("decrement", "-", false, &ButtonStyle::default()),
+                                    button("increment", "+", false, &ButtonStyle::default()),
+                                ]),
+                            Node::new()
+                                .with_layout_direction(Layout::Horizontal)
+                                .with_gap(Size::lpx(16.0))
+                                .with_children(vec![
+                                    Node::new().with_content(Content::Text(
                                         TextContent::new("Enable:".to_string())
                                             .with_font_size(Size::lpx(24.0))
                                             .with_color(mocha::TEXT)
                                             .with_h_align(HorizontalAlign::Right)
                                             .with_v_align(VerticalAlign::Center),
                                     )),
-                                toggle("toggle", self.toggle_value, false, &ToggleStyle::default()),
-                                Node::new().with_width(Size::Fill),
-                            ]),
-                        Node::new().with_height(Size::lpx(8.0)),
-                        slider(
-                            "slider",
-                            self.slider_value,
-                            0.0..=100.0,
-                            false,
-                            &SliderStyle::default(),
-                        ),
-                    ],
-                    &CollapsibleStyle::default(),
+                                    toggle(
+                                        "toggle",
+                                        self.toggle_value,
+                                        false,
+                                        &ToggleStyle::default(),
+                                    ),
+                                ]),
+                            slider(
+                                "slider",
+                                self.slider_value,
+                                0.0..=100.0,
+                                false,
+                                &SliderStyle::default(),
+                            ),
+                        ])],
+                    &CollapsibleStyle::default()
+                        .with_corners(CornerShape::InverseRound(Size::lpx(14.0))),
                 ),
                 // Section 3: Nested Collapsibles
                 collapsible(
@@ -230,7 +228,8 @@ impl ExampleApp for CollapsibleExample {
                                     .with_h_align(HorizontalAlign::Left)
                                     .with_v_align(VerticalAlign::Center),
                                 ))],
-                            &CollapsibleStyle::default(),
+                            &CollapsibleStyle::default()
+                                .with_corners(CornerShape::Round(Size::lpx(10.0))),
                         ),
                         Node::new().with_height(Size::lpx(8.0)),
                         // Nested collapsible 2
@@ -266,7 +265,8 @@ impl ExampleApp for CollapsibleExample {
                                         Node::new().with_width(Size::Fill),
                                     ]),
                             ],
-                            &CollapsibleStyle::default(),
+                            &CollapsibleStyle::default()
+                                .with_corners(CornerShape::Round(Size::lpx(10.0))),
                         ),
                     ],
                     &CollapsibleStyle::default(),

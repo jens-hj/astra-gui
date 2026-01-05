@@ -10,10 +10,11 @@ use astra_gui::{
     Orientation, Overflow, Shape, Size, Spacing, Stroke, Style, TextContent, Transition,
     TriangleSpec, VerticalAlign, ZIndex,
 };
+use astra_gui_macros::WithBuilders;
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
 /// Visual styling for a collapsible container<
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, WithBuilders)]
 pub struct CollapsibleStyle {
     // Header styling
     /// Background color when header is idle
@@ -50,6 +51,8 @@ pub struct CollapsibleStyle {
     pub indicator_disabled_color: Color,
     /// Size of the triangle indicator in pixels
     pub indicator_size: f32,
+    /// Stroke width for the triangle indicator
+    pub indicator_stroke_width: f32,
 
     // Text styling
     /// Color of the title text
@@ -67,7 +70,7 @@ pub struct CollapsibleStyle {
     /// Padding inside the content area
     pub content_padding: Spacing,
     /// Border radius for rounded corners on header
-    pub border_radius: f32,
+    pub corners: CornerShape,
 }
 
 impl Default for CollapsibleStyle {
@@ -81,28 +84,29 @@ impl Default for CollapsibleStyle {
 
             // Header stroke colors
             header_stroke_idle_color: mocha::SURFACE0,
-            header_stroke_hover_color: mocha::LAVENDER,
-            header_stroke_active_color: mocha::LAVENDER,
+            header_stroke_hover_color: mocha::SURFACE0,
+            header_stroke_active_color: mocha::SURFACE0,
             header_stroke_disabled_color: mocha::SURFACE0.with_alpha(0.8),
 
             // Header stroke widths
             stroke_idle_width: 1.0,
-            stroke_hover_width: 2.0,
+            stroke_hover_width: 1.0,
             stroke_active_width: 2.0,
             stroke_disabled_width: 1.0,
 
             // Indicator colors
-            indicator_color: mocha::LAVENDER,
-            indicator_disabled_color: mocha::SURFACE2,
-            indicator_size: 24.0,
+            indicator_color: mocha::SURFACE1,
+            indicator_disabled_color: mocha::SURFACE0.with_alpha(0.8),
+            indicator_size: 20.0,
+            indicator_stroke_width: 1.0,
 
             // Text colors
             title_color: mocha::TEXT,
             title_disabled_color: mocha::SUBTEXT1,
-            title_font_size: 32.0,
+            title_font_size: 24.0,
 
             // Layout
-            header_padding: Spacing::symmetric(Size::lpx(16.0), Size::lpx(12.0)),
+            header_padding: Spacing::all(Size::lpx(14.0)),
             header_gap: 12.0,
             content_padding: Spacing::trbl(
                 Size::lpx(8.0),
@@ -110,7 +114,7 @@ impl Default for CollapsibleStyle {
                 Size::lpx(16.0),
                 Size::lpx(16.0),
             ),
-            border_radius: 24.0,
+            corners: CornerShape::Round(Size::lpx(24.0)),
         }
     }
 }
@@ -180,17 +184,13 @@ pub fn collapsible(
         .with_style(Style {
             fill_color: Some(style.header_idle_color),
             stroke: Some(Stroke::new(
-                Size::lpx(style.stroke_idle_width),
+                Size::lpx(style.indicator_stroke_width),
                 style.indicator_color,
             )),
             ..Default::default()
         })
         .with_disabled_style(Style {
             fill_color: Some(style.header_disabled_color),
-            stroke: Some(Stroke::new(
-                Size::lpx(style.stroke_disabled_width),
-                style.indicator_color,
-            )),
             ..Default::default()
         })
         .with_transition(Transition::quick());
@@ -222,7 +222,7 @@ pub fn collapsible(
         .with_style(Style {
             fill_color: Some(style.header_idle_color),
             text_color: Some(style.title_color),
-            corner_shape: Some(CornerShape::Round(Size::lpx(style.border_radius))),
+            corner_shape: Some(style.corners),
             stroke: Some(Stroke::new(
                 Size::lpx(style.stroke_idle_width),
                 if expanded {
@@ -289,7 +289,7 @@ pub fn collapsible(
                 Size::lpx(style.stroke_idle_width),
                 style.header_stroke_active_color,
             )),
-            corner_shape: Some(CornerShape::Round(Size::lpx(style.border_radius))),
+            corner_shape: Some(style.corners),
             ..Default::default()
         })
         .with_height(if expanded {

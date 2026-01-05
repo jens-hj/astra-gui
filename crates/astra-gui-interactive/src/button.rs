@@ -85,22 +85,22 @@ impl Default for ButtonStyle {
     fn default() -> Self {
         Self {
             // Fill Colors
-            idle_color: mocha::SURFACE0,
-            hover_color: mocha::SURFACE1,
-            pressed_color: mocha::MANTLE,
-            disabled_color: mocha::SURFACE0.with_alpha(0.8),
+            idle_color: mocha::BASE,
+            hover_color: mocha::MANTLE,
+            pressed_color: mocha::CRUST,
+            disabled_color: mocha::BASE.with_alpha(0.8),
             // Stroke Colors
-            idle_stroke_color: mocha::LAVENDER,
-            hover_stroke_color: mocha::LAVENDER,
-            pressed_stroke_color: mocha::LAVENDER,
-            disabled_stroke_color: mocha::SURFACE2,
+            idle_stroke_color: mocha::SURFACE0,
+            hover_stroke_color: mocha::SURFACE0,
+            pressed_stroke_color: mocha::SURFACE0,
+            disabled_stroke_color: mocha::SURFACE0.with_alpha(0.8),
             // Text Colors
             text_color: mocha::TEXT,
             disabled_text_color: mocha::SUBTEXT1,
             // Others
-            padding: Spacing::symmetric(Size::lpx(32.0), Size::lpx(16.0)),
+            padding: Spacing::symmetric(Size::lpx(18.0), Size::lpx(10.0)),
             border_radius: 24.0,
-            font_size: 32.0,
+            font_size: 24.0,
         }
     }
 }
@@ -152,12 +152,12 @@ pub fn button(
         })
         .with_hover_style(Style {
             fill_color: Some(style.hover_color),
-            stroke: Some(Stroke::new(Size::lpx(2.0), style.hover_stroke_color)),
+            stroke: Some(Stroke::new(Size::lpx(1.0), style.hover_stroke_color)),
             ..Default::default()
         })
         .with_active_style(Style {
             fill_color: Some(style.pressed_color),
-            stroke: Some(Stroke::new(Size::lpx(1.0), style.pressed_stroke_color)),
+            stroke: Some(Stroke::new(Size::lpx(2.0), style.pressed_stroke_color)),
             ..Default::default()
         })
         .with_disabled_style(Style {

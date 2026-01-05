@@ -7,3 +7,4 @@ description = "Interactive components library for astra-gui"
 [dependencies]
 astra-gui = { workspace = true }
 astra-gui-wgpu = { workspace = true }
+astra-gui-macros = { workspace = true }

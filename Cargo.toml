@@ -5,6 +5,7 @@ members = [
     "crates/astra-gui-text",
     "crates/astra-gui-wgpu",
     "crates/astra-gui-interactive",
+    "crates/astra-gui-macros",
 ]
 resolver = "2"
 
@@ -38,3 +39,9 @@ astra-gui-fonts = { path = "crates/astra-gui-fonts" }
 astra-gui-text = { path = "crates/astra-gui-text" }
 astra-gui-wgpu = { path = "crates/astra-gui-wgpu" }
 astra-gui-interactive = { path = "crates/astra-gui-interactive" }
+astra-gui-macros = { path = "crates/astra-gui-macros" }
+
+# Proc-macro helpers (used by astra-gui-macros)
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }

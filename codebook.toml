@@ -1,11 +1,12 @@
 words = [
+    "inigo",
+    "lpx",
+    "quilez",
+    "quilez's",
     "rects",
+    "shader",
     "smoothstep",
     "tri",
     "wgpu",
     "winit",
-    "inigo",
-    "quilez",
-    "quilez's",
-    "shader"
 ]
