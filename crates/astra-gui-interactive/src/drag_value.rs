@@ -7,13 +7,14 @@ use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Layout, Node, NodeId, Size,
     Spacing, Stroke, Style, TextContent, Transition, VerticalAlign,
 };
+use astra_gui_macros::WithBuilders;
 use astra_gui_wgpu::{EventDispatcher, InputState, InteractionEvent, Key, NamedKey, TargetedEvent};
 use std::ops::RangeInclusive;
 
 use crate::{text_input, text_input_update, TextInputStyle};
 
 /// Visual styling for a drag value widget
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, WithBuilders)]
 pub struct DragValueStyle {
     /// Background color when idle
     pub idle_color: Color,
@@ -49,6 +50,7 @@ pub struct DragValueStyle {
     pub font_size: f32,
 
     /// Minimum width of the widget
+    #[with_builders(skip)]
     pub min_width: f32,
 
     /// Number of decimal places to show
@@ -93,22 +95,10 @@ impl Default for DragValueStyle {
 }
 
 impl DragValueStyle {
-    /// Set the precision (number of decimal places)
-    pub fn with_precision(mut self, precision: usize) -> Self {
-        self.precision = precision;
-        self
-    }
-
     /// Set the minimum width
     pub fn with_min_width(mut self, min_width: f32) -> Self {
         self.min_width = min_width;
         self.text_input_style.width = min_width;
-        self
-    }
-
-    /// Set the font size
-    pub fn with_font_size(mut self, font_size: f32) -> Self {
-        self.font_size = font_size;
         self
     }
 }

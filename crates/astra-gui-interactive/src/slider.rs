@@ -6,11 +6,12 @@ use astra_gui::{
     catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Size, Style, Transition,
     Translation,
 };
+use astra_gui_macros::WithBuilders;
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 use std::ops::RangeInclusive;
 
 /// Visual styling for a slider
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, WithBuilders)]
 pub struct SliderStyle {
     /// Color of the track (unfilled portion)
     pub track_color: Color,

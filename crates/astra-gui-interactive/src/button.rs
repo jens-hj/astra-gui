@@ -6,6 +6,7 @@ use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, HorizontalAlign, Node, NodeId, Size, Spacing,
     Stroke, Style, TextContent, Transition, VerticalAlign,
 };
+use astra_gui_macros::WithBuilders;
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
 /// Visual state of a button
@@ -48,7 +49,7 @@ impl Default for ButtonState {
 }
 
 /// Visual styling for a button
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, WithBuilders)]
 pub struct ButtonStyle {
     /// Background color when idle
     pub idle_color: Color,

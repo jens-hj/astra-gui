@@ -4,19 +4,24 @@
 //! - `#[derive(WithBuilders)]`: generates `with_<field>(...)` builder-style methods
 //!   for each named field in a struct.
 //!
-//! ## Example
+//! ## Field control
+//! You can exclude specific fields from builder generation using `#[with_builders(skip)]`
+//! on the field.
+//!
+//! ### Example
 //! ```ignore
 //! use astra_gui_macros::WithBuilders;
 //!
 //! #[derive(Clone, Debug, WithBuilders)]
 //! pub struct Style {
 //!     pub padding: f32,
-//!     pub color: Color,
+//!     #[with_builders(skip)]
+//!     pub debug_only: bool,
 //! }
 //!
-//! let s = Style { padding: 1.0, color: Color::WHITE }
-//!     .with_padding(2.0)
-//!     .with_color(Color::BLACK);
+//! let s = Style { padding: 1.0, debug_only: false }
+//!     .with_padding(2.0);
+//! // .with_debug_only(...) is NOT generated.
 //! ```
 
 use proc_macro::TokenStream;
@@ -26,6 +31,9 @@ use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields};
 /// Derive that generates `with_<field>` builder methods for structs with named fields.
 ///
 /// Generated methods take `self` by value (builder style) and return `Self`.
+///
+/// Field attributes:
+/// - `#[with_builders(skip)]`: do not generate a builder method for this field.
 #[proc_macro_derive(WithBuilders, attributes(with_builders))]
 pub fn derive_with_builders(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -59,6 +67,11 @@ pub fn derive_with_builders(input: TokenStream) -> TokenStream {
             // Named fields always have idents, but keep this defensive.
             continue;
         };
+
+        if has_with_builders_skip(field) {
+            continue;
+        }
+
         let field_ty = &field.ty;
 
         // Method name: with_<field_name>
@@ -79,4 +92,28 @@ pub fn derive_with_builders(input: TokenStream) -> TokenStream {
         }
     }
     .into()
+}
+
+fn has_with_builders_skip(field: &syn::Field) -> bool {
+    for attr in &field.attrs {
+        if !attr.path().is_ident("with_builders") {
+            continue;
+        }
+
+        // We accept only `#[with_builders(skip)]` for now.
+        // Any other nested items are ignored (forward-compatible).
+        let mut skip = false;
+        let _ = attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("skip") {
+                skip = true;
+            }
+            Ok(())
+        });
+
+        if skip {
+            return true;
+        }
+    }
+
+    false
 }
