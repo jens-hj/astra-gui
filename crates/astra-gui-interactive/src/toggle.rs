@@ -7,7 +7,6 @@ use astra_gui::{
     Transition, UiContext,
 };
 use astra_gui_macros::WithBuilders;
-use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
 
 /// Visual styling for a toggle switch
 #[derive(Debug, Clone, WithBuilders)]
@@ -164,98 +163,4 @@ impl Component for Toggle {
                     .with_transition(Transition::quick()),
             )
     }
-}
-
-/// Check if a toggle with the given ID was clicked this frame
-///
-/// # Arguments
-/// * `toggle_id` - The ID of the toggle to check
-/// * `events` - Slice of targeted events from this frame
-///
-/// # Returns
-/// `true` if the toggle was clicked, `false` otherwise
-pub fn toggle_clicked(toggle_id: &str, events: &[TargetedEvent]) -> bool {
-    let knob_id = format!("{}_knob", toggle_id);
-    events.iter().any(|e| {
-        matches!(e.event, InteractionEvent::Click { .. })
-            && (e.target.as_str() == toggle_id || e.target.as_str() == knob_id)
-    })
-}
-
-/// Create a toggle switch node
-///
-/// This is a backward-compatible function that wraps the new `Toggle` struct.
-/// For new code, prefer using `Toggle::new()` with the builder pattern.
-///
-/// # Arguments
-/// * `id` - Unique identifier for the toggle (used for event targeting)
-/// * `value` - Current state of the toggle (true = on, false = off)
-/// * `disabled` - Whether the toggle is disabled
-/// * `style` - Visual styling configuration
-///
-/// # Returns
-/// A configured `Node` representing the toggle switch with automatic state transitions
-#[deprecated(
-    since = "0.8.0",
-    note = "Use Toggle::new() with the builder pattern instead"
-)]
-pub fn toggle(id: impl Into<String>, value: bool, disabled: bool, style: &ToggleStyle) -> Node {
-    let id_str = id.into();
-    let knob_offset_x = if value {
-        style.track_width - style.knob_width - style.knob_margin * 2.0
-    } else {
-        0.0
-    };
-
-    // Track (background)
-    Node::new()
-        .with_id(NodeId::new(id_str.clone()))
-        .with_width(Size::lpx(style.track_width))
-        .with_height(Size::lpx(style.track_height))
-        .with_layout_direction(Layout::Horizontal)
-        .with_padding(Spacing::all(Size::lpx(style.knob_margin)))
-        .with_style(Style {
-            fill_color: Some(if value {
-                style.on_color
-            } else {
-                style.off_color
-            }),
-            corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
-                style.track_height / 2.0,
-            ))),
-            opacity: Some(1.0),
-            ..Default::default()
-        })
-        .with_hover_style(Style {
-            fill_color: Some(mocha::SURFACE1),
-            opacity: Some(0.9),
-            ..Default::default()
-        })
-        .with_active_style(Style {
-            opacity: Some(0.7),
-            ..Default::default()
-        })
-        .with_disabled_style(Style {
-            fill_color: Some(mocha::SURFACE0),
-            opacity: Some(0.5),
-            ..Default::default()
-        })
-        .with_disabled(disabled)
-        .with_transition(Transition::quick())
-        .with_child(
-            // Knob (sliding circle with smooth offset animation)
-            Node::new()
-                .with_id(NodeId::new(format!("{}_knob", id_str)))
-                .with_width(Size::lpx(style.knob_width))
-                .with_height(Size::Fill)
-                .with_style(Style {
-                    fill_color: Some(style.knob_color),
-                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
-                        style.knob_width / 2.0,
-                    ))),
-                    translation_x: Some(astra_gui::Size::Logical(knob_offset_x)),
-                    ..Default::default()
-                })
-                .with_transition(Transition::quick()),
-        )
 }
