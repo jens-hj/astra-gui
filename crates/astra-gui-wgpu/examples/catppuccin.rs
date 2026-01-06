@@ -7,7 +7,7 @@ mod shared;
 use astra_gui::{
     catppuccin::{frappe, latte, macchiato, mocha},
     Color, Content, CornerShape, DebugOptions, HorizontalAlign, Layout, Node, Shape, Size, Spacing,
-    StyledRect, TextContent, VerticalAlign,
+    StyledRect, TextContent, UiContext, VerticalAlign,
 };
 use shared::{debug_controls::DEBUG_HELP_TEXT_ONELINE, run_example, ExampleApp};
 
@@ -30,7 +30,7 @@ impl ExampleApp for CatppuccinExample {
         (1600, 1200)
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
+    fn build_ui(&mut self, _ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
         create_demo_ui()
     }
 

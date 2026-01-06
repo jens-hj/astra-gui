@@ -6,7 +6,7 @@ mod shared;
 
 use astra_gui::{
     catppuccin::mocha, Content, CornerShape, DebugOptions, HorizontalAlign, Layout, Node, Shape,
-    Size, Spacing, Stroke, StyledRect, TextContent, VerticalAlign,
+    Size, Spacing, Stroke, StyledRect, TextContent, UiContext, VerticalAlign,
 };
 use shared::{debug_controls::DEBUG_HELP_TEXT_ONELINE, run_example, ExampleApp};
 
@@ -29,7 +29,7 @@ impl ExampleApp for LayoutExample {
         (1200, 800)
     }
 
-    fn build_ui(&mut self, width: f32, height: f32) -> Node {
+    fn build_ui(&mut self, _ctx: &mut UiContext, width: f32, height: f32) -> Node {
         create_demo_ui(width, height, &self.debug_options)
     }
 

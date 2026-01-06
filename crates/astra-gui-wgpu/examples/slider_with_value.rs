@@ -1,6 +1,7 @@
 //! Slider with value widget example
 //!
-//! Demonstrates the combined slider + drag value component.
+//! Demonstrates the combined slider + drag value component using the new
+//! builder pattern API with automatic state management via UiContext.
 //!
 //! Controls:
 //! - Drag slider or value field to adjust
@@ -10,67 +11,37 @@
 //! - Press Enter to confirm or Escape to cancel text input
 //! - ESC: quit
 
-#![allow(unused_imports, unused_variables, dead_code)]
-
 mod shared;
 
 use astra_gui::{
     catppuccin::mocha, Content, DebugOptions, HorizontalAlign, Layout, Node, Shape, Size, Spacing,
-    StyledRect, TextContent, VerticalAlign,
+    StyledRect, TextContent, UiContext, VerticalAlign,
 };
-use astra_gui_interactive::{
-    slider_with_value, slider_with_value_update, DragValueStyle, SliderStyle,
-};
+use astra_gui_interactive::{DragValueStyle, SliderStyle, SliderWithValue};
 use astra_gui_text::Engine as TextEngine;
-use astra_gui_wgpu::TargetedEvent;
 use shared::debug_controls::DEBUG_HELP_TEXT_ONELINE;
-use shared::{run_example, ExampleApp, InteractiveState};
-use std::ops::RangeInclusive;
-
-struct SliderWithValueState {
-    value: f32,
-    text_buffer: String,
-    cursor_pos: usize,
-    selection: Option<(usize, usize)>,
-    focused: bool,
-    drag_accumulator: f32,
-}
-
-impl SliderWithValueState {
-    fn new(value: f32) -> Self {
-        Self {
-            value,
-            text_buffer: String::new(),
-            cursor_pos: 0,
-            selection: None,
-            focused: false,
-            drag_accumulator: value,
-        }
-    }
-}
+use shared::{run_example, ExampleApp};
 
 struct SliderWithValueExample {
-    interactive: InteractiveState,
     text_engine: TextEngine,
     debug_options: DebugOptions,
 
-    // Application state
-    basic_slider: SliderWithValueState,
-    clamped_slider: SliderWithValueState,
-    stepped_slider: SliderWithValueState,
-    disabled_slider: SliderWithValueState,
+    // Application state - values that the sliders control
+    basic_value: f32,
+    clamped_value: f32,
+    stepped_value: f32,
+    disabled_value: f32,
 }
 
 impl ExampleApp for SliderWithValueExample {
     fn new() -> Self {
         Self {
-            interactive: InteractiveState::new(),
             text_engine: TextEngine::new_default(),
             debug_options: DebugOptions::none(),
-            basic_slider: SliderWithValueState::new(42.5),
-            clamped_slider: SliderWithValueState::new(50.0),
-            stepped_slider: SliderWithValueState::new(10.0),
-            disabled_slider: SliderWithValueState::new(99.9),
+            basic_value: 42.5,
+            clamped_value: 50.0,
+            stepped_value: 10.0,
+            disabled_value: 99.9,
         }
     }
 
@@ -82,31 +53,52 @@ impl ExampleApp for SliderWithValueExample {
         (1200, 1000)
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
-        // Extract values to avoid borrow checker issues
-        let basic_val = self.basic_slider.value;
-        let basic_focused = self.basic_slider.focused;
-        let basic_text = self.basic_slider.text_buffer.clone();
-        let basic_cursor = self.basic_slider.cursor_pos;
-        let basic_selection = self.basic_slider.selection;
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
+        Some(&mut self.text_engine)
+    }
 
-        let clamped_val = self.clamped_slider.value;
-        let clamped_focused = self.clamped_slider.focused;
-        let clamped_text = self.clamped_slider.text_buffer.clone();
-        let clamped_cursor = self.clamped_slider.cursor_pos;
-        let clamped_selection = self.clamped_slider.selection;
+    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
+        Some(&mut self.debug_options)
+    }
 
-        let stepped_val = self.stepped_slider.value;
-        let stepped_focused = self.stepped_slider.focused;
-        let stepped_text = self.stepped_slider.text_buffer.clone();
-        let stepped_cursor = self.stepped_slider.cursor_pos;
-        let stepped_selection = self.stepped_slider.selection;
+    fn build_ui(&mut self, ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
+        // Build the basic slider
+        let basic_slider = SliderWithValue::new(&mut self.basic_value, 0.0..=100.0)
+            .speed(0.1)
+            .with_slider_style(SliderStyle::default())
+            .with_value_style(DragValueStyle::default())
+            .on_change(|new_val| {
+                println!("Basic value: {:.2}", new_val);
+            })
+            .build(ctx);
 
-        let disabled_val = self.disabled_slider.value;
-        let disabled_focused = self.disabled_slider.focused;
-        let disabled_text = self.disabled_slider.text_buffer.clone();
-        let disabled_cursor = self.disabled_slider.cursor_pos;
-        let disabled_selection = self.disabled_slider.selection;
+        // Build the clamped slider
+        let clamped_slider = SliderWithValue::new(&mut self.clamped_value, 0.0..=100.0)
+            .speed(0.1)
+            .with_slider_style(SliderStyle::default())
+            .with_value_style(DragValueStyle::default())
+            .on_change(|new_val| {
+                println!("Clamped value: {:.2}", new_val);
+            })
+            .build(ctx);
+
+        // Build the stepped slider
+        let stepped_slider = SliderWithValue::new(&mut self.stepped_value, 0.0..=100.0)
+            .step(5.0)
+            .speed(0.1)
+            .with_slider_style(SliderStyle::default())
+            .with_value_style(DragValueStyle::default())
+            .on_change(|new_val| {
+                println!("Stepped value: {:.1}", new_val);
+            })
+            .build(ctx);
+
+        // Build the disabled slider
+        let disabled_slider = SliderWithValue::new(&mut self.disabled_value, 0.0..=100.0)
+            .disabled(true)
+            .with_slider_style(SliderStyle::default())
+            .with_value_style(DragValueStyle::default())
+            .build(ctx);
 
         Node::new()
             .with_zoom(1.5)
@@ -141,58 +133,14 @@ impl ExampleApp for SliderWithValueExample {
                         .with_v_align(VerticalAlign::Center),
                     )),
                 Node::new().with_height(Size::lpx(20.0)),
-                // Basic slider
-                self.create_slider_row(
-                    "Basic (0-100):",
-                    "basic_slider",
-                    "basic_value",
-                    basic_val,
-                    0.0..=100.0,
-                    basic_focused,
-                    &basic_text,
-                    basic_cursor,
-                    basic_selection,
-                    false,
-                ),
-                // Clamped slider
-                self.create_slider_row(
-                    "Clamped (0-100):",
-                    "clamped_slider",
-                    "clamped_value",
-                    clamped_val,
-                    0.0..=100.0,
-                    clamped_focused,
-                    &clamped_text,
-                    clamped_cursor,
-                    clamped_selection,
-                    false,
-                ),
-                // Stepped slider
-                self.create_slider_row(
-                    "Stepped (5.0 steps):",
-                    "stepped_slider",
-                    "stepped_value",
-                    stepped_val,
-                    0.0..=100.0,
-                    stepped_focused,
-                    &stepped_text,
-                    stepped_cursor,
-                    stepped_selection,
-                    false,
-                ),
-                // Disabled slider
-                self.create_slider_row(
-                    "Disabled:",
-                    "disabled_slider",
-                    "disabled_value",
-                    disabled_val,
-                    0.0..=100.0,
-                    disabled_focused,
-                    &disabled_text,
-                    disabled_cursor,
-                    disabled_selection,
-                    true,
-                ),
+                // Basic slider row
+                create_slider_row("Basic (0-100):", basic_slider),
+                // Clamped slider row
+                create_slider_row("Clamped (0-100):", clamped_slider),
+                // Stepped slider row
+                create_slider_row("Stepped (5.0 steps):", stepped_slider),
+                // Disabled slider row
+                create_slider_row("Disabled:", disabled_slider),
                 // Spacer
                 Node::new().with_height(Size::Fill),
                 // Help bar
@@ -213,139 +161,33 @@ impl ExampleApp for SliderWithValueExample {
                     )),
             ])
     }
-
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
-        Some(&mut self.text_engine)
-    }
-
-    fn interactive_state(&mut self) -> Option<&mut InteractiveState> {
-        Some(&mut self.interactive)
-    }
-
-    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
-        Some(&mut self.debug_options)
-    }
-
-    fn handle_events(&mut self, events: &[TargetedEvent]) -> bool {
-        let mut changed = false;
-
-        // Handle slider with value updates
-        if slider_with_value_update(
-            "basic_slider",
-            "basic_value",
-            &mut self.basic_slider.value,
-            &mut self.basic_slider.text_buffer,
-            &mut self.basic_slider.cursor_pos,
-            &mut self.basic_slider.selection,
-            &mut self.basic_slider.focused,
-            &mut self.basic_slider.drag_accumulator,
-            events,
-            &self.interactive.input_state,
-            &mut self.interactive.event_dispatcher,
-            0.0..=100.0,
-            0.1, // speed
-            None,
-        ) {
-            println!("Basic value: {:.2}", self.basic_slider.value);
-            changed = true;
-        }
-
-        if slider_with_value_update(
-            "clamped_slider",
-            "clamped_value",
-            &mut self.clamped_slider.value,
-            &mut self.clamped_slider.text_buffer,
-            &mut self.clamped_slider.cursor_pos,
-            &mut self.clamped_slider.selection,
-            &mut self.clamped_slider.focused,
-            &mut self.clamped_slider.drag_accumulator,
-            events,
-            &self.interactive.input_state,
-            &mut self.interactive.event_dispatcher,
-            0.0..=100.0,
-            0.1, // speed
-            None,
-        ) {
-            println!("Clamped value: {:.2}", self.clamped_slider.value);
-            changed = true;
-        }
-
-        if slider_with_value_update(
-            "stepped_slider",
-            "stepped_value",
-            &mut self.stepped_slider.value,
-            &mut self.stepped_slider.text_buffer,
-            &mut self.stepped_slider.cursor_pos,
-            &mut self.stepped_slider.selection,
-            &mut self.stepped_slider.focused,
-            &mut self.stepped_slider.drag_accumulator,
-            events,
-            &self.interactive.input_state,
-            &mut self.interactive.event_dispatcher,
-            0.0..=100.0,
-            0.1,       // speed
-            Some(5.0), // step
-        ) {
-            println!("Stepped value: {:.1}", self.stepped_slider.value);
-            changed = true;
-        }
-
-        changed
-    }
 }
 
-impl SliderWithValueExample {
-    fn create_slider_row(
-        &mut self,
-        label: &str,
-        slider_id: &str,
-        value_id: &str,
-        value: f32,
-        range: RangeInclusive<f32>,
-        focused: bool,
-        text_buffer: &str,
-        cursor_pos: usize,
-        selection: Option<(usize, usize)>,
-        disabled: bool,
-    ) -> Node {
-        Node::new()
-            .with_width(Size::Fill)
-            .with_layout_direction(Layout::Horizontal)
-            .with_gap(Size::ppx(16.0))
-            .with_children(vec![
-                // Spacer
-                Node::new().with_width(Size::Fill),
-                // Label
-                Node::new()
-                    .with_width(Size::lpx(200.0))
-                    .with_height(Size::Fill)
-                    .with_content(Content::Text(
-                        TextContent::new(label.to_string())
-                            .with_font_size(Size::lpx(20.0))
-                            .with_color(mocha::TEXT)
-                            .with_h_align(HorizontalAlign::Right)
-                            .with_v_align(VerticalAlign::Center),
-                    )),
-                // Slider with value widget
-                slider_with_value(
-                    slider_id,
-                    value_id,
-                    value,
-                    range,
-                    focused,
-                    disabled,
-                    &SliderStyle::default(),
-                    &DragValueStyle::default().with_precision(1),
-                    text_buffer,
-                    cursor_pos,
-                    selection,
-                    &mut self.text_engine,
-                    &mut self.interactive.event_dispatcher,
-                ),
-                // Spacer
-                Node::new().with_width(Size::Fill),
-            ])
-    }
+/// Helper to create a labeled slider row
+fn create_slider_row(label: &str, slider_widget: Node) -> Node {
+    Node::new()
+        .with_width(Size::Fill)
+        .with_layout_direction(Layout::Horizontal)
+        .with_gap(Size::ppx(16.0))
+        .with_children(vec![
+            // Spacer
+            Node::new().with_width(Size::Fill),
+            // Label
+            Node::new()
+                .with_width(Size::lpx(200.0))
+                .with_height(Size::Fill)
+                .with_content(Content::Text(
+                    TextContent::new(label.to_string())
+                        .with_font_size(Size::lpx(20.0))
+                        .with_color(mocha::TEXT)
+                        .with_h_align(HorizontalAlign::Right)
+                        .with_v_align(VerticalAlign::Center),
+                )),
+            // Slider with value widget
+            slider_widget,
+            // Spacer
+            Node::new().with_width(Size::Fill),
+        ])
 }
 
 fn main() {

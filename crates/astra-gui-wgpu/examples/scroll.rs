@@ -9,20 +9,16 @@
 //!
 //! Note: Debug controls are shared across examples via `shared::debug_controls`.
 
-#![allow(unused_imports, unused_variables, dead_code)]
-
 mod shared;
 
 use astra_gui::{
     catppuccin::mocha, Content, CornerShape, DebugOptions, HorizontalAlign, Layout, Node, NodeId,
-    Overflow, Size, Spacing, Style, TextContent, VerticalAlign,
+    Overflow, Size, Spacing, Style, TextContent, UiContext, VerticalAlign,
 };
 use astra_gui_text::Engine as TextEngine;
-use astra_gui_wgpu::TargetedEvent;
-use shared::{run_example, ExampleApp, InteractiveState};
+use shared::{run_example, ExampleApp};
 
 struct ScrollExample {
-    interactive: InteractiveState,
     text_engine: TextEngine,
     debug_options: DebugOptions,
     item_heights: Vec<f32>,
@@ -41,7 +37,6 @@ impl ExampleApp for ScrollExample {
             .collect();
 
         Self {
-            interactive: InteractiveState::new(),
             text_engine: TextEngine::new_default(),
             debug_options: DebugOptions::none(),
             item_heights,
@@ -57,7 +52,7 @@ impl ExampleApp for ScrollExample {
         (1200, 1000)
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
+    fn build_ui(&mut self, _ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
         // Create a scrollable container with many items - STRESS TEST with nested children
         let mut items = Vec::new();
         for (i, &height) in self.item_heights.iter().enumerate() {
@@ -361,21 +356,12 @@ impl ExampleApp for ScrollExample {
             )
     }
 
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
         Some(&mut self.text_engine)
-    }
-
-    fn interactive_state(&mut self) -> Option<&mut InteractiveState> {
-        Some(&mut self.interactive)
     }
 
     fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
         Some(&mut self.debug_options)
-    }
-
-    fn handle_events(&mut self, _events: &[TargetedEvent]) -> bool {
-        // Scroll is handled automatically by the runner
-        false
     }
 }
 

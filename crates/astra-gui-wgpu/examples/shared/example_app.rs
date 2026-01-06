@@ -1,9 +1,6 @@
-use astra_gui::{DebugOptions, Node};
+use astra_gui::{DebugOptions, Node, UiContext};
 use astra_gui_text::Engine as TextEngine;
-use astra_gui_wgpu::TargetedEvent;
 use winit::window::Window;
-
-use super::InteractiveState;
 
 /// Core trait that all examples must implement.
 /// Only requires UI building logic - all boilerplate is handled automatically.
@@ -11,9 +8,21 @@ pub trait ExampleApp: Sized {
     /// Create a new instance
     fn new() -> Self;
 
+    /// Optional: Provide a text engine for text measurement
+    /// Override this to return your text engine if your UI uses text
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
+        None
+    }
+
     /// Build the UI tree for this frame
-    /// This is the ONLY method most examples need to implement
-    fn build_ui(&mut self, width: f32, height: f32) -> Node;
+    ///
+    /// The UiContext provides:
+    /// - Event checking: `ctx.was_clicked("id")`, `ctx.is_hovered("id")`
+    /// - Focus management: `ctx.is_focused("id")`, `ctx.set_focus(Some("id"))`
+    /// - Widget memory: `ctx.memory()` for internal state
+    /// - ID generation: `ctx.generate_id("label")`
+    /// - Text measurement: `ctx.measure_text(...)`
+    fn build_ui(&mut self, ctx: &mut UiContext, width: f32, height: f32) -> Node;
 
     /// Optional: Window title
     fn window_title() -> &'static str {
@@ -23,18 +32,6 @@ pub trait ExampleApp: Sized {
     /// Optional: Window size
     fn window_size() -> (u32, u32) {
         (800, 600)
-    }
-
-    /// Optional: Provide text measurer for layout computation
-    /// Only needed if UI contains Text nodes or FitContent sizing
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
-        None
-    }
-
-    /// Optional: Access to interactive state for event handling
-    /// Return Some if using interactive components
-    fn interactive_state(&mut self) -> Option<&mut InteractiveState> {
-        None
     }
 
     /// Optional: Access to debug options
@@ -56,18 +53,8 @@ pub trait ExampleApp: Sized {
     /// Optional: Custom ESC key handling
     /// Return true to prevent default exit behavior
     /// Useful for examples with focus management
-    fn handle_escape(&mut self) -> bool {
+    fn handle_escape(&mut self, ctx: &UiContext) -> bool {
         // Default: prevent exit if something is focused
-        if let Some(interactive) = self.interactive_state() {
-            interactive.event_dispatcher.focused_node().is_some()
-        } else {
-            false
-        }
-    }
-
-    /// Optional: Handle interactive events
-    /// Return true if the UI state changed and needs redraw
-    fn handle_events(&mut self, _events: &[TargetedEvent]) -> bool {
-        false
+        ctx.focused_widget().is_some()
     }
 }

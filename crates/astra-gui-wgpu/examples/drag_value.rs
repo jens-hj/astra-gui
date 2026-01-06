@@ -8,68 +8,49 @@
 //! - Hold Ctrl while dragging for fast control (10x speed)
 //! - Click on value to enter text input mode
 //! - Press Enter to confirm or Escape to cancel text input
+//! - Debug controls (M/P/B/C/R/G/O/T/D/S)
 //! - ESC: quit
-
-#![allow(unused_imports, unused_variables, dead_code)]
 
 mod shared;
 
 use astra_gui::{
     catppuccin::mocha, Content, DebugOptions, HorizontalAlign, Layout, Node, Size, Spacing, Style,
-    TextContent, VerticalAlign,
+    TextContent, UiContext, VerticalAlign,
 };
-use astra_gui_interactive::{drag_value, drag_value_update, DragValueStyle};
+use astra_gui_interactive::{DragValue, DragValueStyle};
 use astra_gui_text::Engine as TextEngine;
-use astra_gui_wgpu::TargetedEvent;
 use shared::debug_controls::DEBUG_HELP_TEXT_ONELINE;
-use shared::{run_example, ExampleApp, InteractiveState};
+use shared::{run_example, ExampleApp};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-struct DragValueState {
-    value: f32,
-    text_buffer: String,
-    cursor_pos: usize,
-    selection: Option<(usize, usize)>,
-    focused: bool,
-    drag_accumulator: f32,
-}
-
-impl DragValueState {
-    fn new(value: f32) -> Self {
-        Self {
-            value,
-            text_buffer: String::new(),
-            cursor_pos: 0,
-            selection: None,
-            focused: false,
-            drag_accumulator: value,
-        }
-    }
+/// Shared application state that can be modified from callbacks
+struct AppState {
+    basic_value: f32,
+    clamped_value: f32,
+    stepped_value: f32,
+    fast_drag_value: f32,
+    disabled_value: f32,
 }
 
 struct DragValueExample {
-    interactive: InteractiveState,
     text_engine: TextEngine,
     debug_options: DebugOptions,
-
-    // Application state
-    basic_value: DragValueState,
-    clamped_value: DragValueState,
-    stepped_value: DragValueState,
-    fast_drag_value: DragValueState,
-    disabled_value: DragValueState,
+    state: Rc<RefCell<AppState>>,
 }
 
 impl ExampleApp for DragValueExample {
     fn new() -> Self {
         Self {
-            interactive: InteractiveState::new(),
             text_engine: TextEngine::new_default(),
             debug_options: DebugOptions::none(),
-            basic_value: DragValueState::new(42.5),
-            clamped_value: DragValueState::new(50.0),
-            stepped_value: DragValueState::new(10.0),
-            fast_drag_value: DragValueState::new(1000.0),
-            disabled_value: DragValueState::new(99.9),
+            state: Rc::new(RefCell::new(AppState {
+                basic_value: 42.5,
+                clamped_value: 50.0,
+                stepped_value: 10.0,
+                fast_drag_value: 1000.0,
+                disabled_value: 99.9,
+            })),
         }
     }
 
@@ -81,37 +62,35 @@ impl ExampleApp for DragValueExample {
         (1100, 800)
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
-        // Extract values to avoid borrow checker issues
-        let basic_val = self.basic_value.value;
-        let basic_focused = self.basic_value.focused;
-        let basic_text = self.basic_value.text_buffer.clone();
-        let basic_cursor = self.basic_value.cursor_pos;
-        let basic_selection = self.basic_value.selection;
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
+        Some(&mut self.text_engine)
+    }
 
-        let clamped_val = self.clamped_value.value;
-        let clamped_focused = self.clamped_value.focused;
-        let clamped_text = self.clamped_value.text_buffer.clone();
-        let clamped_cursor = self.clamped_value.cursor_pos;
-        let clamped_selection = self.clamped_value.selection;
+    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
+        Some(&mut self.debug_options)
+    }
 
-        let stepped_val = self.stepped_value.value;
-        let stepped_focused = self.stepped_value.focused;
-        let stepped_text = self.stepped_value.text_buffer.clone();
-        let stepped_cursor = self.stepped_value.cursor_pos;
-        let stepped_selection = self.stepped_value.selection;
+    fn build_ui(&mut self, ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
+        // Clone state for callbacks
+        let state = self.state.clone();
 
-        let fast_val = self.fast_drag_value.value;
-        let fast_focused = self.fast_drag_value.focused;
-        let fast_text = self.fast_drag_value.text_buffer.clone();
-        let fast_cursor = self.fast_drag_value.cursor_pos;
-        let fast_selection = self.fast_drag_value.selection;
+        // Read current values for display
+        let (basic_value, clamped_value, stepped_value, fast_drag_value, disabled_value) = {
+            let s = state.borrow();
+            (
+                s.basic_value,
+                s.clamped_value,
+                s.stepped_value,
+                s.fast_drag_value,
+                s.disabled_value,
+            )
+        };
 
-        let disabled_val = self.disabled_value.value;
-        let disabled_focused = self.disabled_value.focused;
-        let disabled_text = self.disabled_value.text_buffer.clone();
-        let disabled_cursor = self.disabled_value.cursor_pos;
-        let disabled_selection = self.disabled_value.selection;
+        // Clone state for each callback
+        let state_basic = state.clone();
+        let state_clamped = state.clone();
+        let state_stepped = state.clone();
+        let state_fast = state.clone();
 
         Node::new()
             .with_zoom(2.0)
@@ -148,63 +127,70 @@ impl ExampleApp for DragValueExample {
                 Node::new().with_height(Size::lpx(20.0)),
                 // Basic drag value
                 self.create_drag_row(
+                    ctx,
                     "Basic (no limits):",
-                    "basic_drag",
-                    basic_val,
-                    basic_focused,
-                    &basic_text,
-                    basic_cursor,
-                    basic_selection,
+                    basic_value,
+                    None,
+                    None,
+                    0.1,
                     &DragValueStyle::default(),
                     false,
+                    move |new_val| {
+                        state_basic.borrow_mut().basic_value = new_val;
+                        println!("Basic value: {:.2}", new_val);
+                    },
                 ),
                 // Clamped drag value
                 self.create_drag_row(
+                    ctx,
                     "Clamped (0-100):",
-                    "clamped_drag",
-                    clamped_val,
-                    clamped_focused,
-                    &clamped_text,
-                    clamped_cursor,
-                    clamped_selection,
+                    clamped_value,
+                    Some(0.0..=100.0),
+                    None,
+                    0.1,
                     &DragValueStyle::default(),
                     false,
+                    move |new_val| {
+                        state_clamped.borrow_mut().clamped_value = new_val;
+                        println!("Clamped value: {:.2}", new_val);
+                    },
                 ),
                 // Stepped drag value
                 self.create_drag_row(
+                    ctx,
                     "Stepped (5.0 steps):",
-                    "stepped_drag",
-                    stepped_val,
-                    stepped_focused,
-                    &stepped_text,
-                    stepped_cursor,
-                    stepped_selection,
+                    stepped_value,
+                    Some(0.0..=100.0),
+                    Some(5.0),
+                    0.1,
                     &DragValueStyle::default().with_precision(1),
                     false,
+                    move |new_val| {
+                        state_stepped.borrow_mut().stepped_value = new_val;
+                        println!("Stepped value: {:.1}", new_val);
+                    },
                 ),
                 // Fast drag value
                 self.create_drag_row(
+                    ctx,
                     "Fast drag (10x speed):",
-                    "fast_drag",
-                    fast_val,
-                    fast_focused,
-                    &fast_text,
-                    fast_cursor,
-                    fast_selection,
+                    fast_drag_value,
+                    None,
+                    None,
+                    1.0,
                     &DragValueStyle::default().with_precision(0),
                     false,
+                    move |new_val| {
+                        state_fast.borrow_mut().fast_drag_value = new_val;
+                        println!("Fast drag value: {:.0}", new_val);
+                    },
                 ),
                 // Disabled drag value
-                self.create_drag_row(
+                self.create_drag_row_disabled(
+                    ctx,
                     "Disabled:",
-                    "disabled_drag",
-                    disabled_val,
-                    disabled_focused,
-                    &disabled_text,
-                    disabled_cursor,
-                    disabled_selection,
+                    disabled_value,
                     &DragValueStyle::default(),
-                    true,
                 ),
                 // Spacer
                 Node::new().with_height(Size::Fill),
@@ -226,116 +212,38 @@ impl ExampleApp for DragValueExample {
                     )),
             ])
     }
-
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
-        Some(&mut self.text_engine)
-    }
-
-    fn interactive_state(&mut self) -> Option<&mut InteractiveState> {
-        Some(&mut self.interactive)
-    }
-
-    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
-        Some(&mut self.debug_options)
-    }
-
-    fn handle_events(&mut self, events: &[TargetedEvent]) -> bool {
-        let mut changed = false;
-
-        // Handle drag value updates
-        if drag_value_update(
-            "basic_drag",
-            &mut self.basic_value.value,
-            &mut self.basic_value.text_buffer,
-            &mut self.basic_value.cursor_pos,
-            &mut self.basic_value.selection,
-            &mut self.basic_value.focused,
-            &mut self.basic_value.drag_accumulator,
-            events,
-            &self.interactive.input_state,
-            &mut self.interactive.event_dispatcher,
-            None,
-            0.1, // speed
-            None,
-        ) {
-            println!("Basic value: {:.2}", self.basic_value.value);
-            changed = true;
-        }
-
-        if drag_value_update(
-            "clamped_drag",
-            &mut self.clamped_value.value,
-            &mut self.clamped_value.text_buffer,
-            &mut self.clamped_value.cursor_pos,
-            &mut self.clamped_value.selection,
-            &mut self.clamped_value.focused,
-            &mut self.clamped_value.drag_accumulator,
-            events,
-            &self.interactive.input_state,
-            &mut self.interactive.event_dispatcher,
-            Some(0.0..=100.0), // range
-            0.1,               // speed
-            None,
-        ) {
-            println!("Clamped value: {:.2}", self.clamped_value.value);
-            changed = true;
-        }
-
-        if drag_value_update(
-            "stepped_drag",
-            &mut self.stepped_value.value,
-            &mut self.stepped_value.text_buffer,
-            &mut self.stepped_value.cursor_pos,
-            &mut self.stepped_value.selection,
-            &mut self.stepped_value.focused,
-            &mut self.stepped_value.drag_accumulator,
-            events,
-            &self.interactive.input_state,
-            &mut self.interactive.event_dispatcher,
-            Some(0.0..=100.0), // range
-            0.1,               // speed
-            Some(5.0),         // step
-        ) {
-            println!("Stepped value: {:.1}", self.stepped_value.value);
-            changed = true;
-        }
-
-        if drag_value_update(
-            "fast_drag",
-            &mut self.fast_drag_value.value,
-            &mut self.fast_drag_value.text_buffer,
-            &mut self.fast_drag_value.cursor_pos,
-            &mut self.fast_drag_value.selection,
-            &mut self.fast_drag_value.focused,
-            &mut self.fast_drag_value.drag_accumulator,
-            events,
-            &self.interactive.input_state,
-            &mut self.interactive.event_dispatcher,
-            None,
-            1.0, // faster base speed
-            None,
-        ) {
-            println!("Fast drag value: {:.2}", self.fast_drag_value.value);
-            changed = true;
-        }
-
-        changed
-    }
 }
 
 impl DragValueExample {
-    fn create_drag_row(
+    fn create_drag_row<F>(
         &mut self,
+        ctx: &mut UiContext,
         label: &str,
-        id: &str,
-        value: f32,
-        focused: bool,
-        text_buffer: &str,
-        cursor_pos: usize,
-        selection: Option<(usize, usize)>,
+        mut value: f32,
+        range: Option<std::ops::RangeInclusive<f32>>,
+        step: Option<f32>,
+        speed: f32,
         style: &DragValueStyle,
         disabled: bool,
-    ) -> Node {
+        on_change: F,
+    ) -> Node
+    where
+        F: FnMut(f32) + 'static,
+    {
+        let mut drag_value = DragValue::new(&mut value)
+            .speed(speed)
+            .disabled(disabled)
+            .with_style(style.clone())
+            .on_change(on_change);
+
+        if let Some(r) = range {
+            drag_value = drag_value.range(r);
+        }
+
+        if let Some(s) = step {
+            drag_value = drag_value.step(s);
+        }
+
         Node::new()
             .with_width(Size::Fill)
             .with_layout_direction(Layout::Horizontal)
@@ -355,18 +263,43 @@ impl DragValueExample {
                             .with_v_align(VerticalAlign::Center),
                     )),
                 // Drag value widget
-                drag_value(
-                    id,
-                    value,
-                    focused,
-                    disabled,
-                    style,
-                    text_buffer,
-                    cursor_pos,
-                    selection,
-                    &mut self.text_engine,
-                    &mut self.interactive.event_dispatcher,
-                ),
+                drag_value.build(ctx),
+                // Spacer
+                Node::new().with_width(Size::Fill),
+            ])
+    }
+
+    fn create_drag_row_disabled(
+        &mut self,
+        ctx: &mut UiContext,
+        label: &str,
+        mut value: f32,
+        style: &DragValueStyle,
+    ) -> Node {
+        let drag_value = DragValue::new(&mut value)
+            .disabled(true)
+            .with_style(style.clone());
+
+        Node::new()
+            .with_width(Size::Fill)
+            .with_layout_direction(Layout::Horizontal)
+            .with_gap(Size::lpx(16.0))
+            .with_children(vec![
+                // Spacer
+                Node::new().with_width(Size::Fill),
+                // Label
+                Node::new()
+                    .with_width(Size::lpx(220.0))
+                    .with_height(Size::Fill)
+                    .with_content(Content::Text(
+                        TextContent::new(label.to_string())
+                            .with_font_size(Size::lpx(20.0))
+                            .with_color(mocha::TEXT)
+                            .with_h_align(HorizontalAlign::Right)
+                            .with_v_align(VerticalAlign::Center),
+                    )),
+                // Drag value widget
+                drag_value.build(ctx),
                 // Spacer
                 Node::new().with_width(Size::Fill),
             ])

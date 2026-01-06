@@ -26,7 +26,7 @@ mod shared;
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, DebugOptions, HorizontalAlign, Layout, Node,
-    Overflow, Shape, Size, Spacing, Stroke, StyledRect, TextContent, VerticalAlign,
+    Overflow, Shape, Size, Spacing, Stroke, StyledRect, TextContent, UiContext, VerticalAlign,
 };
 use astra_gui_text::Engine as TextEngine;
 use shared::{debug_controls::DEBUG_HELP_TEXT_ONELINE, run_example, ExampleApp};
@@ -52,16 +52,16 @@ impl ExampleApp for OverflowExample {
         (1180, 720)
     }
 
-    fn build_ui(&mut self, width: f32, height: f32) -> Node {
-        create_demo_ui(width, height, &self.debug_options).with_zoom(2.0)
-    }
-
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
         Some(&mut self.text_engine)
     }
 
     fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
         Some(&mut self.debug_options)
+    }
+
+    fn build_ui(&mut self, _ctx: &mut UiContext, width: f32, height: f32) -> Node {
+        create_demo_ui(width, height, &self.debug_options).with_zoom(2.0)
     }
 }
 

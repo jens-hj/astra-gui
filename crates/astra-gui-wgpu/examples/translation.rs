@@ -1,38 +1,27 @@
-//! Translation example
-//!
-//! Demonstrates translation (offset) with nested elements.
+//! Translation example demonstrating transform translations with interactive components.
 //!
 //! Controls:
-//! - Use sliders to adjust translations
-//! - Click buttons to verify hit testing works
+//! - Use sliders to adjust X/Y translation of outer/inner containers
+//! - Click +/- buttons to change counter
+//! - Click toggle switch to test hit testing in translated containers
 //! - Debug controls (M/P/B/C/R/G/O/T/D/S)
 //! - ESC: quit
-//!
-//! Note: Debug controls are shared across examples via `shared::debug_controls`.
-
-#![allow(unused_imports, unused_variables, dead_code)]
 
 mod shared;
 
 use astra_gui::{
-    catppuccin::mocha, Content, DebugOptions, HorizontalAlign, Layout, Node, Shape, Size, Spacing,
-    Stroke, StyledRect, TextContent, Translation, VerticalAlign,
+    catppuccin::mocha, Component, Content, DebugOptions, HorizontalAlign, Layout, Node, Shape,
+    Size, Spacing, Stroke, StyledRect, TextContent, Translation, UiContext, VerticalAlign,
 };
-use astra_gui_interactive::{
-    button, button_clicked, slider, slider_drag, toggle, toggle_clicked, ButtonStyle, SliderStyle,
-    ToggleStyle,
-};
+use astra_gui_interactive::{Button, ButtonStyle, Slider, SliderStyle, Toggle, ToggleStyle};
 use astra_gui_text::Engine as TextEngine;
-use astra_gui_wgpu::TargetedEvent;
 use shared::debug_controls::DEBUG_HELP_TEXT_ONELINE;
-use shared::{run_example, ExampleApp, InteractiveState};
+use shared::{run_example, ExampleApp};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-struct TranslationExample {
-    interactive: InteractiveState,
-    text_engine: TextEngine,
-    debug_options: DebugOptions,
-
-    // Application state
+/// Shared application state that can be modified from callbacks
+struct AppState {
     outer_translation_x: f32,
     outer_translation_y: f32,
     inner_translation_x: f32,
@@ -41,18 +30,25 @@ struct TranslationExample {
     toggle_state: bool,
 }
 
+struct TranslationExample {
+    text_engine: TextEngine,
+    debug_options: DebugOptions,
+    state: Rc<RefCell<AppState>>,
+}
+
 impl ExampleApp for TranslationExample {
     fn new() -> Self {
         Self {
-            interactive: InteractiveState::new(),
             text_engine: TextEngine::new_default(),
             debug_options: DebugOptions::none(),
-            outer_translation_x: 50.0,
-            outer_translation_y: 30.0,
-            inner_translation_x: 20.0,
-            inner_translation_y: 20.0,
-            counter: 0,
-            toggle_state: false,
+            state: Rc::new(RefCell::new(AppState {
+                outer_translation_x: 50.0,
+                outer_translation_y: 30.0,
+                inner_translation_x: 20.0,
+                inner_translation_y: 20.0,
+                counter: 0,
+                toggle_state: false,
+            })),
         }
     }
 
@@ -64,7 +60,41 @@ impl ExampleApp for TranslationExample {
         (1200, 800)
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
+        Some(&mut self.text_engine)
+    }
+
+    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
+        Some(&mut self.debug_options)
+    }
+
+    fn build_ui(&mut self, ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
+        // Clone state for callbacks
+        let state = self.state.clone();
+
+        // Read current values for display
+        let (outer_x, outer_y, inner_x, inner_y, counter, toggle_state) = {
+            let s = state.borrow();
+            (
+                s.outer_translation_x,
+                s.outer_translation_y,
+                s.inner_translation_x,
+                s.inner_translation_y,
+                s.counter,
+                s.toggle_state,
+            )
+        };
+
+        // Clone state for each callback
+        let state_outer_x = state.clone();
+        let state_outer_y = state.clone();
+        let state_inner_x = state.clone();
+        let state_inner_y = state.clone();
+        let state_dec = state.clone();
+        let state_inc = state.clone();
+        let state_reset = state.clone();
+        let state_toggle = state.clone();
+
         Node::new()
             .with_zoom(1.5)
             .with_width(Size::Fill)
@@ -90,11 +120,14 @@ impl ExampleApp for TranslationExample {
                 Node::new()
                     .with_width(Size::Fill)
                     .with_content(Content::Text(
-                        TextContent::new("Adjust sliders to translate containers. Nested translations should accumulate.".to_string())
-                            .with_font_size(Size::lpx(16.0))
-                            .with_color(mocha::SUBTEXT0)
-                            .with_h_align(HorizontalAlign::Center)
-                            .with_v_align(VerticalAlign::Center),
+                        TextContent::new(
+                            "Adjust sliders to translate containers. Nested translations should accumulate."
+                                .to_string(),
+                        )
+                        .with_font_size(Size::lpx(16.0))
+                        .with_color(mocha::SUBTEXT0)
+                        .with_h_align(HorizontalAlign::Center)
+                        .with_v_align(VerticalAlign::Center),
                     )),
                 // Main content area with horizontal layout
                 Node::new()
@@ -127,18 +160,20 @@ impl ExampleApp for TranslationExample {
                                     .with_layout_direction(Layout::Horizontal)
                                     .with_gap(Size::lpx(12.0))
                                     .with_children(vec![
-                                        slider(
-                                            "outer_x_slider",
-                                            self.outer_translation_x,
-                                            -200.0..=200.0,
-                                            false,
-                                            &SliderStyle::default(),
-                                        ),
+                                        Slider::new(outer_x, -200.0..=200.0)
+                                            .step(1.0)
+                                            .with_style(SliderStyle::default())
+                                            .on_change(move |new_val| {
+                                                state_outer_x.borrow_mut().outer_translation_x =
+                                                    new_val;
+                                                println!("Outer X: {:.1}", new_val);
+                                            })
+                                            .node(ctx),
                                         Node::new()
                                             .with_width(Size::lpx(60.0))
                                             .with_height(Size::lpx(24.0))
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("{:.0}", self.outer_translation_x))
+                                                TextContent::new(format!("{:.0}", outer_x))
                                                     .with_font_size(Size::lpx(18.0))
                                                     .with_color(mocha::LAVENDER)
                                                     .with_h_align(HorizontalAlign::Right)
@@ -160,18 +195,20 @@ impl ExampleApp for TranslationExample {
                                     .with_layout_direction(Layout::Horizontal)
                                     .with_gap(Size::lpx(12.0))
                                     .with_children(vec![
-                                        slider(
-                                            "outer_y_slider",
-                                            self.outer_translation_y,
-                                            -200.0..=200.0,
-                                            false,
-                                            &SliderStyle::default(),
-                                        ),
+                                        Slider::new(outer_y, -200.0..=200.0)
+                                            .step(1.0)
+                                            .with_style(SliderStyle::default())
+                                            .on_change(move |new_val| {
+                                                state_outer_y.borrow_mut().outer_translation_y =
+                                                    new_val;
+                                                println!("Outer Y: {:.1}", new_val);
+                                            })
+                                            .node(ctx),
                                         Node::new()
                                             .with_width(Size::lpx(60.0))
                                             .with_height(Size::lpx(24.0))
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("{:.0}", self.outer_translation_y))
+                                                TextContent::new(format!("{:.0}", outer_y))
                                                     .with_font_size(Size::lpx(18.0))
                                                     .with_color(mocha::LAVENDER)
                                                     .with_h_align(HorizontalAlign::Right)
@@ -193,18 +230,20 @@ impl ExampleApp for TranslationExample {
                                     .with_layout_direction(Layout::Horizontal)
                                     .with_gap(Size::lpx(12.0))
                                     .with_children(vec![
-                                        slider(
-                                            "inner_x_slider",
-                                            self.inner_translation_x,
-                                            -100.0..=100.0,
-                                            false,
-                                            &SliderStyle::default(),
-                                        ),
+                                        Slider::new(inner_x, -100.0..=100.0)
+                                            .step(1.0)
+                                            .with_style(SliderStyle::default())
+                                            .on_change(move |new_val| {
+                                                state_inner_x.borrow_mut().inner_translation_x =
+                                                    new_val;
+                                                println!("Inner X: {:.1}", new_val);
+                                            })
+                                            .node(ctx),
                                         Node::new()
                                             .with_width(Size::lpx(60.0))
                                             .with_height(Size::lpx(24.0))
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("{:.0}", self.inner_translation_x))
+                                                TextContent::new(format!("{:.0}", inner_x))
                                                     .with_font_size(Size::lpx(18.0))
                                                     .with_color(mocha::LAVENDER)
                                                     .with_h_align(HorizontalAlign::Right)
@@ -226,18 +265,20 @@ impl ExampleApp for TranslationExample {
                                     .with_layout_direction(Layout::Horizontal)
                                     .with_gap(Size::lpx(12.0))
                                     .with_children(vec![
-                                        slider(
-                                            "inner_y_slider",
-                                            self.inner_translation_y,
-                                            -100.0..=100.0,
-                                            false,
-                                            &SliderStyle::default(),
-                                        ),
+                                        Slider::new(inner_y, -100.0..=100.0)
+                                            .step(1.0)
+                                            .with_style(SliderStyle::default())
+                                            .on_change(move |new_val| {
+                                                state_inner_y.borrow_mut().inner_translation_y =
+                                                    new_val;
+                                                println!("Inner Y: {:.1}", new_val);
+                                            })
+                                            .node(ctx),
                                         Node::new()
                                             .with_width(Size::lpx(60.0))
                                             .with_height(Size::lpx(24.0))
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("{:.0}", self.inner_translation_y))
+                                                TextContent::new(format!("{:.0}", inner_y))
                                                     .with_font_size(Size::lpx(18.0))
                                                     .with_color(mocha::LAVENDER)
                                                     .with_h_align(HorizontalAlign::Right)
@@ -262,7 +303,7 @@ impl ExampleApp for TranslationExample {
                                         Node::new()
                                             .with_width(Size::Fill)
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("{}", self.counter))
+                                                TextContent::new(format!("{}", counter))
                                                     .with_font_size(Size::lpx(48.0))
                                                     .with_color(mocha::PEACH)
                                                     .with_h_align(HorizontalAlign::Center)
@@ -271,11 +312,18 @@ impl ExampleApp for TranslationExample {
                                         Node::new()
                                             .with_width(Size::Fill)
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("Toggle: {}", if self.toggle_state { "ON" } else { "OFF" }))
-                                                    .with_font_size(Size::lpx(20.0))
-                                                    .with_color(if self.toggle_state { mocha::GREEN } else { mocha::RED })
-                                                    .with_h_align(HorizontalAlign::Center)
-                                                    .with_v_align(VerticalAlign::Center),
+                                                TextContent::new(format!(
+                                                    "Toggle: {}",
+                                                    if toggle_state { "ON" } else { "OFF" }
+                                                ))
+                                                .with_font_size(Size::lpx(20.0))
+                                                .with_color(if toggle_state {
+                                                    mocha::GREEN
+                                                } else {
+                                                    mocha::RED
+                                                })
+                                                .with_h_align(HorizontalAlign::Center)
+                                                .with_v_align(VerticalAlign::Center),
                                             )),
                                     ]),
                             ]),
@@ -288,8 +336,8 @@ impl ExampleApp for TranslationExample {
                                     .with_width(Size::lpx(400.0))
                                     .with_height(Size::lpx(400.0))
                                     .with_translation(Translation::new(
-                                        Size::Logical(self.outer_translation_x),
-                                        Size::Logical(self.outer_translation_y),
+                                        Size::Logical(outer_x),
+                                        Size::Logical(outer_y),
                                     ))
                                     .with_shape(Shape::Rect(
                                         StyledRect::new(Default::default(), mocha::CRUST)
@@ -318,36 +366,64 @@ impl ExampleApp for TranslationExample {
                                             .with_layout_direction(Layout::Horizontal)
                                             .with_gap(Size::lpx(12.0))
                                             .with_children(vec![
-                                                button(
-                                                    "decrement_btn",
-                                                    "-",
-                                                    false,
-                                                    &ButtonStyle::default(),
-                                                ),
-                                                button(
-                                                    "increment_btn",
-                                                    "+",
-                                                    false,
-                                                    &ButtonStyle::default(),
-                                                ),
-                                                button(
-                                                    "reset_btn",
-                                                    "Reset",
-                                                    false,
-                                                    &ButtonStyle::default(),
-                                                ),
+                                                Button::new("-")
+                                                    .with_style(ButtonStyle::default())
+                                                    .on_click({
+                                                        let state = state_dec.clone();
+                                                        move || {
+                                                            let mut s = state.borrow_mut();
+                                                            s.counter -= 1;
+                                                            println!(
+                                                                "Decrement clicked! Counter: {}",
+                                                                s.counter
+                                                            );
+                                                        }
+                                                    })
+                                                    .node(ctx),
+                                                Button::new("+")
+                                                    .with_style(ButtonStyle::default())
+                                                    .on_click({
+                                                        let state = state_inc.clone();
+                                                        move || {
+                                                            let mut s = state.borrow_mut();
+                                                            s.counter += 1;
+                                                            println!(
+                                                                "Increment clicked! Counter: {}",
+                                                                s.counter
+                                                            );
+                                                        }
+                                                    })
+                                                    .node(ctx),
+                                                Button::new("Reset")
+                                                    .with_style(ButtonStyle::default())
+                                                    .on_click({
+                                                        let state = state_reset.clone();
+                                                        move || {
+                                                            let mut s = state.borrow_mut();
+                                                            s.counter = 0;
+                                                            s.outer_translation_x = 0.0;
+                                                            s.outer_translation_y = 0.0;
+                                                            s.inner_translation_x = 0.0;
+                                                            s.inner_translation_y = 0.0;
+                                                            println!("Reset clicked!");
+                                                        }
+                                                    })
+                                                    .node(ctx),
                                             ]),
                                         // Inner translated container (green border)
                                         Node::new()
                                             .with_width(Size::Fill)
                                             .with_height(Size::lpx(200.0))
                                             .with_translation(Translation::new(
-                                                Size::Logical(self.inner_translation_x),
-                                                Size::Logical(self.inner_translation_y),
+                                                Size::Logical(inner_x),
+                                                Size::Logical(inner_y),
                                             ))
                                             .with_shape(Shape::Rect(
                                                 StyledRect::new(Default::default(), mocha::CRUST)
-                                                    .with_stroke(Stroke::new(Size::lpx(2.0), mocha::GREEN))
+                                                    .with_stroke(Stroke::new(
+                                                        Size::lpx(2.0),
+                                                        mocha::GREEN,
+                                                    ))
                                                     .with_corner_shape(astra_gui::CornerShape::Cut(
                                                         Size::lpx(20.0),
                                                     )),
@@ -360,11 +436,13 @@ impl ExampleApp for TranslationExample {
                                                 Node::new()
                                                     .with_width(Size::Fill)
                                                     .with_content(Content::Text(
-                                                        TextContent::new("Inner Container".to_string())
-                                                            .with_font_size(Size::lpx(20.0))
-                                                            .with_color(mocha::TEXT)
-                                                            .with_h_align(HorizontalAlign::Center)
-                                                            .with_v_align(VerticalAlign::Center),
+                                                        TextContent::new(
+                                                            "Inner Container".to_string(),
+                                                        )
+                                                        .with_font_size(Size::lpx(20.0))
+                                                        .with_color(mocha::TEXT)
+                                                        .with_h_align(HorizontalAlign::Center)
+                                                        .with_v_align(VerticalAlign::Center),
                                                     )),
                                                 // Toggle in inner container
                                                 Node::new()
@@ -375,18 +453,28 @@ impl ExampleApp for TranslationExample {
                                                         Node::new()
                                                             .with_width(Size::Fill)
                                                             .with_content(Content::Text(
-                                                                TextContent::new("Toggle:".to_string())
-                                                                    .with_font_size(Size::lpx(18.0))
-                                                                    .with_color(mocha::TEXT)
-                                                                    .with_h_align(HorizontalAlign::Right)
-                                                                    .with_v_align(VerticalAlign::Center),
+                                                                TextContent::new(
+                                                                    "Toggle:".to_string(),
+                                                                )
+                                                                .with_font_size(Size::lpx(18.0))
+                                                                .with_color(mocha::TEXT)
+                                                                .with_h_align(HorizontalAlign::Right)
+                                                                .with_v_align(VerticalAlign::Center),
                                                             )),
-                                                        toggle(
-                                                            "toggle_switch",
-                                                            self.toggle_state,
-                                                            false,
-                                                            &ToggleStyle::default(),
-                                                        ),
+                                                        Toggle::new(toggle_state)
+                                                            .with_style(ToggleStyle::default())
+                                                            .on_toggle({
+                                                                let state = state_toggle.clone();
+                                                                move |new_state| {
+                                                                    state.borrow_mut().toggle_state =
+                                                                        new_state;
+                                                                    println!(
+                                                                        "Toggle clicked! State: {}",
+                                                                        new_state
+                                                                    );
+                                                                }
+                                                            })
+                                                            .node(ctx),
                                                     ]),
                                                 // Nested translation info
                                                 Node::new()
@@ -394,13 +482,13 @@ impl ExampleApp for TranslationExample {
                                                     .with_content(Content::Text(
                                                         TextContent::new(format!(
                                                             "Total: ({:.0}, {:.0})",
-                                                            self.outer_translation_x + self.inner_translation_x,
-                                                            self.outer_translation_y + self.inner_translation_y
+                                                            outer_x + inner_x,
+                                                            outer_y + inner_y
                                                         ))
-                                                            .with_font_size(Size::lpx(16.0))
-                                                            .with_color(mocha::TEXT)
-                                                            .with_h_align(HorizontalAlign::Center)
-                                                            .with_v_align(VerticalAlign::Center),
+                                                        .with_font_size(Size::lpx(16.0))
+                                                        .with_color(mocha::TEXT)
+                                                        .with_h_align(HorizontalAlign::Center)
+                                                        .with_v_align(VerticalAlign::Center),
                                                     )),
                                             ]),
                                     ]),
@@ -427,103 +515,6 @@ impl ExampleApp for TranslationExample {
                             .with_v_align(VerticalAlign::Center),
                     )),
             ])
-    }
-
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
-        Some(&mut self.text_engine)
-    }
-
-    fn interactive_state(&mut self) -> Option<&mut InteractiveState> {
-        Some(&mut self.interactive)
-    }
-
-    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
-        Some(&mut self.debug_options)
-    }
-
-    fn handle_events(&mut self, events: &[TargetedEvent]) -> bool {
-        let mut changed = false;
-
-        // Handle button clicks
-        if button_clicked("increment_btn", events) {
-            self.counter += 1;
-            println!("Increment clicked! Counter: {}", self.counter);
-            changed = true;
-        }
-
-        if button_clicked("decrement_btn", events) {
-            self.counter -= 1;
-            println!("Decrement clicked! Counter: {}", self.counter);
-            changed = true;
-        }
-
-        if button_clicked("reset_btn", events) {
-            self.counter = 0;
-            self.outer_translation_x = 0.0;
-            self.outer_translation_y = 0.0;
-            self.inner_translation_x = 0.0;
-            self.inner_translation_y = 0.0;
-            println!("Reset clicked! Counter: {}", self.counter);
-            changed = true;
-        }
-
-        // Handle toggle
-        if toggle_clicked("toggle_switch", events) {
-            self.toggle_state = !self.toggle_state;
-            println!("Toggle switched! State: {}", self.toggle_state);
-            changed = true;
-        }
-
-        // Handle translation sliders
-        if slider_drag(
-            "outer_x_slider",
-            &mut self.outer_translation_x,
-            &(-200.0..=200.0),
-            events,
-            &SliderStyle::default(),
-            Some(1.0),
-        ) {
-            println!("Outer X: {:.1}", self.outer_translation_x);
-            changed = true;
-        }
-
-        if slider_drag(
-            "outer_y_slider",
-            &mut self.outer_translation_y,
-            &(-200.0..=200.0),
-            events,
-            &SliderStyle::default(),
-            Some(1.0),
-        ) {
-            println!("Outer Y: {:.1}", self.outer_translation_y);
-            changed = true;
-        }
-
-        if slider_drag(
-            "inner_x_slider",
-            &mut self.inner_translation_x,
-            &(-100.0..=100.0),
-            events,
-            &SliderStyle::default(),
-            Some(1.0),
-        ) {
-            println!("Inner X: {:.1}", self.inner_translation_x);
-            changed = true;
-        }
-
-        if slider_drag(
-            "inner_y_slider",
-            &mut self.inner_translation_y,
-            &(-100.0..=100.0),
-            events,
-            &SliderStyle::default(),
-            Some(1.0),
-        ) {
-            println!("Inner Y: {:.1}", self.inner_translation_y);
-            changed = true;
-        }
-
-        changed
     }
 }
 

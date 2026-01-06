@@ -19,7 +19,7 @@ mod shared;
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, DebugOptions, HorizontalAlign, Layout, Node,
-    Place, Size, Spacing, Stroke, Style, TextContent, VerticalAlign,
+    Place, Size, Spacing, Stroke, Style, TextContent, UiContext, VerticalAlign,
 };
 use astra_gui_text::Engine as TextEngine;
 use shared::{run_example, ExampleApp};
@@ -99,7 +99,19 @@ impl ExampleApp for PlaceExample {
         }
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
+        Some(&mut self.text_engine)
+    }
+
+    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
+        Some(&mut self.debug_options)
+    }
+
+    fn zoom_level(&self) -> f32 {
+        self.zoom_level
+    }
+
+    fn build_ui(&mut self, _ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
         // Root fills the window. Stack children are positioned using per-child `Place`.
         let root = Node::new()
             .with_id("root")
@@ -191,18 +203,6 @@ impl ExampleApp for PlaceExample {
         // The example runner applies `zoom_level` by calling `with_zoom(zoom)`.
         // We keep the default 1.0 here.
         root
-    }
-
-    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
-        Some(&mut self.debug_options)
-    }
-
-    fn zoom_level(&self) -> f32 {
-        self.zoom_level
-    }
-
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
-        Some(&mut self.text_engine)
     }
 }
 

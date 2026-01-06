@@ -6,7 +6,7 @@ mod shared;
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, DebugOptions, HorizontalAlign, Layout, Node,
-    Overflow, Shape, Size, Spacing, Stroke, StyledRect, TextContent, VerticalAlign,
+    Overflow, Shape, Size, Spacing, Stroke, StyledRect, TextContent, UiContext, VerticalAlign,
 };
 use shared::{debug_controls::DEBUG_HELP_TEXT_ONELINE, run_example, ExampleApp};
 
@@ -29,7 +29,7 @@ impl ExampleApp for StrokeExample {
         (1600, 1000)
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
+    fn build_ui(&mut self, _ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
         create_stroke_test_ui().with_zoom(2.0)
     }
 

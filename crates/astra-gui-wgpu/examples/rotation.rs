@@ -1,52 +1,50 @@
-//! Rotation example
-//!
-//! Demonstrates rotation with nested rotations and interactive elements.
+//! Rotation example demonstrating transform rotations with interactive components.
 //!
 //! Controls:
-//! - Click buttons inside rotated containers to verify hit testing
-//! - Drag sliders to adjust rotation angles
-//! - Toggle switches work even when rotated
+//! - Use sliders to adjust rotation of outer/inner containers
+//! - Click +/- buttons to change counter
+//! - Click toggle switch to test hit testing in rotated containers
+//! - Debug controls (M/P/B/C/R/G/O/T/D/S)
 //! - ESC: quit
-
-#![allow(unused_imports, unused_variables, dead_code)]
 
 mod shared;
 
 use astra_gui::{
-    catppuccin::mocha, Content, DebugOptions, HorizontalAlign, Layout, Node, Shape, Size, Spacing,
-    Stroke, StyledRect, TextContent, TransformOrigin, VerticalAlign,
+    catppuccin::mocha, Component, Content, DebugOptions, HorizontalAlign, Layout, Node, Shape,
+    Size, Spacing, Stroke, StyledRect, TextContent, TransformOrigin, UiContext, VerticalAlign,
 };
-use astra_gui_interactive::{
-    button, button_clicked, slider, slider_drag, toggle, toggle_clicked, ButtonStyle, SliderStyle,
-    ToggleStyle,
-};
+use astra_gui_interactive::{Button, ButtonStyle, Slider, SliderStyle, Toggle, ToggleStyle};
 use astra_gui_text::Engine as TextEngine;
-use astra_gui_wgpu::TargetedEvent;
 use shared::debug_controls::DEBUG_HELP_TEXT_ONELINE;
-use shared::{run_example, ExampleApp, InteractiveState};
+use shared::{run_example, ExampleApp};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-struct RotationExample {
-    interactive: InteractiveState,
-    text_engine: TextEngine,
-    debug_options: DebugOptions,
-
-    // Application state
-    outer_rotation: f32, // Degrees
-    inner_rotation: f32, // Degrees
+/// Shared application state that can be modified from callbacks
+struct AppState {
+    outer_rotation: f32,
+    inner_rotation: f32,
     counter: i32,
     toggle_state: bool,
+}
+
+struct RotationExample {
+    text_engine: TextEngine,
+    debug_options: DebugOptions,
+    state: Rc<RefCell<AppState>>,
 }
 
 impl ExampleApp for RotationExample {
     fn new() -> Self {
         Self {
-            interactive: InteractiveState::new(),
             text_engine: TextEngine::new_default(),
             debug_options: DebugOptions::none(),
-            outer_rotation: 30.0,
-            inner_rotation: 0.0,
-            counter: 0,
-            toggle_state: true,
+            state: Rc::new(RefCell::new(AppState {
+                outer_rotation: 30.0,
+                inner_rotation: 0.0,
+                counter: 0,
+                toggle_state: true,
+            })),
         }
     }
 
@@ -58,7 +56,37 @@ impl ExampleApp for RotationExample {
         (1200, 800)
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
+        Some(&mut self.text_engine)
+    }
+
+    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
+        Some(&mut self.debug_options)
+    }
+
+    fn build_ui(&mut self, ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
+        // Clone state for callbacks
+        let state = self.state.clone();
+
+        // Read current values for display
+        let (outer_rotation, inner_rotation, counter, toggle_state) = {
+            let s = state.borrow();
+            (
+                s.outer_rotation,
+                s.inner_rotation,
+                s.counter,
+                s.toggle_state,
+            )
+        };
+
+        // Clone state for each callback
+        let state_outer = state.clone();
+        let state_inner = state.clone();
+        let state_dec = state.clone();
+        let state_inc = state.clone();
+        let state_reset = state.clone();
+        let state_toggle = state.clone();
+
         Node::new()
             .with_zoom(1.5)
             .with_width(Size::Fill)
@@ -84,11 +112,14 @@ impl ExampleApp for RotationExample {
                 Node::new()
                     .with_width(Size::Fill)
                     .with_content(Content::Text(
-                        TextContent::new("Adjust sliders to rotate containers. Click buttons to verify hit testing works!".to_string())
-                            .with_font_size(Size::lpx(16.0))
-                            .with_color(mocha::SUBTEXT0)
-                            .with_h_align(HorizontalAlign::Center)
-                            .with_v_align(VerticalAlign::Center),
+                        TextContent::new(
+                            "Adjust sliders to rotate containers. Click buttons to verify hit testing works!"
+                                .to_string(),
+                        )
+                        .with_font_size(Size::lpx(16.0))
+                        .with_color(mocha::SUBTEXT0)
+                        .with_h_align(HorizontalAlign::Center)
+                        .with_v_align(VerticalAlign::Center),
                     )),
                 // Main content area with rotated containers
                 Node::new()
@@ -122,17 +153,18 @@ impl ExampleApp for RotationExample {
                                     .with_layout_direction(Layout::Horizontal)
                                     .with_gap(Size::lpx(12.0))
                                     .with_children(vec![
-                                        slider(
-                                            "outer_rotation_slider",
-                                            self.outer_rotation,
-                                            -180.0..=180.0,
-                                            false,
-                                            &SliderStyle::default(),
-                                        ),
+                                        Slider::new(outer_rotation, -180.0..=180.0)
+                                            .step(1.0)
+                                            .with_style(SliderStyle::default())
+                                            .on_change(move |new_val| {
+                                                state_outer.borrow_mut().outer_rotation = new_val;
+                                                println!("Outer rotation: {:.1}°", new_val);
+                                            })
+                                            .node(ctx),
                                         Node::new()
                                             .with_width(Size::lpx(60.0))
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("{:.0}°", self.outer_rotation))
+                                                TextContent::new(format!("{:.0}°", outer_rotation))
                                                     .with_font_size(Size::lpx(18.0))
                                                     .with_color(mocha::LAVENDER)
                                                     .with_h_align(HorizontalAlign::Right)
@@ -154,17 +186,18 @@ impl ExampleApp for RotationExample {
                                     .with_layout_direction(Layout::Horizontal)
                                     .with_gap(Size::lpx(12.0))
                                     .with_children(vec![
-                                        slider(
-                                            "inner_rotation_slider",
-                                            self.inner_rotation,
-                                            -180.0..=180.0,
-                                            false,
-                                            &SliderStyle::default(),
-                                        ),
+                                        Slider::new(inner_rotation, -180.0..=180.0)
+                                            .step(1.0)
+                                            .with_style(SliderStyle::default())
+                                            .on_change(move |new_val| {
+                                                state_inner.borrow_mut().inner_rotation = new_val;
+                                                println!("Inner rotation: {:.1}°", new_val);
+                                            })
+                                            .node(ctx),
                                         Node::new()
                                             .with_width(Size::lpx(60.0))
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("{:.0}°", self.inner_rotation))
+                                                TextContent::new(format!("{:.0}°", inner_rotation))
                                                     .with_font_size(Size::lpx(18.0))
                                                     .with_color(mocha::LAVENDER)
                                                     .with_h_align(HorizontalAlign::Right)
@@ -190,7 +223,7 @@ impl ExampleApp for RotationExample {
                                         Node::new()
                                             .with_width(Size::Fill)
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("{}", self.counter))
+                                                TextContent::new(format!("{}", counter))
                                                     .with_font_size(Size::lpx(48.0))
                                                     .with_color(mocha::PEACH)
                                                     .with_h_align(HorizontalAlign::Center)
@@ -199,11 +232,18 @@ impl ExampleApp for RotationExample {
                                         Node::new()
                                             .with_width(Size::Fill)
                                             .with_content(Content::Text(
-                                                TextContent::new(format!("Toggle: {}", if self.toggle_state { "ON" } else { "OFF" }))
-                                                    .with_font_size(Size::lpx(20.0))
-                                                    .with_color(if self.toggle_state { mocha::GREEN } else { mocha::RED })
-                                                    .with_h_align(HorizontalAlign::Center)
-                                                    .with_v_align(VerticalAlign::Center),
+                                                TextContent::new(format!(
+                                                    "Toggle: {}",
+                                                    if toggle_state { "ON" } else { "OFF" }
+                                                ))
+                                                .with_font_size(Size::lpx(20.0))
+                                                .with_color(if toggle_state {
+                                                    mocha::GREEN
+                                                } else {
+                                                    mocha::RED
+                                                })
+                                                .with_h_align(HorizontalAlign::Center)
+                                                .with_v_align(VerticalAlign::Center),
                                             )),
                                     ]),
                             ]),
@@ -216,7 +256,7 @@ impl ExampleApp for RotationExample {
                                 Node::new()
                                     .with_width(Size::lpx(400.0))
                                     .with_height(Size::lpx(400.0))
-                                    .with_rotation(self.outer_rotation.to_radians())
+                                    .with_rotation(outer_rotation.to_radians())
                                     .with_transform_origin(TransformOrigin::center())
                                     .with_shape(Shape::Rect(
                                         StyledRect::new(Default::default(), mocha::CRUST)
@@ -245,34 +285,60 @@ impl ExampleApp for RotationExample {
                                             .with_layout_direction(Layout::Horizontal)
                                             .with_gap(Size::lpx(12.0))
                                             .with_children(vec![
-                                                button(
-                                                    "decrement_btn",
-                                                    "-",
-                                                    false,
-                                                    &ButtonStyle::default(),
-                                                ),
-                                                button(
-                                                    "increment_btn",
-                                                    "+",
-                                                    false,
-                                                    &ButtonStyle::default(),
-                                                ),
-                                                button(
-                                                    "reset_btn",
-                                                    "Reset",
-                                                    false,
-                                                    &ButtonStyle::default(),
-                                                ),
+                                                Button::new("-")
+                                                    .with_style(ButtonStyle::default())
+                                                    .on_click({
+                                                        let state = state_dec.clone();
+                                                        move || {
+                                                            let mut s = state.borrow_mut();
+                                                            s.counter -= 1;
+                                                            println!(
+                                                                "Decrement clicked! Counter: {}",
+                                                                s.counter
+                                                            );
+                                                        }
+                                                    })
+                                                    .node(ctx),
+                                                Button::new("+")
+                                                    .with_style(ButtonStyle::default())
+                                                    .on_click({
+                                                        let state = state_inc.clone();
+                                                        move || {
+                                                            let mut s = state.borrow_mut();
+                                                            s.counter += 1;
+                                                            println!(
+                                                                "Increment clicked! Counter: {}",
+                                                                s.counter
+                                                            );
+                                                        }
+                                                    })
+                                                    .node(ctx),
+                                                Button::new("Reset")
+                                                    .with_style(ButtonStyle::default())
+                                                    .on_click({
+                                                        let state = state_reset.clone();
+                                                        move || {
+                                                            let mut s = state.borrow_mut();
+                                                            s.counter = 0;
+                                                            s.outer_rotation = 0.0;
+                                                            s.inner_rotation = 0.0;
+                                                            println!("Reset clicked!");
+                                                        }
+                                                    })
+                                                    .node(ctx),
                                             ]),
                                         // Inner rotated container (green)
                                         Node::new()
                                             .with_width(Size::Fill)
                                             .with_height(Size::lpx(200.0))
-                                            .with_rotation(self.inner_rotation.to_radians())
+                                            .with_rotation(inner_rotation.to_radians())
                                             .with_transform_origin(TransformOrigin::center())
                                             .with_shape(Shape::Rect(
                                                 StyledRect::new(Default::default(), mocha::CRUST)
-                                                    .with_stroke(Stroke::new(Size::lpx(2.0), mocha::GREEN))
+                                                    .with_stroke(Stroke::new(
+                                                        Size::lpx(2.0),
+                                                        mocha::GREEN,
+                                                    ))
                                                     .with_corner_shape(astra_gui::CornerShape::Cut(
                                                         Size::lpx(20.0),
                                                     )),
@@ -285,11 +351,13 @@ impl ExampleApp for RotationExample {
                                                 Node::new()
                                                     .with_width(Size::Fill)
                                                     .with_content(Content::Text(
-                                                        TextContent::new("Inner Container".to_string())
-                                                            .with_font_size(Size::lpx(20.0))
-                                                            .with_color(mocha::TEXT)
-                                                            .with_h_align(HorizontalAlign::Center)
-                                                            .with_v_align(VerticalAlign::Center),
+                                                        TextContent::new(
+                                                            "Inner Container".to_string(),
+                                                        )
+                                                        .with_font_size(Size::lpx(20.0))
+                                                        .with_color(mocha::TEXT)
+                                                        .with_h_align(HorizontalAlign::Center)
+                                                        .with_v_align(VerticalAlign::Center),
                                                     )),
                                                 // Toggle in inner container
                                                 Node::new()
@@ -300,18 +368,28 @@ impl ExampleApp for RotationExample {
                                                         Node::new()
                                                             .with_width(Size::Fill)
                                                             .with_content(Content::Text(
-                                                                TextContent::new("Toggle:".to_string())
-                                                                    .with_font_size(Size::lpx(18.0))
-                                                                    .with_color(mocha::TEXT)
-                                                                    .with_h_align(HorizontalAlign::Right)
-                                                                    .with_v_align(VerticalAlign::Center),
+                                                                TextContent::new(
+                                                                    "Toggle:".to_string(),
+                                                                )
+                                                                .with_font_size(Size::lpx(18.0))
+                                                                .with_color(mocha::TEXT)
+                                                                .with_h_align(HorizontalAlign::Right)
+                                                                .with_v_align(VerticalAlign::Center),
                                                             )),
-                                                        toggle(
-                                                            "toggle_switch",
-                                                            self.toggle_state,
-                                                            false,
-                                                            &ToggleStyle::default(),
-                                                        ),
+                                                        Toggle::new(toggle_state)
+                                                            .with_style(ToggleStyle::default())
+                                                            .on_toggle({
+                                                                let state = state_toggle.clone();
+                                                                move |new_state| {
+                                                                    state.borrow_mut().toggle_state =
+                                                                        new_state;
+                                                                    println!(
+                                                                        "Toggle clicked! State: {}",
+                                                                        new_state
+                                                                    );
+                                                                }
+                                                            })
+                                                            .node(ctx),
                                                     ]),
                                                 // Nested rotation info
                                                 Node::new()
@@ -319,12 +397,12 @@ impl ExampleApp for RotationExample {
                                                     .with_content(Content::Text(
                                                         TextContent::new(format!(
                                                             "Total: {:.0}°",
-                                                            self.outer_rotation + self.inner_rotation
+                                                            outer_rotation + inner_rotation
                                                         ))
-                                                            .with_font_size(Size::lpx(16.0))
-                                                            .with_color(mocha::TEXT)
-                                                            .with_h_align(HorizontalAlign::Center)
-                                                            .with_v_align(VerticalAlign::Center),
+                                                        .with_font_size(Size::lpx(16.0))
+                                                        .with_color(mocha::TEXT)
+                                                        .with_h_align(HorizontalAlign::Center)
+                                                        .with_v_align(VerticalAlign::Center),
                                                     )),
                                             ]),
                                     ]),
@@ -351,76 +429,6 @@ impl ExampleApp for RotationExample {
                             .with_v_align(VerticalAlign::Center),
                     )),
             ])
-    }
-
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
-        Some(&mut self.text_engine)
-    }
-
-    fn interactive_state(&mut self) -> Option<&mut InteractiveState> {
-        Some(&mut self.interactive)
-    }
-
-    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
-        Some(&mut self.debug_options)
-    }
-
-    fn handle_events(&mut self, events: &[TargetedEvent]) -> bool {
-        let mut changed = false;
-
-        // Handle button clicks
-        if button_clicked("increment_btn", events) {
-            self.counter += 1;
-            println!("Increment clicked! Counter: {}", self.counter);
-            changed = true;
-        }
-
-        if button_clicked("decrement_btn", events) {
-            self.counter -= 1;
-            println!("Decrement clicked! Counter: {}", self.counter);
-            changed = true;
-        }
-
-        if button_clicked("reset_btn", events) {
-            self.counter = 0;
-            self.outer_rotation = 0.0;
-            self.inner_rotation = 0.0;
-            println!("Reset clicked! Counter: {}", self.counter);
-            changed = true;
-        }
-
-        if toggle_clicked("toggle_switch", events) {
-            self.toggle_state = !self.toggle_state;
-            println!("Toggle clicked! State: {}", self.toggle_state);
-            changed = true;
-        }
-
-        // Handle rotation sliders
-        if slider_drag(
-            "outer_rotation_slider",
-            &mut self.outer_rotation,
-            &(-180.0..=180.0),
-            events,
-            &SliderStyle::default(),
-            Some(1.0),
-        ) {
-            println!("Outer rotation: {:.1}°", self.outer_rotation);
-            changed = true;
-        }
-
-        if slider_drag(
-            "inner_rotation_slider",
-            &mut self.inner_rotation,
-            &(-180.0..=180.0),
-            events,
-            &SliderStyle::default(),
-            Some(1.0),
-        ) {
-            println!("Inner rotation: {:.1}°", self.inner_rotation);
-            changed = true;
-        }
-
-        changed
     }
 }
 

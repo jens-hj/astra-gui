@@ -1,7 +1,7 @@
 use super::debug_controls::{handle_debug_keybinds, DEBUG_HELP_TEXT};
 use super::example_app::ExampleApp;
 use super::gpu_state::GpuState;
-use astra_gui::{FullOutput, Rect};
+use astra_gui::{FullOutput, Rect, UiContext};
 use astra_gui_wgpu::WinitInputExt;
 use std::sync::Arc;
 use std::time::Instant;
@@ -44,6 +44,7 @@ pub struct AppRunner<T: ExampleApp> {
     window: Option<Arc<Window>>,
     gpu_state: Option<GpuState>,
     app: T,
+    ctx: UiContext,
     last_frame_time: Instant,
     frame_stats: FrameStats,
     #[cfg(feature = "profiling")]
@@ -56,6 +57,7 @@ impl<T: ExampleApp> AppRunner<T> {
             window: None,
             gpu_state: None,
             app,
+            ctx: UiContext::new(),
             last_frame_time: Instant::now(),
             frame_stats: FrameStats::default(),
             #[cfg(feature = "profiling")]
@@ -75,21 +77,21 @@ impl<T: ExampleApp> AppRunner<T> {
     fn render(&mut self) {
         let frame_start = Instant::now();
 
-        // Update app state
-        if let Some(interactive) = self.app.interactive_state() {
-            let _delta_time = interactive.delta_time();
-            interactive.begin_frame_transitions();
-        }
-
         // Get window size
         let size = match &self.window {
             Some(window) => window.inner_size(),
             None => return,
         };
 
-        // Build UI
+        // Begin frame - updates input state and prepares for new frame
+        let input = self.ctx.input().clone();
+        self.ctx.begin_frame(&input);
+
+        // Build UI - components check for events and fire callbacks internally
         let build_start = Instant::now();
-        let mut ui = self.app.build_ui(size.width as f32, size.height as f32);
+        let mut ui = self
+            .app
+            .build_ui(&mut self.ctx, size.width as f32, size.height as f32);
         let build_time = build_start.elapsed();
 
         // Apply zoom if needed
@@ -99,48 +101,25 @@ impl<T: ExampleApp> AppRunner<T> {
         }
 
         // Inject dimension overrides from previous frame's transitions BEFORE layout
-        if let Some(interactive) = self.app.interactive_state() {
-            interactive
-                .state_manager
-                .inject_dimension_overrides(&mut ui);
-        }
+        self.ctx.inject_dimension_overrides(&mut ui);
 
-        // Compute layout (single pass, uses injected overrides)
+        // Compute layout
         let layout_start = Instant::now();
         let window_rect = Rect::from_min_size([0.0, 0.0], [size.width as f32, size.height as f32]);
 
-        {
-            let mut text_measurer = self.app.text_measurer();
-            if let Some(measurer) = text_measurer.as_deref_mut() {
-                ui.compute_layout_with_measurer(window_rect, measurer);
-            } else {
-                ui.compute_layout(window_rect);
-            }
+        if let Some(text_engine) = self.app.text_engine() {
+            ui.compute_layout_with_measurer(window_rect, text_engine);
+        } else {
+            ui.compute_layout(window_rect);
         }
         let layout_time = layout_start.elapsed();
 
-        // Handle interactive events if needed
+        // End frame - dispatches events and updates transitions
         let event_start = Instant::now();
-        let events = if let Some(interactive) = self.app.interactive_state() {
-            let (events, interaction_states) = interactive
-                .event_dispatcher
-                .dispatch(&interactive.input_state, &mut ui);
-
-            // Update transitions and capture dimensions for next frame
-            interactive
-                .state_manager
-                .update_transitions(&mut ui, &interaction_states);
-
-            events
-        } else {
-            Vec::new()
-        };
+        self.ctx.end_frame(&mut ui);
         let event_time = event_start.elapsed();
 
-        // Let app handle events (after releasing the borrow on interactive_state)
-        self.app.handle_events(&events);
-
-        // Generate output (using from_laid_out_node since we already computed layout)
+        // Generate output
         let output_start = Instant::now();
         let debug_options = self.app.debug_options_mut().copied();
         let output = FullOutput::from_laid_out_node(
@@ -172,9 +151,7 @@ impl<T: ExampleApp> AppRunner<T> {
         let render_time = render_start.elapsed();
 
         // Clear input state for next frame
-        if let Some(interactive) = self.app.interactive_state() {
-            interactive.end_frame();
-        }
+        self.ctx.input_mut().begin_frame();
 
         // Update frame stats
         let total_frame_time = frame_start.elapsed();
@@ -258,10 +235,8 @@ impl<T: ExampleApp> ApplicationHandler for AppRunner<T> {
         _window_id: WindowId,
         event: WindowEvent,
     ) {
-        // Handle input events for interactive examples
-        if let Some(interactive) = self.app.interactive_state() {
-            interactive.input_state.handle_winit_event(&event);
-        }
+        // Handle input events - feed into UiContext's input state
+        self.ctx.input_mut().handle_winit_event(&event);
 
         match event {
             WindowEvent::CloseRequested => {
@@ -277,7 +252,7 @@ impl<T: ExampleApp> ApplicationHandler for AppRunner<T> {
             ) && key_event.state == ElementState::Pressed =>
             {
                 // Custom ESC handling
-                if !self.app.handle_escape() {
+                if !self.app.handle_escape(&self.ctx) {
                     event_loop.exit();
                 }
             }

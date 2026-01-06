@@ -12,7 +12,7 @@ mod shared;
 
 use astra_gui::{
     catppuccin::mocha, Color, Content, CornerShape, DebugOptions, HorizontalAlign, Layout, Node,
-    Size, Spacing, Stroke, Style, TextContent, VerticalAlign,
+    Size, Spacing, Stroke, Style, TextContent, UiContext, VerticalAlign,
 };
 use astra_gui_text::Engine as TextEngine;
 use shared::debug_controls::DEBUG_HELP_TEXT_ONELINE;
@@ -45,7 +45,19 @@ impl ExampleApp for Alignment {
         (1200, 1200)
     }
 
-    fn build_ui(&mut self, _width: f32, _height: f32) -> Node {
+    fn text_engine(&mut self) -> Option<&mut TextEngine> {
+        Some(&mut self.text_engine)
+    }
+
+    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
+        Some(&mut self.debug_options)
+    }
+
+    fn zoom_level(&self) -> f32 {
+        self.zoom_level
+    }
+
+    fn build_ui(&mut self, _ctx: &mut UiContext, _width: f32, _height: f32) -> Node {
         // Helper function to create a colored box
         let create_box = |color: Color, text: &str| {
             Node::new()
@@ -246,18 +258,6 @@ impl ExampleApp for Alignment {
                             .with_v_align(VerticalAlign::Center),
                     )),
             ])
-    }
-
-    fn text_measurer(&mut self) -> Option<&mut TextEngine> {
-        Some(&mut self.text_engine)
-    }
-
-    fn debug_options_mut(&mut self) -> Option<&mut DebugOptions> {
-        Some(&mut self.debug_options)
-    }
-
-    fn zoom_level(&self) -> f32 {
-        self.zoom_level
     }
 
     fn on_window_created(&mut self, window: &Window) {
