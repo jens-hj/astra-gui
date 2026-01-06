@@ -138,7 +138,10 @@ impl Default for CollapsibleStyle {
 ///
 /// # Example
 /// ```rust
+/// use astra_gui_interactive::{button, collapsible, collapsible_clicked, ButtonStyle, CollapsibleStyle};
+///
 /// let mut expanded = true;
+/// let events = Vec::new();
 ///
 /// let ui = collapsible(
 ///     "settings",
@@ -322,6 +325,11 @@ pub fn collapsible(
 ///
 /// # Example
 /// ```rust
+/// use astra_gui_interactive::collapsible_clicked;
+///
+/// let events = Vec::new();
+/// let mut expanded = true;
+///
 /// if collapsible_clicked("settings", &events) {
 ///     expanded = !expanded;
 /// }

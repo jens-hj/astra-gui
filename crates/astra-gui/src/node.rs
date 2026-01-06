@@ -3,6 +3,27 @@ use crate::layout::{
     ComputedLayout, Layout, Overflow, ScrollDirection, Size, Spacing, TransformOrigin, Translation,
     ZIndex,
 };
+
+/// Determines how a node should be placed within its parent.
+///
+/// This is primarily useful for `Layout::Stack`, where the parent's alignment currently applies
+/// uniformly to all children. By setting `Place` on a child, you can override its placement without
+/// changing the parent's alignment.
+///
+/// Notes:
+/// - `Place::Alignment` uses the parent content rect and the child's computed size
+/// - `Place::Absolute` interprets `(x, y)` as offsets from the parent's content origin
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Place {
+    Absolute {
+        x: Size,
+        y: Size,
+    },
+    Alignment {
+        h_align: HorizontalAlign,
+        v_align: VerticalAlign,
+    },
+}
 use crate::measure::{ContentMeasurer, IntrinsicSize, MeasureTextRequest};
 use crate::primitives::{Rect, Shape};
 use crate::style::Style;
@@ -51,6 +72,12 @@ pub struct Node {
     width: Size,
     /// Height of the node
     height: Size,
+    /// Optional per-node placement override within the parent.
+    ///
+    /// When set, this determines how the node is positioned within its parent's content rect.
+    /// This is intended to be used by parent layout algorithms to allow per-child placement
+    /// overrides (e.g. Stack children anchored individually).
+    place: Option<Place>,
     /// Translation from the default position (post-layout transform)
     translation: Translation,
     /// Rotation in radians, clockwise positive (CSS convention)
@@ -153,6 +180,7 @@ impl Node {
             id: None,
             width: Size::default(),
             height: Size::default(),
+            place: None,
             translation: Translation::ZERO,
             rotation: 0.0,
             scale: 1.0,
@@ -215,6 +243,17 @@ impl Node {
     pub fn with_width(mut self, width: Size) -> Self {
         self.width = width;
         self
+    }
+
+    /// Override how this node is placed within its parent.
+    pub fn with_place(mut self, place: Place) -> Self {
+        self.place = Some(place);
+        self
+    }
+
+    /// Get the placement override, if any.
+    pub fn place(&self) -> Option<Place> {
+        self.place
     }
 
     /// Set the height
@@ -1573,20 +1612,90 @@ impl Node {
                         (new_x - child_rect.min[0], 0.0)
                     }
                     Layout::Stack => {
-                        // For stack layout, apply both alignments
+                        // For stack layout, apply both alignments.
+                        //
+                        // IMPORTANT:
+                        // - By default, Stack uses the *parent's* alignment for all children.
+                        // - If the child has `Place` set, it can override placement:
+                        //   - `Place::Alignment` overrides the parent's alignment for this child.
+                        //   - `Place::Absolute` places the child at a fixed offset from the parent's content origin.
+                        //
+                        // Margin handling:
+                        // Alignment-based placement should respect the child's margins so panels can be inset from
+                        // edges without requiring manualTranslation.
                         let available_width = content_width;
                         let available_height = content_height;
 
-                        let offset_x = match self.h_align {
+                        // Start with parent alignment (default behavior)
+                        let mut offset_x = match self.h_align {
                             HorizontalAlign::Left => 0.0,
                             HorizontalAlign::Center => (available_width - child_width) / 2.0,
                             HorizontalAlign::Right => available_width - child_width,
                         };
-                        let offset_y = match self.v_align {
+                        let mut offset_y = match self.v_align {
                             VerticalAlign::Top => 0.0,
                             VerticalAlign::Center => (available_height - child_height) / 2.0,
                             VerticalAlign::Bottom => available_height - child_height,
                         };
+
+                        // Default alignment should include margins too (treat margins as insets from the content rect).
+                        // NOTE: For Center alignment, we intentionally ignore margins to preserve true centering.
+                        offset_x += match self.h_align {
+                            HorizontalAlign::Left => child_margin_left,
+                            HorizontalAlign::Center => 0.0,
+                            HorizontalAlign::Right => -child_margin_right,
+                        };
+                        offset_y += match self.v_align {
+                            VerticalAlign::Top => child_margin_top,
+                            VerticalAlign::Center => 0.0,
+                            VerticalAlign::Bottom => -child_margin_bottom,
+                        };
+
+                        // Apply per-child placement override if present
+                        if let Some(place) = self.children[i].place() {
+                            match place {
+                                Place::Alignment { h_align, v_align } => {
+                                    offset_x = match h_align {
+                                        HorizontalAlign::Left => child_margin_left,
+                                        HorizontalAlign::Center => {
+                                            (available_width - child_width) / 2.0
+                                        }
+                                        HorizontalAlign::Right => {
+                                            (available_width - child_width) - child_margin_right
+                                        }
+                                    };
+                                    offset_y = match v_align {
+                                        VerticalAlign::Top => child_margin_top,
+                                        VerticalAlign::Center => {
+                                            (available_height - child_height) / 2.0
+                                        }
+                                        VerticalAlign::Bottom => {
+                                            (available_height - child_height) - child_margin_bottom
+                                        }
+                                    };
+                                }
+                                Place::Absolute { x, y } => {
+                                    // Absolute placement is defined in terms of `Size` so callers can use
+                                    // logical/physical pixels or relative sizing.
+                                    //
+                                    // We resolve relative sizes against the parent's available size.
+                                    // Absolute placement is relative to the parent's content origin; margins are not
+                                    // automatically applied (use margins only with Place::Alignment).
+                                    offset_x = x
+                                        .try_resolve_with_scale(
+                                            available_width,
+                                            effective_scale_factor,
+                                        )
+                                        .unwrap_or(0.0);
+                                    offset_y = y
+                                        .try_resolve_with_scale(
+                                            available_height,
+                                            effective_scale_factor,
+                                        )
+                                        .unwrap_or(0.0);
+                                }
+                            }
+                        }
 
                         let new_x = content_x + offset_x;
                         let new_y = content_y + offset_y;
