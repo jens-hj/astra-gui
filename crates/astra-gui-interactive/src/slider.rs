@@ -3,8 +3,8 @@
 //! Provides a draggable slider for selecting values within a range.
 
 use astra_gui::{
-    catppuccin::mocha, Color, CornerShape, Layout, Node, NodeId, Size, Style, Transition,
-    Translation,
+    catppuccin::mocha, Color, Component, CornerShape, Layout, Node, NodeId, Size, Style,
+    Transition, Translation, UiContext,
 };
 use astra_gui_macros::WithBuilders;
 use astra_gui_wgpu::{InteractionEvent, TargetedEvent};
@@ -46,122 +46,222 @@ impl Default for SliderStyle {
     }
 }
 
-/// Create a slider node
+/// A slider component for selecting values within a range
 ///
-/// The slider consists of:
-/// - A track (background)
-/// - A filled portion showing the current value
-/// - A draggable thumb
+/// # Example
 ///
-/// # Arguments
-/// * `id` - Unique identifier for the slider (used for event targeting)
-/// * `value` - Current value (should be within the range)
-/// * `range` - The valid range of values
-/// * `disabled` - Whether the slider is disabled
-/// * `style` - Visual styling configuration
-///
-/// # Returns
-/// A configured `Node` representing the slider
-pub fn slider(
-    id: impl Into<String>,
+/// ```ignore
+/// Slider::new(value, 0.0..=100.0)
+///     .on_change(|new_value| println!("Value: {}", new_value))
+///     .node(&mut ctx)
+/// ```
+pub struct Slider {
     value: f32,
     range: RangeInclusive<f32>,
+    step: Option<f32>,
     disabled: bool,
-    style: &SliderStyle,
-) -> Node {
-    let id_str = id.into();
+    style: SliderStyle,
+    on_change: Option<Box<dyn FnMut(f32)>>,
+}
 
-    // Calculate percentage (0.0 to 1.0)
-    let range_size = range.end() - range.start();
-    let percentage = if range_size > 0.0 {
-        ((value - range.start()) / range_size).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
+impl Slider {
+    /// Create a new slider with the given value and range
+    pub fn new(value: f32, range: RangeInclusive<f32>) -> Self {
+        Slider {
+            value,
+            range,
+            step: None,
+            disabled: false,
+            style: SliderStyle::default(),
+            on_change: None,
+        }
+    }
 
-    // Calculate thumb position
-    let thumb_inset = (style.track_height - style.thumb_size) / 2.0;
-    let usable_width =
-        style.track_width - style.thumb_size - (style.track_height - style.thumb_size) * 2.0;
-    let thumb_offset_x =
-        (usable_width - (style.thumb_size - style.track_height)) * percentage + thumb_inset;
+    /// Set the step size for value snapping
+    pub fn step(mut self, step: f32) -> Self {
+        self.step = Some(step);
+        self
+    }
 
-    // Calculate filled width
-    let filled_width = thumb_offset_x + style.track_height - thumb_inset;
+    /// Set whether the slider is disabled
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
 
-    // Create a wrapper that just handles the sizing
-    // We'll use a single interactive container that captures all events
-    Node::new()
-        .with_width(Size::lpx(style.track_width))
-        .with_height(Size::lpx(style.thumb_size.max(style.track_height)))
-        .with_layout_direction(Layout::Stack) // Stack the visual elements
-        // Track background (unfilled) - no ID so events go to container
-        .with_children(vec![
-            Node::new()
-                .with_width(Size::lpx(style.track_width))
-                .with_height(Size::lpx(style.track_height))
-                .with_style(Style {
-                    fill_color: Some(style.track_color),
-                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
-                        style.track_height / 2.0,
-                    ))),
-                    ..Default::default()
-                })
-                .with_disabled(disabled)
-                .with_transition(Transition::quick()),
-            // Filled portion of track
-            Node::new()
-                .with_width(Size::lpx(filled_width))
-                .with_height(Size::lpx(style.track_height))
-                .with_style(Style {
-                    fill_color: Some(style.filled_color),
-                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
-                        style.track_height / 2.0,
-                    ))),
-                    ..Default::default()
-                })
-                .with_disabled_style(Style {
-                    fill_color: Some(mocha::SURFACE1),
-                    ..Default::default()
-                })
-                .with_disabled(disabled)
-                .with_transition(Transition::quick()),
-            Node::new()
-                .with_width(Size::lpx(style.thumb_size))
-                .with_height(Size::lpx(style.thumb_size))
-                .with_translation(Translation::new(
-                    astra_gui::Size::Logical(thumb_offset_x),
-                    astra_gui::Size::Logical(thumb_inset),
-                ))
-                .with_style(Style {
-                    fill_color: Some(style.thumb_color),
-                    opacity: Some(1.0),
-                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
-                        style.thumb_size / 2.0,
-                    ))),
-                    ..Default::default()
-                })
-                .with_hover_style(Style {
-                    fill_color: Some(style.thumb_hover_color),
-                    ..Default::default()
-                })
-                .with_active_style(Style {
-                    fill_color: Some(style.thumb_active_color),
-                    ..Default::default()
-                })
-                .with_disabled_style(Style {
-                    opacity: Some(0.0),
-                    ..Default::default()
-                })
-                .with_disabled(disabled)
-                .with_transition(Transition::quick()),
-            // Hitbox node
-            Node::new()
-                .with_id(NodeId::new(format!("{}_hitbox", id_str)))
-                .with_width(Size::Fill)
-                .with_height(Size::Fill)
-                .with_disabled(disabled),
-        ])
+    /// Set a custom style for the slider
+    pub fn with_style(mut self, style: SliderStyle) -> Self {
+        self.style = style;
+        self
+    }
+
+    /// Set a callback to be called when the slider value changes
+    pub fn on_change(mut self, f: impl FnMut(f32) + 'static) -> Self {
+        self.on_change = Some(Box::new(f));
+        self
+    }
+
+    /// Calculate new value from local position
+    fn calculate_value_from_position(&self, local_x: f32, zoom: f32) -> f32 {
+        let adjusted_x = local_x / zoom;
+        let usable_width = self.style.track_width - self.style.thumb_size;
+        let adjusted_x = (adjusted_x - self.style.thumb_size / 2.0).clamp(0.0, usable_width);
+        let percentage = if usable_width > 0.0 {
+            (adjusted_x / usable_width).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        let range_size = self.range.end() - self.range.start();
+        let mut new_value = self.range.start() + range_size * percentage;
+
+        // Apply step if provided
+        if let Some(step_size) = self.step {
+            if step_size > 0.0 {
+                // Snap to range boundaries if we're very close
+                if percentage < 0.02 {
+                    new_value = *self.range.start();
+                } else if percentage > 0.98 {
+                    new_value = *self.range.end();
+                } else {
+                    let steps_from_start = ((new_value - self.range.start()) / step_size).round();
+                    new_value = self.range.start() + steps_from_start * step_size;
+                    new_value = new_value.clamp(*self.range.start(), *self.range.end());
+                }
+            }
+        }
+
+        new_value
+    }
+}
+
+impl Component for Slider {
+    fn node(mut self, ctx: &mut UiContext) -> Node {
+        // Generate unique ID for the slider hitbox
+        let id = ctx.generate_id("slider");
+        let hitbox_id = format!("{}_hitbox", id);
+
+        // Check for drag events from last frame and fire callback
+        if !self.disabled {
+            for event in ctx.events() {
+                if event.target.as_str() != hitbox_id {
+                    continue;
+                }
+
+                match &event.event {
+                    InteractionEvent::Click { .. }
+                    | InteractionEvent::DragStart { .. }
+                    | InteractionEvent::DragMove { .. } => {
+                        let new_value =
+                            self.calculate_value_from_position(event.local_position.x, event.zoom);
+
+                        if (self.value - new_value).abs() > f32::EPSILON {
+                            if let Some(ref mut on_change) = self.on_change {
+                                on_change(new_value);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Calculate percentage (0.0 to 1.0)
+        let range_size = self.range.end() - self.range.start();
+        let percentage = if range_size > 0.0 {
+            ((self.value - self.range.start()) / range_size).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        // Calculate thumb position
+        let thumb_inset = (self.style.track_height - self.style.thumb_size) / 2.0;
+        let usable_width = self.style.track_width
+            - self.style.thumb_size
+            - (self.style.track_height - self.style.thumb_size) * 2.0;
+        let thumb_offset_x = (usable_width - (self.style.thumb_size - self.style.track_height))
+            * percentage
+            + thumb_inset;
+
+        // Calculate filled width
+        let filled_width = thumb_offset_x + self.style.track_height - thumb_inset;
+
+        // Create the slider node
+        Node::new()
+            .with_width(Size::lpx(self.style.track_width))
+            .with_height(Size::lpx(
+                self.style.thumb_size.max(self.style.track_height),
+            ))
+            .with_layout_direction(Layout::Stack)
+            .with_children(vec![
+                // Track background (unfilled)
+                Node::new()
+                    .with_width(Size::lpx(self.style.track_width))
+                    .with_height(Size::lpx(self.style.track_height))
+                    .with_style(Style {
+                        fill_color: Some(self.style.track_color),
+                        corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                            self.style.track_height / 2.0,
+                        ))),
+                        ..Default::default()
+                    })
+                    .with_disabled(self.disabled)
+                    .with_transition(Transition::quick()),
+                // Filled portion of track
+                Node::new()
+                    .with_width(Size::lpx(filled_width))
+                    .with_height(Size::lpx(self.style.track_height))
+                    .with_style(Style {
+                        fill_color: Some(self.style.filled_color),
+                        corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                            self.style.track_height / 2.0,
+                        ))),
+                        ..Default::default()
+                    })
+                    .with_disabled_style(Style {
+                        fill_color: Some(mocha::SURFACE1),
+                        ..Default::default()
+                    })
+                    .with_disabled(self.disabled)
+                    .with_transition(Transition::quick()),
+                // Thumb
+                Node::new()
+                    .with_width(Size::lpx(self.style.thumb_size))
+                    .with_height(Size::lpx(self.style.thumb_size))
+                    .with_translation(Translation::new(
+                        astra_gui::Size::Logical(thumb_offset_x),
+                        astra_gui::Size::Logical(thumb_inset),
+                    ))
+                    .with_style(Style {
+                        fill_color: Some(self.style.thumb_color),
+                        opacity: Some(1.0),
+                        corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                            self.style.thumb_size / 2.0,
+                        ))),
+                        ..Default::default()
+                    })
+                    .with_hover_style(Style {
+                        fill_color: Some(self.style.thumb_hover_color),
+                        ..Default::default()
+                    })
+                    .with_active_style(Style {
+                        fill_color: Some(self.style.thumb_active_color),
+                        ..Default::default()
+                    })
+                    .with_disabled_style(Style {
+                        opacity: Some(0.0),
+                        ..Default::default()
+                    })
+                    .with_disabled(self.disabled)
+                    .with_transition(Transition::quick()),
+                // Hitbox node
+                Node::new()
+                    .with_id(NodeId::new(&hitbox_id))
+                    .with_width(Size::Fill)
+                    .with_height(Size::Fill)
+                    .with_disabled(self.disabled),
+            ])
+    }
 }
 
 /// Update slider value from drag events
@@ -190,11 +290,9 @@ pub fn slider_drag(
     let container_id = format!("{}_hitbox", slider_id);
 
     // Only handle events from container
-    // Stack layout causes coordinate issues with thumb events during drag
     for event in events {
         let target_str = event.target.as_str();
 
-        // Only process container events
         if target_str != container_id {
             continue;
         }
@@ -221,18 +319,15 @@ pub fn slider_drag(
                 // Apply step if provided
                 if let Some(step_size) = step {
                     if step_size > 0.0 {
-                        // Snap to range boundaries if we're very close (within 2% of slider)
-                        // This allows reaching min/max even when they're not divisible by step
+                        // Snap to range boundaries if we're very close
                         if percentage < 0.02 {
                             new_value = *range.start();
                         } else if percentage > 0.98 {
                             new_value = *range.end();
                         } else {
-                            // Round to nearest step
                             let steps_from_start =
                                 ((new_value - range.start()) / step_size).round();
                             new_value = range.start() + steps_from_start * step_size;
-                            // Clamp to range in case rounding pushed us out of bounds
                             new_value = new_value.clamp(*range.start(), *range.end());
                         }
                     }
@@ -270,4 +365,123 @@ pub fn slider_dragging(slider_id: &str, events: &[TargetedEvent]) -> bool {
             InteractionEvent::DragStart { .. } | InteractionEvent::DragMove { .. }
         ) && (e.target.as_str() == slider_id || e.target.as_str() == container_id)
     })
+}
+
+/// Create a slider node
+///
+/// This is a backward-compatible function that wraps the new `Slider` struct.
+/// For new code, prefer using `Slider::new()` with the builder pattern.
+///
+/// # Arguments
+/// * `id` - Unique identifier for the slider (used for event targeting)
+/// * `value` - Current value (should be within the range)
+/// * `range` - The valid range of values
+/// * `disabled` - Whether the slider is disabled
+/// * `style` - Visual styling configuration
+///
+/// # Returns
+/// A configured `Node` representing the slider
+#[deprecated(
+    since = "0.8.0",
+    note = "Use Slider::new() with the builder pattern instead"
+)]
+pub fn slider(
+    id: impl Into<String>,
+    value: f32,
+    range: RangeInclusive<f32>,
+    disabled: bool,
+    style: &SliderStyle,
+) -> Node {
+    let id_str = id.into();
+
+    // Calculate percentage (0.0 to 1.0)
+    let range_size = range.end() - range.start();
+    let percentage = if range_size > 0.0 {
+        ((value - range.start()) / range_size).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
+    // Calculate thumb position
+    let thumb_inset = (style.track_height - style.thumb_size) / 2.0;
+    let usable_width =
+        style.track_width - style.thumb_size - (style.track_height - style.thumb_size) * 2.0;
+    let thumb_offset_x =
+        (usable_width - (style.thumb_size - style.track_height)) * percentage + thumb_inset;
+
+    // Calculate filled width
+    let filled_width = thumb_offset_x + style.track_height - thumb_inset;
+
+    Node::new()
+        .with_width(Size::lpx(style.track_width))
+        .with_height(Size::lpx(style.thumb_size.max(style.track_height)))
+        .with_layout_direction(Layout::Stack)
+        .with_children(vec![
+            // Track background (unfilled)
+            Node::new()
+                .with_width(Size::lpx(style.track_width))
+                .with_height(Size::lpx(style.track_height))
+                .with_style(Style {
+                    fill_color: Some(style.track_color),
+                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                        style.track_height / 2.0,
+                    ))),
+                    ..Default::default()
+                })
+                .with_disabled(disabled)
+                .with_transition(Transition::quick()),
+            // Filled portion of track
+            Node::new()
+                .with_width(Size::lpx(filled_width))
+                .with_height(Size::lpx(style.track_height))
+                .with_style(Style {
+                    fill_color: Some(style.filled_color),
+                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                        style.track_height / 2.0,
+                    ))),
+                    ..Default::default()
+                })
+                .with_disabled_style(Style {
+                    fill_color: Some(mocha::SURFACE1),
+                    ..Default::default()
+                })
+                .with_disabled(disabled)
+                .with_transition(Transition::quick()),
+            // Thumb
+            Node::new()
+                .with_width(Size::lpx(style.thumb_size))
+                .with_height(Size::lpx(style.thumb_size))
+                .with_translation(Translation::new(
+                    astra_gui::Size::Logical(thumb_offset_x),
+                    astra_gui::Size::Logical(thumb_inset),
+                ))
+                .with_style(Style {
+                    fill_color: Some(style.thumb_color),
+                    opacity: Some(1.0),
+                    corner_shape: Some(CornerShape::Round(astra_gui::Size::Logical(
+                        style.thumb_size / 2.0,
+                    ))),
+                    ..Default::default()
+                })
+                .with_hover_style(Style {
+                    fill_color: Some(style.thumb_hover_color),
+                    ..Default::default()
+                })
+                .with_active_style(Style {
+                    fill_color: Some(style.thumb_active_color),
+                    ..Default::default()
+                })
+                .with_disabled_style(Style {
+                    opacity: Some(0.0),
+                    ..Default::default()
+                })
+                .with_disabled(disabled)
+                .with_transition(Transition::quick()),
+            // Hitbox node
+            Node::new()
+                .with_id(NodeId::new(format!("{}_hitbox", id_str)))
+                .with_width(Size::Fill)
+                .with_height(Size::Fill)
+                .with_disabled(disabled),
+        ])
 }

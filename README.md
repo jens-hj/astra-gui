@@ -69,11 +69,12 @@ Button::new("Submit")
     .on_click(|| save_data())
     .node(&mut ctx)
 
-// Future: Slider with change handler
+// Slider with drag value field
 SliderWithValue::new(&mut value, 0.0..=100.0)
-    .with_step(5.0)
+    .step(5.0)
+    .speed(0.5)
     .on_change(|new_val| println!("Value: {}", new_val))
-    .node(&mut ctx)
+    .build(&mut ctx)
 ```
 
 The `UiContext` manages:
