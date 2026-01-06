@@ -32,7 +32,8 @@ use std::collections::HashMap;
 ///
 /// ```ignore
 /// // In your app's update loop:
-/// ctx.begin_frame(&input);
+/// // Input accumulates via ctx.input_mut().handle_winit_event() between frames
+/// ctx.begin_frame();
 ///
 /// // Build UI - components check for events and fire callbacks internally
 /// let root = Button::new("Click me")
@@ -113,13 +114,14 @@ impl UiContext {
     pub fn scale_factor(&self) -> f32 {
         self.scale_factor
     }
+    // ========== Frame Lifecycle ==========
 
     /// Begin a new frame
     ///
     /// This should be called at the start of each frame before building UI.
-    /// It updates the input state and prepares for the new frame.
-    pub fn begin_frame(&mut self, input: &InputState) {
-        self.input = input.clone();
+    /// It prepares the context for a new frame. Input state is accumulated
+    /// via `input_mut().handle_winit_event()` between frames.
+    pub fn begin_frame(&mut self) {
         self.state_manager.begin_frame();
         self.id_counter = 0;
     }

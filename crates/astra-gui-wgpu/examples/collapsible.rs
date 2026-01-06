@@ -9,6 +9,8 @@
 //! - Debug controls (M/P/B/C/R/G/O/T/D/S)
 //! - ESC: quit
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 mod shared;
 
 use astra_gui::CornerShape;

@@ -11,6 +11,8 @@
 //! - Press Enter to confirm or Escape to cancel text input
 //! - ESC: quit
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 mod shared;
 
 use astra_gui::{

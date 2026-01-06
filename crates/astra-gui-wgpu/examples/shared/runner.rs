@@ -83,9 +83,9 @@ impl<T: ExampleApp> AppRunner<T> {
             None => return,
         };
 
-        // Begin frame - updates input state and prepares for new frame
-        let input = self.ctx.input().clone();
-        self.ctx.begin_frame(&input);
+        // Begin frame - prepares context for new frame
+        // Input state accumulates via handle_winit_event() between frames
+        self.ctx.begin_frame();
 
         // Build UI - components check for events and fire callbacks internally
         let build_start = Instant::now();

@@ -152,7 +152,8 @@ The main changes in 0.8.x:
 2. **New `UiContext`**: Central context for UI operations
    ```rust
    let mut ctx = UiContext::new();
-   ctx.begin_frame(&input);
+   // Input accumulates via ctx.input_mut().handle_winit_event() between frames
+   ctx.begin_frame();
    let root = build_ui(&mut ctx);
    ctx.end_frame(&mut root);
    ```

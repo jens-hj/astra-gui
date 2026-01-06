@@ -96,10 +96,12 @@ struct DragState {
     button: MouseButton,
     /// The node being dragged
     target: NodeId,
-    /// Position where the drag started
-    start_pos: Point,
     /// Last known position during drag
     last_pos: Point,
+    /// The origin (top-left) of the target node in screen coordinates
+    node_origin: Point,
+    /// The zoom factor at the target node
+    zoom: f32,
 }
 
 /// Cursor blink state tracker
@@ -252,8 +254,11 @@ impl EventDispatcher {
 
         // Check for focus changes (click to focus)
         if input.is_button_just_pressed(MouseButton::Left) {
-            // Find the topmost focusable node (for now, any node with an ID)
-            let new_focus = hits.first().and_then(|hit| hit.node_id.clone());
+            // Find the topmost focusable node (must have an ID)
+            let new_focus = hits
+                .iter()
+                .find(|h| h.node_id.is_some())
+                .and_then(|hit| hit.node_id.clone());
 
             // Generate blur event for previously focused node
             if let Some(ref old_focus) = self.focused_node {
@@ -286,6 +291,12 @@ impl EventDispatcher {
         if let Some(ref mut drag) = self.drag_state {
             // Check if drag button was released
             if input.is_button_just_released(drag.button) {
+                // Calculate local position within the target node
+                let local_position = Point {
+                    x: cursor_pos.x - drag.node_origin.x,
+                    y: cursor_pos.y - drag.node_origin.y,
+                };
+
                 // Generate DragEnd event
                 events.push(TargetedEvent {
                     event: InteractionEvent::DragEnd {
@@ -293,11 +304,8 @@ impl EventDispatcher {
                         position: cursor_pos,
                     },
                     target: drag.target.clone(),
-                    local_position: Point {
-                        x: cursor_pos.x - drag.start_pos.x,
-                        y: cursor_pos.y - drag.start_pos.y,
-                    },
-                    zoom: 1.0,
+                    local_position,
+                    zoom: drag.zoom,
                 });
 
                 // Mark the drag target as active in interaction states
@@ -310,17 +318,20 @@ impl EventDispatcher {
                 };
 
                 if delta.x.abs() > 0.001 || delta.y.abs() > 0.001 {
+                    // Calculate local position within the target node
+                    let local_position = Point {
+                        x: cursor_pos.x - drag.node_origin.x,
+                        y: cursor_pos.y - drag.node_origin.y,
+                    };
+
                     events.push(TargetedEvent {
                         event: InteractionEvent::DragMove {
                             position: cursor_pos,
                             delta,
                         },
                         target: drag.target.clone(),
-                        local_position: Point {
-                            x: cursor_pos.x - drag.start_pos.x,
-                            y: cursor_pos.y - drag.start_pos.y,
-                        },
-                        zoom: 1.0,
+                        local_position,
+                        zoom: drag.zoom,
                     });
                 }
 
@@ -346,14 +357,22 @@ impl EventDispatcher {
             for button in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
                 if input.is_button_down(button) && !input.is_button_just_pressed(button) {
                     // Button held from previous frame - check if we should start a drag
-                    if let Some(hit) = hits.first() {
+                    // Find first hit with a node_id (skip nodes without IDs)
+                    if let Some(hit) = hits.iter().rfind(|h| h.node_id.is_some()) {
                         if let Some(ref node_id) = hit.node_id {
+                            // Calculate node origin from cursor position and local position
+                            let node_origin = Point {
+                                x: cursor_pos.x - hit.local_pos.x,
+                                y: cursor_pos.y - hit.local_pos.y,
+                            };
+
                             // Start drag
                             self.drag_state = Some(DragState {
                                 button,
                                 target: node_id.clone(),
-                                start_pos: cursor_pos,
                                 last_pos: cursor_pos,
+                                node_origin,
+                                zoom: hit.zoom,
                             });
 
                             events.push(TargetedEvent {
@@ -376,7 +395,8 @@ impl EventDispatcher {
         if self.drag_state.is_none() {
             for button in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
                 if input.is_button_just_released(button) {
-                    if let Some(hit) = hits.first() {
+                    // Find the first hit that has a node_id (skip nodes without IDs)
+                    if let Some(hit) = hits.iter().rfind(|h| h.node_id.is_some()) {
                         if let Some(ref node_id) = hit.node_id {
                             events.push(TargetedEvent {
                                 event: InteractionEvent::Click {

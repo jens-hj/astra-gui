@@ -8,6 +8,8 @@
 //! - S: Toggle render mode (SDF/Mesh)
 //! - ESC: Exit
 
+#![allow(unused_imports, unused_variables, dead_code)]
+
 mod shared;
 
 use astra_gui::{
@@ -282,9 +284,9 @@ impl ZoomRunner {
             None => return,
         };
 
-        // Begin frame
-        let input = self.ctx.input().clone();
-        self.ctx.begin_frame(&input);
+        // Begin frame - prepares context for new frame
+        // Input state accumulates via handle_winit_event() between frames
+        self.ctx.begin_frame();
 
         // Build UI
         let mut ui = self
