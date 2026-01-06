@@ -1,22 +1,33 @@
 //! # astra-gui-wgpu
 //!
 //! WGPU rendering backend for astra-gui.
+//!
+//! This crate provides:
+//! - WGPU-based rendering for astra-gui
+//! - Winit input event conversion via `WinitInputExt`
+//!
+//! For the core UI types (InputState, EventDispatcher, UiContext, etc.),
+//! import them directly from `astra_gui`.
 
 mod events;
 mod input;
 mod instance;
-mod interactive_state;
 
 #[cfg(feature = "text-cosmic")]
 mod text;
 
+// Re-export event and state types from astra-gui core
 pub use events::*;
-pub use input::*;
-pub use interactive_state::*;
 
-// Re-export keyboard and mouse types for use in interactive components
-pub use winit::event::MouseButton;
-pub use winit::keyboard::{Key, NamedKey};
+// Export the winit input adapter extension trait
+pub use input::WinitInputExt;
+
+// Re-export winit key types for convenience (used by interactive components)
+pub use winit::event::MouseButton as WinitMouseButton;
+pub use winit::keyboard::{Key as WinitKey, NamedKey as WinitNamedKey};
+
+// Re-export core types from astra-gui for convenience
+pub use astra_gui::{InputState, Key, MouseButton, NamedKey, UiContext, WidgetMemory};
 
 use astra_gui::{
     ClippedShape, Color, CornerShape, FullOutput, HorizontalAlign, Rect, Shape, Size, Stroke,

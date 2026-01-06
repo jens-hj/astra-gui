@@ -17,6 +17,7 @@ use astra_gui::{
     Stroke, TextContent, VerticalAlign, ZIndex,
 };
 use astra_gui_text::Engine as TextEngine;
+use astra_gui_wgpu::WinitInputExt;
 use shared::debug_controls::DEBUG_HELP_TEXT;
 use shared::{ExampleApp, InteractiveState};
 use winit::event::{ElementState, MouseScrollDelta, WindowEvent};
@@ -260,7 +261,7 @@ fn main() {
         ) {
             // Handle interactive input
             if let Some(interactive) = self.app.interactive_state() {
-                interactive.input_state.handle_event(&event);
+                interactive.input_state.handle_winit_event(&event);
             }
 
             // Handle custom zoom/pan input BEFORE other processing

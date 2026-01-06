@@ -176,7 +176,10 @@ pub fn text_input(
 
     // Update cursor blink state if focused
     let cursor_visible = if focused {
-        event_dispatcher.update_cursor_blink(&node_id, style.cursor_style.blink_interval)
+        event_dispatcher.update_cursor_blink(
+            &node_id,
+            style.cursor_style.blink_interval.as_millis() as u64,
+        )
     } else {
         false
     };

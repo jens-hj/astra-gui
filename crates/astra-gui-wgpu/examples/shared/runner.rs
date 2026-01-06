@@ -2,6 +2,7 @@ use super::debug_controls::{handle_debug_keybinds, DEBUG_HELP_TEXT};
 use super::example_app::ExampleApp;
 use super::gpu_state::GpuState;
 use astra_gui::{FullOutput, Rect};
+use astra_gui_wgpu::WinitInputExt;
 use std::sync::Arc;
 use std::time::Instant;
 use winit::{
@@ -259,7 +260,7 @@ impl<T: ExampleApp> ApplicationHandler for AppRunner<T> {
     ) {
         // Handle input events for interactive examples
         if let Some(interactive) = self.app.interactive_state() {
-            interactive.input_state.handle_event(&event);
+            interactive.input_state.handle_winit_event(&event);
         }
 
         match event {

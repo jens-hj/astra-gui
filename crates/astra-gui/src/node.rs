@@ -3,6 +3,10 @@ use crate::layout::{
     ComputedLayout, Layout, Overflow, ScrollDirection, Size, Spacing, TransformOrigin, Translation,
     ZIndex,
 };
+use crate::measure::{ContentMeasurer, IntrinsicSize, MeasureTextRequest};
+use crate::primitives::{Rect, Shape};
+use crate::style::Style;
+use crate::transition::Transition;
 
 /// Determines how a node should be placed within its parent.
 ///
@@ -13,21 +17,38 @@ use crate::layout::{
 /// Notes:
 /// - `Place::Alignment` uses the parent content rect and the child's computed size
 /// - `Place::Absolute` interprets `(x, y)` as offsets from the parent's content origin
+///
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Place {
-    Absolute {
-        x: Size,
-        y: Size,
-    },
     Alignment {
         h_align: HorizontalAlign,
         v_align: VerticalAlign,
     },
+    Absolute {
+        x: Size,
+        y: Size,
+    },
 }
-use crate::measure::{ContentMeasurer, IntrinsicSize, MeasureTextRequest};
-use crate::primitives::{Rect, Shape};
-use crate::style::Style;
-use crate::transition::Transition;
+
+// TODO: Later let's implement Place like this:
+// Such that each dimension can be either absolute or an alignment withing the parent's content rect.
+// #[derive(Debug, Clone, Copy, PartialEq)]
+// pub struct Place {
+//     pub x: PlaceX,
+//     pub y: PlaceY,
+// }
+
+// #[derive(Debug, Clone, Copy, PartialEq)]
+// pub enum PlaceX {
+//     Absolute { x: Size },
+//     Alignment { h_align: HorizontalAlign },
+// }
+
+// #[derive(Debug, Clone, Copy, PartialEq)]
+// pub enum PlaceY {
+//     Absolute { y: Size },
+//     Alignment { v_align: VerticalAlign },
+// }
 
 /// Unique identifier for a node, used for hit-testing and event routing
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

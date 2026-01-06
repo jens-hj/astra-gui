@@ -1,5 +1,11 @@
-use astra_gui::transition::lerp_style;
-use astra_gui::{Node, NodeId, Style, Transition};
+//! Interactive state management for UI nodes
+//!
+//! This module provides the `InteractiveStateManager` which tracks interaction
+//! states and manages style transitions for all nodes in the UI tree.
+//! It is backend-agnostic and works with any rendering backend.
+
+use crate::transition::lerp_style;
+use crate::{InteractionState, Node, NodeId, Style, Transition};
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -14,15 +20,6 @@ fn styles_differ(a: &Style, b: &Style) -> bool {
         || a.translation_y != b.translation_y
         || a.width_override != b.width_override
         || a.height_override != b.height_override
-}
-
-/// Current interaction state of a node
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum InteractionState {
-    Idle,
-    Hovered,
-    Active,
-    Disabled,
 }
 
 /// Transition state for a single node
@@ -59,10 +56,12 @@ struct NodeTransitionState {
 /// Manages interactive state and transitions for all nodes
 ///
 /// This is the external state tracker that maintains node states across frames.
-/// Since nodes are rebuilt every frame, this manager preserves transition state
-/// and interpolates between styles smoothly.
+/// Since nodes are rebuilt every frame in immediate mode, this manager preserves
+/// transition state and interpolates between styles smoothly.
 pub struct InteractiveStateManager {
+    /// Per-node transition states
     states: HashMap<NodeId, NodeTransitionState>,
+    /// Current frame time
     current_time: Instant,
 }
 
@@ -396,5 +395,49 @@ impl InteractiveStateManager {
 impl Default for InteractiveStateManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_interactive_state_manager_creation() {
+        let manager = InteractiveStateManager::new();
+        assert!(!manager.has_active_transitions());
+    }
+
+    #[test]
+    fn test_begin_frame() {
+        let mut manager = InteractiveStateManager::new();
+        let time_before = manager.current_time;
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        manager.begin_frame();
+
+        assert!(manager.current_time > time_before);
+    }
+
+    #[test]
+    fn test_update_state_idle() {
+        let mut manager = InteractiveStateManager::new();
+        let node_id = NodeId::new("test");
+        let base_style = Style::default();
+
+        let result = manager.update_state(
+            &node_id,
+            InteractionState::Idle,
+            &base_style,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        // Should return the base style unchanged
+        assert_eq!(result.fill_color, base_style.fill_color);
     }
 }
