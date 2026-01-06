@@ -23,6 +23,7 @@ The library is split into several crates:
 - **Text Rendering**: Powered by cosmic-text for high-quality text shaping with aggressive caching
 - **Modular Design**: Use only the crates you need
 - **Transform Support**: Full translation and rotation support with proper transform composition
+- **Per-child Placement (Stack)**: Override placement of individual children (e.g. anchor panels per-corner) via `Place`
 - **Performance Optimized**: 
   - Text shaping cache for reusable shaped text
   - Glyph metrics and atlas placement caching
@@ -57,6 +58,7 @@ See the `crates/astra-gui-wgpu/examples/` directory for usage examples:
 - `interactive.rs` - Interactive components
 - `layout.rs` - Layout system
 - `overflow.rs` - Overflow handling
+- `place.rs` - Per-child placement overrides in `Layout::Stack` using `Place` (alignment + absolute)
 - `rotation.rs` - Transform rotation with interactive controls
 - `scroll.rs` - Scrollable containers with nested scrolling
 - `slider_with_value.rs` - Slider with value display
