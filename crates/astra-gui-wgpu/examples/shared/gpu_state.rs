@@ -33,8 +33,20 @@ impl GpuState {
     pub async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
 
+        let backends = std::env::var("WGPU_BACKEND")
+            .ok()
+            .map(|s| match s.to_lowercase().as_str() {
+                "vulkan" => wgpu::Backends::VULKAN,
+                "metal" => wgpu::Backends::METAL,
+                "dx12" => wgpu::Backends::DX12,
+                "gl" => wgpu::Backends::GL,
+                "webgpu" => wgpu::Backends::BROWSER_WEBGPU,
+                _ => wgpu::Backends::all(),
+            })
+            .unwrap_or(wgpu::Backends::all());
+
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends,
             ..Default::default()
         });
 

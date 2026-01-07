@@ -194,7 +194,29 @@ impl App {
             return;
         };
 
-        let output = gpu_state.surface.get_current_texture().unwrap();
+        let output = match gpu_state.surface.get_current_texture() {
+            Ok(output) => output,
+            Err(wgpu::SurfaceError::Lost) | Err(wgpu::SurfaceError::Outdated) => {
+                let size = gpu_state.window.inner_size();
+                if size.width > 0 && size.height > 0 {
+                    gpu_state.config.width = size.width;
+                    gpu_state.config.height = size.height;
+                    gpu_state
+                        .surface
+                        .configure(&gpu_state.device, &gpu_state.config);
+                }
+                return;
+            }
+            Err(wgpu::SurfaceError::OutOfMemory) => {
+                eprintln!("Out of memory");
+                std::process::exit(1);
+            }
+            Err(e) => {
+                eprintln!("Render error: {:?}", e);
+                return;
+            }
+        };
+
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -206,27 +228,29 @@ impl App {
                     label: Some("Render Encoder"),
                 });
 
-        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: mocha::BASE.r as f64,
-                        g: mocha::BASE.g as f64,
-                        b: mocha::BASE.b as f64,
-                        a: 1.0,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-                depth_slice: None,
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
+        {
+            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: mocha::BASE.r as f64,
+                            g: mocha::BASE.g as f64,
+                            b: mocha::BASE.b as f64,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+        }
 
         gpu_state.renderer.render(
             &gpu_state.device,
@@ -372,7 +396,22 @@ impl ApplicationHandler for App {
             .with_inner_size(winit::dpi::PhysicalSize::new(900, 600));
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let backends = std::env::var("WGPU_BACKEND")
+            .ok()
+            .map(|s| match s.to_lowercase().as_str() {
+                "vulkan" => wgpu::Backends::VULKAN,
+                "metal" => wgpu::Backends::METAL,
+                "dx12" => wgpu::Backends::DX12,
+                "gl" => wgpu::Backends::GL,
+                "webgpu" => wgpu::Backends::BROWSER_WEBGPU,
+                _ => wgpu::Backends::all(),
+            })
+            .unwrap_or(wgpu::Backends::all());
+
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends,
+            ..Default::default()
+        });
         let surface = instance.create_surface(window.clone()).unwrap();
 
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {

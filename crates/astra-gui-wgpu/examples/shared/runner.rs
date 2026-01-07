@@ -137,7 +137,7 @@ impl<T: ExampleApp> AppRunner<T> {
 
         match gpu_state.render(&output) {
             Ok(_) => {}
-            Err(wgpu::SurfaceError::Lost) => {
+            Err(wgpu::SurfaceError::Lost) | Err(wgpu::SurfaceError::Outdated) => {
                 if let Some(window) = &self.window {
                     gpu_state.resize(window.inner_size())
                 }
