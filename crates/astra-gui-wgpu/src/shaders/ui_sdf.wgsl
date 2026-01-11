@@ -29,6 +29,7 @@ struct InstanceInput {
     @location(11) params12: vec2<f32>,  // param1, param2
     @location(12) params34: vec2<f32>,  // param3, param4
     @location(13) params56: vec2<f32>,  // param5, param6
+    @location(14) stroke_offset: f32,
 }
 
 struct VertexOutput {
@@ -44,6 +45,7 @@ struct VertexOutput {
     @location(8) half_size: vec2<f32>,
     @location(9) scale: f32,
     @location(10) params56: vec2<f32>,
+    @location(11) stroke_offset: f32,
 }
 
 @group(0) @binding(0)
@@ -58,9 +60,10 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     var out: VertexOutput;
 
     // Expand unit quad to local-space rectangle
-    // Add padding for stroke (only half stroke width since it's centered on the edge)
-    // Phase 1.3: Only pad when stroke_width > 0 to avoid unnecessary fragment invocations
-    let padding = select(0.0, inst.stroke_width * 0.5, inst.stroke_width > 0.0);
+    // For Outset/Centered alignments, stroke can extend beyond shape edge
+    // Calculate maximum extent the stroke can reach
+    let max_stroke_extent = max(0.0, inst.stroke_width + abs(inst.stroke_offset));
+    let padding = select(0.0, max_stroke_extent, inst.stroke_width > 0.0);
     let expanded_size = inst.half_size + vec2<f32>(padding);
 
     // Apply transforms: Scale → Rotate → Translate (around transform origin)
@@ -103,6 +106,7 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     out.half_size = inst.half_size;
     out.scale = inst.scale;
     out.params56 = inst.params56;
+    out.stroke_offset = inst.stroke_offset;
 
     return out;
 }
@@ -244,25 +248,28 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let corner_param1 = in.params12.x;
         let corner_param2 = in.params12.y;
 
+        // Calculate boundary with stroke offset for alignment
+        let boundary_offset = in.half_size - in.stroke_offset;
+
         switch corner_type {
             case 0u: {  // None (sharp corners)
-                dist = sd_box(in.local_pos, in.half_size - in.stroke_width / 2.0);
+                dist = sd_box(in.local_pos, boundary_offset);
             }
             case 1u: {  // Round (circular arcs)
-                dist = sd_rounded_box(in.local_pos, in.half_size - in.stroke_width / 2.0, corner_param1);
+                dist = sd_rounded_box(in.local_pos, boundary_offset, corner_param1);
             }
             case 2u: {  // Cut (chamfered at 45°)
-                dist = sd_chamfer_box(in.local_pos, in.half_size - in.stroke_width / 2.0, corner_param1);
+                dist = sd_chamfer_box(in.local_pos, boundary_offset, corner_param1);
             }
             case 3u: {  // InverseRound (concave arcs)
-                dist = sd_inverse_round_box(in.local_pos, in.half_size - in.stroke_width / 2.0, corner_param1, in.stroke_width);
+                dist = sd_inverse_round_box(in.local_pos, boundary_offset, corner_param1, in.stroke_width);
             }
             case 4u: {  // Squircle (superellipse)
-                dist = sd_squircle_box(in.local_pos, in.half_size - in.stroke_width / 2.0, corner_param1, corner_param2);
+                dist = sd_squircle_box(in.local_pos, boundary_offset, corner_param1, corner_param2);
             }
             default: {
                 // Fallback to sharp corners
-                dist = sd_box(in.local_pos, in.half_size - in.stroke_width / 2.0);
+                dist = sd_box(in.local_pos, boundary_offset);
             }
         }
     }

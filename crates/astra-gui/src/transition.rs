@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::primitives::{CornerShape, Stroke};
+use crate::primitives::{CornerShape, Stroke, StrokeAlignment};
 use crate::style::Style;
 
 /// Easing function type: takes progress (0.0 to 1.0) and returns eased value (0.0 to 1.0)
@@ -79,11 +79,39 @@ pub fn lerp_size(a: crate::layout::Size, b: crate::layout::Size, t: f32) -> crat
     }
 }
 
+/// Linearly interpolate between two stroke alignments
+/// Since alignment resolves to an offset value, we interpolate the resolved offsets
+pub fn lerp_stroke_alignment(
+    a: StrokeAlignment,
+    b: StrokeAlignment,
+    stroke_width: f32,
+    t: f32,
+) -> StrokeAlignment {
+    let offset_a = a.calculate_offset(stroke_width);
+    let offset_b = b.calculate_offset(stroke_width);
+    let lerped_offset = lerp_f32(offset_a, offset_b, t);
+    // Return as Custom variant with the interpolated offset (negated because calculate_offset returns negated)
+    StrokeAlignment::Custom(-lerped_offset)
+}
+
 /// Linearly interpolate between two strokes
 pub fn lerp_stroke(a: Stroke, b: Stroke, t: f32) -> Stroke {
+    use crate::layout::Size;
+
+    // Try to extract a reference width from the Size values for alignment calculation
+    // This gives better interpolation but alignment will be recalculated with actual width during rendering
+    let reference_width = match (a.width, b.width) {
+        (Size::Logical(w1), Size::Logical(w2)) => lerp_f32(w1, w2, t),
+        (Size::Physical(w1), Size::Physical(w2)) => lerp_f32(w1, w2, t),
+        (Size::Logical(w), _) | (_, Size::Logical(w)) => w,
+        (Size::Physical(w), _) | (_, Size::Physical(w)) => w,
+        _ => 100.0, // Fallback for Fill/FitContent/Relative
+    };
+
     Stroke {
         width: lerp_size(a.width, b.width, t),
         color: lerp_color(a.color, b.color, t),
+        alignment: lerp_stroke_alignment(a.alignment, b.alignment, reference_width, t),
     }
 }
 

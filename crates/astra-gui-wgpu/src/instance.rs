@@ -41,8 +41,8 @@ pub struct RectInstance {
     pub param5: f32,
     /// Parameter 6: unused for rects, or triangle v2.y for triangles
     pub param6: f32,
-    /// Padding for alignment
-    pub _padding: f32,
+    /// Stroke offset for alignment (0 = centered, positive = outward, negative = inward)
+    pub stroke_offset: f32,
 }
 
 impl RectInstance {
@@ -81,12 +81,14 @@ impl RectInstance {
                 .clamp(0.0, 255.0) as u8,
         ];
 
-        let (stroke_color, stroke_width) = if let Some(stroke) = &triangle.stroke {
+        let (stroke_color, stroke_width, stroke_offset) = if let Some(stroke) = &triangle.stroke {
             let width = max_x - min_x;
             let resolved_width = stroke
                 .width
                 .try_resolve_with_scale(width, 1.0)
                 .unwrap_or(0.0);
+
+            let offset = stroke.alignment.calculate_offset(resolved_width);
 
             (
                 [
@@ -98,9 +100,10 @@ impl RectInstance {
                         .clamp(0.0, 255.0) as u8,
                 ],
                 resolved_width,
+                offset,
             )
         } else {
-            ([0, 0, 0, 0], 0.0)
+            ([0, 0, 0, 0], 0.0, 0.0)
         };
 
         // Extract transform data
@@ -137,7 +140,7 @@ impl RectInstance {
             param4: tri_v1[1],
             param5: tri_v2[0],
             param6: tri_v2[1],
-            _padding: 0.0,
+            stroke_offset,
         }
     }
 
@@ -222,6 +225,12 @@ impl RectInstance {
                 shader_location: 13,
                 format: wgpu::VertexFormat::Float32x2,
             },
+            // stroke_offset: f32 at location 14
+            wgpu::VertexAttribute {
+                offset: 80,
+                shader_location: 14,
+                format: wgpu::VertexFormat::Float32,
+            },
         ];
 
         wgpu::VertexBufferLayout {
@@ -284,13 +293,15 @@ impl From<&ClippedShape> for RectInstance {
         ];
 
         // Convert stroke (if present) and apply opacity
-        let (stroke_color, stroke_width) = if let Some(stroke) = &rect.stroke {
+        let (stroke_color, stroke_width, stroke_offset) = if let Some(stroke) = &rect.stroke {
             // Resolve stroke width to f32 (should already be in physical pixels at this point)
             let width = clipped.node_rect.max[0] - clipped.node_rect.min[0];
             let resolved_width = stroke
                 .width
                 .try_resolve_with_scale(width, 1.0)
                 .unwrap_or(0.0);
+
+            let offset = stroke.alignment.calculate_offset(resolved_width);
 
             (
                 [
@@ -302,9 +313,10 @@ impl From<&ClippedShape> for RectInstance {
                         .clamp(0.0, 255.0) as u8,
                 ],
                 resolved_width,
+                offset,
             )
         } else {
-            ([0, 0, 0, 0], 0.0)
+            ([0, 0, 0, 0], 0.0, 0.0)
         };
 
         // Convert corner shape to type + parameters
@@ -335,7 +347,7 @@ impl From<&ClippedShape> for RectInstance {
             param4: 0.0,
             param5: 0.0,
             param6: 0.0,
-            _padding: 0.0,
+            stroke_offset,
         }
     }
 }

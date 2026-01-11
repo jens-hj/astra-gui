@@ -36,16 +36,62 @@ impl From<Point> for [f32; 2] {
     }
 }
 
+/// Defines how a stroke is positioned relative to the shape boundary
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StrokeAlignment {
+    /// Stroke rendered entirely inside the shape (current behavior)
+    Inset,
+
+    /// Stroke centered on the shape boundary (half inside, half outside)
+    Centered,
+
+    /// Stroke rendered entirely outside the shape
+    Outset,
+
+    /// Custom offset from the shape boundary in pixels.
+    /// Positive = outward, Negative = inward
+    Custom(f32),
+}
+
+impl StrokeAlignment {
+    /// Calculate the offset to apply to the SDF boundary.
+    /// Returns the value to SUBTRACT from half_size in the shader.
+    pub fn calculate_offset(&self, stroke_width: f32) -> f32 {
+        match self {
+            StrokeAlignment::Inset => stroke_width / 2.0,
+            StrokeAlignment::Centered => 0.0,
+            StrokeAlignment::Outset => -stroke_width / 2.0,
+            StrokeAlignment::Custom(offset) => -offset,
+        }
+    }
+}
+
+impl Default for StrokeAlignment {
+    fn default() -> Self {
+        StrokeAlignment::Inset // Backward compatibility
+    }
+}
+
 /// Stroke definition with width and color
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stroke {
     pub width: Size,
     pub color: Color,
+    pub alignment: StrokeAlignment,
 }
 
 impl Stroke {
     pub const fn new(width: Size, color: Color) -> Self {
-        Self { width, color }
+        Self {
+            width,
+            color,
+            alignment: StrokeAlignment::Inset, // Default for backward compatibility
+        }
+    }
+
+    pub const fn with_alignment(mut self, alignment: StrokeAlignment) -> Self {
+        self.alignment = alignment;
+        self
     }
 }
 

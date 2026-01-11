@@ -5,4 +5,4 @@
 - Aim for extremely performant, should always run above 500 FPS unless it's a very complex scene.
 - FitContent is default dimension, so don't specify it explicitly.
 - If you want a node to have rect shape, then don't no anything, it will default to that.
-- Always use .with_style to style nodes, not the StyledRect, it will be applied automatically.
+- Always use .with_style to style nodes, not the StyledRect or StyledTriangle directly, it will be applied automatically. And if you want to force a specific shape, then just use the default builder .with_shape(Shape::triangle(...)) or any other shape builder.
