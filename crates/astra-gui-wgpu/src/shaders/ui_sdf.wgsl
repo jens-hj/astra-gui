@@ -163,7 +163,7 @@ fn sd_inverse_round_box(p: vec2<f32>, size: vec2<f32>, radius: f32, stroke_width
     let box_dist = max(to_corner.x, to_corner.y);
 
     // In corner region (close enough to corner to be affected by circle)
-    let corner_dist = -radius - stroke_width / 2.0;
+    let corner_dist = -radius - stroke_width;
     let close_to_corner = to_corner.x > corner_dist && to_corner.y > corner_dist;
     if close_to_corner {
         // Circle centered at corner (size.x, size.y)
