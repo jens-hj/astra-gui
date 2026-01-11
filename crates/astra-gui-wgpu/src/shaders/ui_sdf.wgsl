@@ -259,6 +259,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // Scale corner size for stroke to maintain parallel contours
         // When stroke is offset outward, corner size increases proportionally
         let corner_offset = -in.stroke_offset + in.stroke_width * 0.5;
+        let cut_corner_offset = corner_offset * 0.4023689; // sqrt(2)/2
         let stroke_corner_param1 = max(0.0, corner_param1 + corner_offset);
         let stroke_corner_param2 = corner_param2; // smoothness doesn't scale
 
@@ -272,7 +273,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
                 fill_dist = sd_rounded_box(in.local_pos, in.half_size, corner_param1);
             }
             case 2u: {  // Cut (chamfered at 45°)
-                dist = sd_chamfer_box(in.local_pos, stroke_boundary, stroke_corner_param1);
+                dist = sd_chamfer_box(in.local_pos, stroke_boundary, stroke_corner_param1 - cut_corner_offset);
                 fill_dist = sd_chamfer_box(in.local_pos, in.half_size, corner_param1);
             }
             case 3u: {  // InverseRound (concave arcs)

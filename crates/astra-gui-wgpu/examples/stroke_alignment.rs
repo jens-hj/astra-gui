@@ -158,6 +158,18 @@ fn demo_row(corner_shape: CornerShape, stroke_width: f32, cell_size: f32) -> Nod
                 stroke_width,
                 StrokeAlignment::Custom(15.0),
             ),
+            alignment_cell(
+                "Custom(30px)",
+                corner_shape,
+                stroke_width,
+                StrokeAlignment::Custom(30.0),
+            ),
+            alignment_cell(
+                "Custom(-30px)",
+                corner_shape,
+                stroke_width,
+                StrokeAlignment::Custom(-30.0),
+            ),
         ])
 }
 
@@ -205,6 +217,18 @@ fn custom_offset_row(stroke_width: f32, cell_size: f32) -> Node {
                 CornerShape::Round(Size::lpx(15.0)),
                 stroke_width,
                 StrokeAlignment::Custom(15.0),
+            ),
+            alignment_cell(
+                "Custom(30px)\nFar Outside",
+                CornerShape::Round(Size::lpx(15.0)),
+                stroke_width,
+                StrokeAlignment::Custom(30.0),
+            ),
+            alignment_cell(
+                "Custom(-30px)\nFar Inside",
+                CornerShape::Round(Size::lpx(15.0)),
+                stroke_width,
+                StrokeAlignment::Custom(-30.0),
             ),
         ])
 }
