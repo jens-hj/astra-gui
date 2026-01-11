@@ -167,10 +167,10 @@ fn demo_row(corner_shape: CornerShape, stroke_width: f32, cell_size: f32) -> Nod
                 StrokeAlignment::Outset,
             ),
             alignment_cell(
-                "Custom(10px)",
+                "Custom(15px)",
                 corner_shape,
                 stroke_width,
-                StrokeAlignment::Custom(10.0),
+                StrokeAlignment::Custom(15.0),
             ),
         ])
 }
@@ -238,8 +238,8 @@ fn alignment_cell(
         .with_children(vec![
             label_text(label),
             Node::new()
-                .with_width(Size::Fill)
-                .with_height(Size::Fill)
+                .with_width(Size::rel(0.8))
+                .with_height(Size::rel(0.8))
                 .with_style(Style {
                     fill_color: Some(mocha::CRUST),
                     corner_shape: Some(corner_shape),
@@ -314,9 +314,11 @@ fn section_text(text: &str) -> Node {
 }
 
 fn label_text(text: &str) -> Node {
-    Node::new().with_content(Content::Text(
-        TextContent::new(text)
-            .with_font_size(Size::lpx(12.0))
-            .with_color(mocha::SUBTEXT1),
-    ))
+    Node::new()
+        .with_margin(Spacing::bottom(Size::lpx(30.0)))
+        .with_content(Content::Text(
+            TextContent::new(text)
+                .with_font_size(Size::lpx(12.0))
+                .with_color(mocha::SUBTEXT1),
+        ))
 }

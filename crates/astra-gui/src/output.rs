@@ -350,7 +350,10 @@ fn collect_clipped_shapes_with_opacity(
                         .width
                         .try_resolve_with_scale(width, scale_factor)
                         .unwrap_or(1.0);
-                    scaled_rect.stroke = Some(Stroke::new(Size::ppx(scaled_width), stroke.color));
+                    scaled_rect.stroke = Some(
+                        Stroke::new(Size::ppx(scaled_width), stroke.color)
+                            .with_alignment(stroke.alignment),
+                    );
                 }
 
                 // Resolve corner shape
@@ -394,8 +397,10 @@ fn collect_clipped_shapes_with_opacity(
                         .width
                         .try_resolve_with_scale(width, scale_factor)
                         .unwrap_or(1.0);
-                    scaled_triangle.stroke =
-                        Some(Stroke::new(Size::ppx(scaled_width), stroke.color));
+                    scaled_triangle.stroke = Some(
+                        Stroke::new(Size::ppx(scaled_width), stroke.color)
+                            .with_alignment(stroke.alignment),
+                    );
                 }
 
                 Shape::Triangle(scaled_triangle)

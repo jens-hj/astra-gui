@@ -94,9 +94,9 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     out.clip_pos = vec4<f32>(ndc.x, -ndc.y, 0.0, 1.0);
 
     // Pass through instance data to fragment shader
-    // local_pos is relative to the shape boundary (not the expanded quad with stroke padding)
-    // SDF computation uses unrotated local space
-    out.local_pos = vert.pos * inst.half_size;
+    // local_pos must use expanded_size so interpolation correctly represents
+    // fragment position relative to center (SDF uses half_size for boundary)
+    out.local_pos = vert.pos * expanded_size;
     out.fill_color = inst.fill_color;
     out.stroke_color = inst.stroke_color;
     out.stroke_width = inst.stroke_width;
@@ -249,7 +249,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let corner_param2 = in.params12.y;
 
         // Calculate boundary with stroke offset for alignment
-        let boundary_offset = in.half_size - in.stroke_offset;
+        // The stroke extends stroke_width on each side of dist=0, so we add stroke_width/2
+        // to shift the boundary so the stroke aligns correctly
+        let boundary_offset = in.half_size - in.stroke_offset + in.stroke_width * 0.5;
 
         switch corner_type {
             case 0u: {  // None (sharp corners)
