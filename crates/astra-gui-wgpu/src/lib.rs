@@ -127,11 +127,20 @@ pub struct Renderer {
     text_engine: gui_text::Engine,
 
     // Text shaping cache - stores pre-shaped text to avoid expensive reshaping every frame
-    // Key: (text, font_size, width, height, wrap, line_height * 100)
+    // Key: (text, font_size, width, height, wrap, line_height * 100, font_weight, font_style)
     // NOTE: Only caches ShapedText, NOT LinePlacement (which contains absolute positions)
     #[cfg(feature = "text-cosmic")]
     shape_cache: std::collections::HashMap<
-        (String, u32, u32, u32, astra_gui::Wrap, u32),
+        (
+            String,
+            u32,
+            u32,
+            u32,
+            astra_gui::Wrap,
+            u32,
+            u16,
+            astra_gui::FontStyle,
+        ),
         gui_text::ShapedText,
     >,
 
@@ -980,7 +989,7 @@ impl Renderer {
                                 .try_resolve_with_scale(width, 1.0)
                                 .unwrap_or(16.0);
 
-                            // Create cache key from text + font size + rect dimensions + wrap + line height
+                            // Create cache key from text + font size + rect dimensions + wrap + line height + weight + style
                             let cache_key = (
                                 text.to_string(),
                                 font_size_px as u32,
@@ -988,6 +997,8 @@ impl Renderer {
                                 (rect.max[1] - rect.min[1]) as u32,
                                 text_shape.wrap,
                                 (text_shape.line_height_multiplier * 100.0) as u32,
+                                text_shape.font_weight.to_weight(),
+                                text_shape.font_style,
                             );
 
                             let shaped = if let Some(cached) = self.shape_cache.get(&cache_key) {
@@ -1005,6 +1016,8 @@ impl Renderer {
                                         family: None,
                                         wrap: text_shape.wrap,
                                         line_height_multiplier: text_shape.line_height_multiplier,
+                                        font_weight: text_shape.font_weight.to_weight(),
+                                        font_style: text_shape.font_style,
                                     });
                                 self.shape_cache.insert(cache_key, shaped_text.clone());
                                 shaped_text

@@ -245,6 +245,8 @@ impl Component for Collapsible {
                 v_align: VerticalAlign::Center,
                 wrap: astra_gui::Wrap::Word,
                 line_height_multiplier: 1.2,
+                font_weight: astra_gui::FontWeight::Normal,
+                font_style: astra_gui::FontStyle::Normal,
             }));
 
         // Clickable header with hover/active states

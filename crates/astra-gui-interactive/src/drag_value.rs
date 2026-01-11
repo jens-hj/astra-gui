@@ -648,6 +648,8 @@ fn build_editing_node(
                 v_align: VerticalAlign::Center,
                 wrap: astra_gui::Wrap::None,
                 line_height_multiplier: 1.2,
+                font_weight: astra_gui::FontWeight::Normal,
+                font_style: astra_gui::FontStyle::Normal,
             })),
     );
 
@@ -761,6 +763,8 @@ fn build_drag_display_node(id: &str, value: f32, disabled: bool, style: &DragVal
                     v_align: VerticalAlign::Center,
                     wrap: astra_gui::Wrap::Word,
                     line_height_multiplier: 1.2,
+                    font_weight: astra_gui::FontWeight::Normal,
+                    font_style: astra_gui::FontStyle::Normal,
                 }))
                 .with_style(Style {
                     text_color: Some(style.text_color),

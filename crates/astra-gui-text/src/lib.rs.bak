@@ -335,6 +335,17 @@ pub mod cosmic {
                 .db_mut()
                 .load_font_data(astra_gui_fonts::inter::italic_variable_opsz_wght().to_vec());
 
+            // Debug: print loaded font IDs
+            eprintln!("DEBUG: Loaded fonts:");
+            font_system.db().faces().for_each(|face| {
+                eprintln!(
+                    "  Font ID: {}, Family: {:?}, Style: {:?}",
+                    face.id,
+                    face.families.first().map(|f| &f.0),
+                    face.style
+                );
+            });
+
             Self {
                 font_system,
                 swash_cache: cosmic_text::SwashCache::new(),
@@ -366,7 +377,6 @@ pub mod cosmic {
         fn make_attrs(&self, font_weight: u16, font_style: FontStyle) -> Attrs<'static> {
             // `Attrs` holds references internally, so returning `Attrs<'static>` must not borrow
             // from parameters. Build attrs with weight and style.
-
             let attrs = Attrs::new()
                 .family(cosmic_text::Family::Name("Inter"))
                 .weight(cosmic_text::Weight(font_weight));
@@ -464,13 +474,18 @@ pub mod cosmic {
                     let font_id_str = format!("{}", physical.cache_key.font_id);
                     let font_id = FontId(font_id_str.parse::<u64>().unwrap());
 
+                    eprintln!(
+                        "DEBUG shape_line: font_id_str={}, font_id={}, glyph_id={}",
+                        font_id_str, font_id.0, physical.cache_key.glyph_id
+                    );
+
                     let key = GlyphKey::new(
                         font_id,
                         physical.cache_key.glyph_id as u32,
                         f32::from_bits(physical.cache_key.font_size_bits)
                             .round()
                             .max(1.0) as u16,
-                        req.font_weight as i16, // Store weight for variable font rasterization
+                        0, // subpixel_x_64 not used for weight/style encoding anymore
                     );
 
                     // Convert to line-top-left space:
@@ -552,7 +567,7 @@ pub mod cosmic {
                         f32::from_bits(physical.cache_key.font_size_bits)
                             .round()
                             .max(1.0) as u16,
-                        req.font_weight as i16, // Store weight for variable font rasterization
+                        0, // subpixel_x_64 not used for weight/style encoding anymore
                     );
 
                     // Position in line-local space (baseline-relative)
@@ -603,20 +618,25 @@ pub mod cosmic {
                 std::mem::transmute::<slotmap::KeyData, fontdb::ID>(key_data)
             };
 
+            eprintln!(
+                "DEBUG rasterize: font_id={}, glyph_id={}, px_size={}",
+                key.font_id.0, key.glyph_id, key.px_size
+            );
+
             // Build a cosmic CacheKey and rasterize using SwashCache.
             //
             // `CacheKey::new` returns (cache_key, x, y) where x/y are the integer placement offsets.
             // Those offsets must be applied when placing the bitmap quad.
             //
-            // IMPORTANT: For variable fonts (like Inter), the weight parameter controls the weight axis.
-            // We must use the weight that was used during shaping (stored in subpixel_x_64).
+            // IMPORTANT: Use default weight (400) to prevent cosmic-text from re-selecting
+            // a different font variant. The font_id already identifies the correct variant.
 
             let (cache_key, x, y) = cosmic_text::CacheKey::new(
                 font_id,
                 key.glyph_id as u16,
                 key.px_size as f32,
                 (0.0, 0.0),
-                fontdb::Weight(key.subpixel_x_64 as u16), // Use weight from shaping for variable fonts
+                fontdb::Weight(400), // Default weight - font_id already specifies the variant
                 cosmic_text::CacheKeyFlags::empty(),
             );
 
@@ -625,7 +645,16 @@ pub mod cosmic {
                 .get_image(&mut self.font_system, cache_key)
                 .clone();
 
-            let image = image_opt?;
+            let image = match image_opt {
+                Some(img) => img,
+                None => {
+                    eprintln!(
+                        "DEBUG rasterize: FAILED to get image for font_id={}, glyph_id={}",
+                        key.font_id.0, key.glyph_id
+                    );
+                    return None;
+                }
+            };
 
             // We only support coverage masks for now (which is what the WGPU shader expects).
             // If we ever encounter color glyphs, implement conversion or switch the atlas format.

@@ -4,7 +4,7 @@
 //! (e.g., text metrics) during layout. It enables `Size::FitContent` to resolve to
 //! actual dimensions rather than falling back to parent size.
 
-use crate::content::{HorizontalAlign, TextContent, VerticalAlign, Wrap};
+use crate::content::{FontStyle, FontWeight, HorizontalAlign, TextContent, VerticalAlign, Wrap};
 
 /// Request to measure the intrinsic size of text (single or multi-line).
 #[derive(Debug, Clone)]
@@ -21,6 +21,10 @@ pub struct MeasureTextRequest<'a> {
     pub wrap: Wrap,
     /// Line height as a multiplier of font size
     pub line_height_multiplier: f32,
+    /// Font weight
+    pub font_weight: FontWeight,
+    /// Font style
+    pub font_style: FontStyle,
 }
 
 impl<'a> MeasureTextRequest<'a> {
@@ -41,6 +45,8 @@ impl<'a> MeasureTextRequest<'a> {
             max_width: None,
             wrap: content.wrap,
             line_height_multiplier: content.line_height_multiplier,
+            font_weight: content.font_weight,
+            font_style: content.font_style,
         }
     }
 }

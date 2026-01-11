@@ -528,6 +528,8 @@ fn build_text_input_node(
                         max_width: None,
                         wrap: astra_gui::Wrap::None,
                         line_height_multiplier: 1.2,
+                        font_weight: astra_gui::FontWeight::Normal,
+                        font_style: astra_gui::FontStyle::Normal,
                     })
                     .width
             } else {
@@ -554,6 +556,8 @@ fn build_text_input_node(
                             max_width: None,
                             wrap: astra_gui::Wrap::None,
                             line_height_multiplier: 1.2,
+                            font_weight: astra_gui::FontWeight::Normal,
+                            font_style: astra_gui::FontStyle::Normal,
                         })
                         .width
                 } else {
@@ -576,6 +580,8 @@ fn build_text_input_node(
                                     max_width: None,
                                     wrap: astra_gui::Wrap::None,
                                     line_height_multiplier: 1.2,
+                                    font_weight: astra_gui::FontWeight::Normal,
+                                    font_style: astra_gui::FontStyle::Normal,
                                 })
                                 .width
                         } else {
@@ -598,6 +604,8 @@ fn build_text_input_node(
                                 max_width: None,
                                 wrap: astra_gui::Wrap::None,
                                 line_height_multiplier: 1.2,
+                                font_weight: astra_gui::FontWeight::Normal,
+                                font_style: astra_gui::FontStyle::Normal,
                             })
                             .width
                     } else {
@@ -651,6 +659,8 @@ fn build_text_input_node(
                 v_align: VerticalAlign::Center,
                 wrap: astra_gui::Wrap::None,
                 line_height_multiplier: 1.2,
+                font_weight: astra_gui::FontWeight::Normal,
+                font_style: astra_gui::FontStyle::Normal,
             }))
             .with_style(Style {
                 text_color: Some(text_color),

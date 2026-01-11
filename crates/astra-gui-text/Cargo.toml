@@ -17,6 +17,7 @@ astra-gui-fonts = { path = "../astra-gui-fonts", default-features = true, featur
 
 # Text shaping & rasterization
 cosmic-text = { workspace = true, optional = true }
+slotmap = "1.0"
 
 # Utility
 bytemuck = { version = "1.24", features = ["derive"] }
