@@ -234,7 +234,9 @@ fn sd_triangle(p: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32>) -> f32
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Compute signed distance based on shape type
+    // dist = distance to stroke boundary, fill_dist = distance to original shape boundary
     var dist: f32;
+    var fill_dist: f32;
 
     if in.shape_corner_type == 100u {
         // Triangle - vertices stored in params as world-space coordinates
@@ -242,36 +244,49 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let tri_v1 = in.params34;
         let tri_v2 = in.params56;
         dist = sd_triangle(in.world_pos, tri_v0, tri_v1, tri_v2);
+        fill_dist = dist; // Triangle doesn't support stroke offset yet
     } else {
         // Rectangle - compute distance based on corner type
         let corner_type = in.shape_corner_type;
         let corner_param1 = in.params12.x;
         let corner_param2 = in.params12.y;
 
-        // Calculate boundary with stroke offset for alignment
+        // Calculate stroke boundary with offset for alignment
         // The stroke extends stroke_width on each side of dist=0, so we add stroke_width/2
         // to shift the boundary so the stroke aligns correctly
-        let boundary_offset = in.half_size - in.stroke_offset + in.stroke_width * 0.5;
+        let stroke_boundary = in.half_size - in.stroke_offset + in.stroke_width * 0.5;
+
+        // Scale corner size for stroke to maintain parallel contours
+        // When stroke is offset outward, corner size increases proportionally
+        let corner_offset = -in.stroke_offset + in.stroke_width * 0.5;
+        let stroke_corner_param1 = max(0.0, corner_param1 + corner_offset);
+        let stroke_corner_param2 = corner_param2; // smoothness doesn't scale
 
         switch corner_type {
             case 0u: {  // None (sharp corners)
-                dist = sd_box(in.local_pos, boundary_offset);
+                dist = sd_box(in.local_pos, stroke_boundary);
+                fill_dist = sd_box(in.local_pos, in.half_size);
             }
             case 1u: {  // Round (circular arcs)
-                dist = sd_rounded_box(in.local_pos, boundary_offset, corner_param1);
+                dist = sd_rounded_box(in.local_pos, stroke_boundary, stroke_corner_param1);
+                fill_dist = sd_rounded_box(in.local_pos, in.half_size, corner_param1);
             }
             case 2u: {  // Cut (chamfered at 45°)
-                dist = sd_chamfer_box(in.local_pos, boundary_offset, corner_param1);
+                dist = sd_chamfer_box(in.local_pos, stroke_boundary, stroke_corner_param1);
+                fill_dist = sd_chamfer_box(in.local_pos, in.half_size, corner_param1);
             }
             case 3u: {  // InverseRound (concave arcs)
-                dist = sd_inverse_round_box(in.local_pos, boundary_offset, corner_param1, in.stroke_width);
+                dist = sd_inverse_round_box(in.local_pos, stroke_boundary, stroke_corner_param1, in.stroke_width);
+                fill_dist = sd_inverse_round_box(in.local_pos, in.half_size, corner_param1, in.stroke_width);
             }
             case 4u: {  // Squircle (superellipse)
-                dist = sd_squircle_box(in.local_pos, boundary_offset, corner_param1, corner_param2);
+                dist = sd_squircle_box(in.local_pos, stroke_boundary, stroke_corner_param1, stroke_corner_param2);
+                fill_dist = sd_squircle_box(in.local_pos, in.half_size, corner_param1, corner_param2);
             }
             default: {
                 // Fallback to sharp corners
-                dist = sd_box(in.local_pos, boundary_offset);
+                dist = sd_box(in.local_pos, stroke_boundary);
+                fill_dist = sd_box(in.local_pos, in.half_size);
             }
         }
     }
@@ -299,8 +314,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let alpha = 1.0 - smoothstep(-aa_width, aa_width, stroke_dist);
         final_color = in.stroke_color * alpha;
     } else {
-        // Outside stroke ring - render fill (if inside shape) with AA
-        let alpha = 1.0 - smoothstep(-aa_width, aa_width, dist);
+        // Outside stroke ring - render fill (if inside original shape) with AA
+        let alpha = 1.0 - smoothstep(-aa_width, aa_width, fill_dist);
         final_color = in.fill_color * alpha;
     }
 

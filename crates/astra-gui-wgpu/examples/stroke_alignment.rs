@@ -122,20 +122,6 @@ fn create_demo_ui() -> Node {
                 ),
             ),
             labeled_row("Triangle", triangle_row(stroke_width)),
-            // Custom offset section
-            Node::new()
-                .with_height(Size::Fill)
-                .with_width(Size::Fill)
-                .with_padding(Spacing::all(Size::lpx(15.0)))
-                .with_gap(Size::lpx(15.0))
-                .with_layout_direction(Layout::Vertical)
-                .with_margin(Spacing::symmetric(Size::lpx(0.0), Size::lpx(20.0)))
-                .with_shape(panel(mocha::SURFACE0))
-                .with_children(vec![
-                    title_text("Custom Offset Examples"),
-                    subtitle_text("Specific pixel offsets for fine control"),
-                    custom_offset_row(8.0, cell_size),
-                ]),
         ]);
 
     // Root layout
@@ -241,10 +227,11 @@ fn alignment_cell(
                 .with_width(Size::rel(0.8))
                 .with_height(Size::rel(0.8))
                 .with_style(Style {
-                    fill_color: Some(mocha::CRUST),
+                    fill_color: Some(mocha::RED),
                     corner_shape: Some(corner_shape),
                     stroke: Some(
-                        Stroke::new(Size::lpx(stroke_width), mocha::BLUE).with_alignment(alignment),
+                        Stroke::new(Size::lpx(stroke_width), mocha::GREEN)
+                            .with_alignment(alignment),
                     ),
                     ..Default::default()
                 }),
