@@ -298,9 +298,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist)));
 
     // Phase 1.2: Early discard for pixels definitely outside shape (10-15% improvement)
-    // If we're more than 1.5 AA widths away from the shape, we're fully transparent - discard early
-    // This skips all remaining fragment work for border pixels
-    if dist > aa_width * 1.5 {
+    // When stroke is inset, we need to check against fill boundary, not stroke boundary
+    // Otherwise we'd discard fill pixels that should be visible
+    let outer_dist = min(dist, fill_dist);
+    if outer_dist > aa_width * 1.5 {
         discard;
     }
 
