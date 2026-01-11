@@ -57,7 +57,7 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
             Node::new()
                 .with_layout_direction(Layout::Horizontal)
                 .with_gap(Size::lpx(10.0))
-                .with_height(Size::fraction(0.15))
+                .with_height(Size::rel(0.15))
                 .with_shape(Shape::Rect(
                     StyledRect::new(Default::default(), mocha::SURFACE0)
                         .with_corner_shape(CornerShape::Round(Size::lpx(50.0)))
@@ -95,13 +95,13 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                 ]),
             // Main content area - horizontal layout
             Node::new()
-                .with_height(Size::fraction(0.75))
+                .with_height(Size::rel(0.75))
                 .with_gap(Size::lpx(25.0))
                 .with_layout_direction(Layout::Horizontal)
                 .with_children(vec![
                     // Left sidebar - 25% width
                     Node::new()
-                        .with_width(Size::fraction(0.25))
+                        .with_width(Size::rel(0.25))
                         .with_padding(Spacing::all(Size::lpx(20.0)))
                         .with_gap(Size::lpx(10.0))
                         .with_shape(Shape::Rect(
@@ -125,7 +125,7 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                         ]),
                     // Right of sidebar
                     Node::new()
-                        .with_width(Size::fraction(0.75))
+                        .with_width(Size::rel(0.75))
                         .with_padding(Spacing::all(Size::lpx(20.0)))
                         .with_gap(Size::lpx(20.0))
                         .with_shape(Shape::Rect(
@@ -137,7 +137,7 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                         .with_children(vec![
                             // Content cards in vertical layout
                             Node::new()
-                                .with_height(Size::fraction(0.3))
+                                .with_height(Size::rel(0.3))
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
                                         .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
@@ -145,11 +145,11 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                                 )),
                             // Horizontal row of smaller cards
                             Node::new()
-                                .with_height(Size::fraction(0.3))
+                                .with_height(Size::rel(0.3))
                                 .with_gap(Size::lpx(20.0))
                                 .with_layout_direction(Layout::Horizontal)
                                 .with_children(vec![
-                                    Node::new().with_width(Size::fraction(0.5)).with_shape(
+                                    Node::new().with_width(Size::rel(0.5)).with_shape(
                                         Shape::Rect(
                                             StyledRect::new(Default::default(), mocha::SURFACE1)
                                                 .with_corner_shape(CornerShape::Cut(Size::lpx(
@@ -161,7 +161,7 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                                                 )),
                                         ),
                                     ),
-                                    Node::new().with_width(Size::fraction(0.5)).with_shape(
+                                    Node::new().with_width(Size::rel(0.5)).with_shape(
                                         Shape::Rect(
                                             StyledRect::new(Default::default(), mocha::SURFACE1)
                                                 .with_corner_shape(CornerShape::Cut(Size::lpx(
@@ -175,7 +175,7 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                                     ),
                                 ]),
                             Node::new()
-                                .with_height(Size::fraction(0.4))
+                                .with_height(Size::rel(0.4))
                                 .with_shape(Shape::Rect(
                                     StyledRect::new(Default::default(), mocha::SURFACE1)
                                         .with_corner_shape(CornerShape::Round(Size::lpx(30.0)))
@@ -185,7 +185,7 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                 ]),
             // Footer - 10% height with three Fill children laid out horizontally with gap
             Node::new()
-                .with_height(Size::fraction(0.1))
+                .with_height(Size::rel(0.1))
                 .with_padding(Spacing::all(Size::lpx(20.0)))
                 .with_gap(Size::lpx(20.0))
                 .with_layout_direction(Layout::Horizontal)

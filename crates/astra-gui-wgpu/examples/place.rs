@@ -48,8 +48,8 @@ impl PlaceExample {
             .with_layout_direction(Layout::Vertical)
             .with_gap(Size::lpx(8.0))
             .with_padding(Spacing::all(Size::lpx(12.0)))
-            .with_width(Size::fit_content())
-            .with_height(Size::fit_content())
+            .with_width(Size::fit())
+            .with_height(Size::fit())
             .with_style(Style {
                 fill_color: Some(mocha::BASE.with_alpha(0.98)),
                 stroke: Some(Stroke::new(Size::lpx(1.0), mocha::SURFACE2)),
@@ -74,8 +74,8 @@ impl PlaceExample {
         Node::new()
             .with_layout_direction(Layout::Horizontal)
             .with_padding(Spacing::all(Size::lpx(8.0)))
-            .with_width(Size::fit_content())
-            .with_height(Size::fit_content())
+            .with_width(Size::fit())
+            .with_height(Size::fit())
             .with_style(Style {
                 fill_color: Some(mocha::MANTLE.with_alpha(0.95)),
                 stroke: Some(Stroke::new(Size::lpx(1.0), mocha::SURFACE1)),

@@ -319,7 +319,7 @@ impl ExampleApp for ScrollExample {
                         // Title
                         Node::new()
                             .with_width(Size::Fill)
-                            .with_height(Size::fraction(0.1))
+                            .with_height(Size::rel(0.1))
                             .with_content(Content::Text(
                                 TextContent::new(
                                     "Scroll Example - Use Mouse Wheel (Shift for horizontal)"
@@ -333,7 +333,7 @@ impl ExampleApp for ScrollExample {
                         // Centered vertical scroll container
                         Node::new()
                             .with_width(Size::Fill)
-                            .with_height(Size::fraction(0.37))
+                            .with_height(Size::rel(0.37))
                             .with_layout_direction(Layout::Horizontal)
                             .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                             .with_child(scroll_container)
@@ -341,7 +341,7 @@ impl ExampleApp for ScrollExample {
                         // 2D grid scroll container
                         Node::new()
                             .with_width(Size::Fill)
-                            .with_height(Size::fraction(0.33))
+                            .with_height(Size::rel(0.33))
                             .with_layout_direction(Layout::Horizontal)
                             .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                             .with_child(grid_scroll_container)
@@ -349,7 +349,7 @@ impl ExampleApp for ScrollExample {
                         // Horizontal scroll container
                         Node::new()
                             .with_width(Size::Fill)
-                            .with_height(Size::fraction(0.2))
+                            .with_height(Size::rel(0.2))
                             .with_layout_direction(Layout::Horizontal)
                             .with_child(Node::new().with_width(Size::Fill)) // Left spacer
                             .with_child(horizontal_scroll_container)

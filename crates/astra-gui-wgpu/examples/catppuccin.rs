@@ -53,7 +53,7 @@ fn theme_card(
     let mut rows = vec![];
     for chunk in colors.chunks(5) {
         let row = Node::new()
-            .with_height(Size::fraction(1.0 / 5.0))
+            .with_height(Size::rel(1.0 / 5.0))
             .with_layout_direction(Layout::Horizontal)
             .with_gap(Size::lpx(10.0))
             .with_children(
@@ -167,7 +167,7 @@ fn create_demo_ui() -> Node {
         .with_children(vec![
             // Top Row
             Node::new()
-                .with_height(Size::fraction(0.5))
+                .with_height(Size::rel(0.5))
                 .with_layout_direction(Layout::Horizontal)
                 .with_children(vec![
                     theme_card(
@@ -187,7 +187,7 @@ fn create_demo_ui() -> Node {
                 ]),
             // Bottom Row
             Node::new()
-                .with_height(Size::fraction(0.5))
+                .with_height(Size::rel(0.5))
                 .with_layout_direction(Layout::Horizontal)
                 .with_children(vec![
                     theme_card(

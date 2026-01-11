@@ -3,3 +3,6 @@
 - Always use conventional commit messages
 - Always make commit messages short and precise
 - Aim for extremely performant, should always run above 500 FPS unless it's a very complex scene.
+- FitContent is default dimension, so don't specify it explicitly.
+- If you want a node to have rect shape, then don't no anything, it will default to that.
+- Always use .with_style to style nodes, not the StyledRect, it will be applied automatically.

@@ -1155,7 +1155,7 @@ impl Node {
                             (resolved_width - padding_left - padding_right).max(0.0);
                         Some(content_width)
                     }
-                    Size::Fill | Size::Relative(_) => {
+                    Size::Fill | Size::Relative(_) | Size::Fractional(_) => {
                         // Dynamic width depends on parent - can't use for measurement
                         // Measure without width constraint
                         None
@@ -1294,8 +1294,8 @@ impl Node {
         // Accumulation struct for single-pass traversal
         struct ChildAnalysis {
             spacing: f32,
-            fill_count: usize,
-            non_fill_size: f32,
+            total_fractional_weight: f32,
+            non_fractional_size: f32,
             // Cache measurements: child_index -> (width, height)
             measured_sizes: Vec<Option<(f32, f32)>>,
             // Cache resolved margins: child_index -> (left, right, top, bottom)
@@ -1304,8 +1304,8 @@ impl Node {
 
         let mut analysis = ChildAnalysis {
             spacing: 0.0,
-            fill_count: 0,
-            non_fill_size: 0.0,
+            total_fractional_weight: 0.0,
+            non_fractional_size: 0.0,
             measured_sizes: vec![None; self.children.len()],
             resolved_margins: Vec::with_capacity(self.children.len()),
         };
@@ -1380,11 +1380,11 @@ impl Node {
                 Layout::Stack => {}
             }
 
-            // 2. Measure and accumulate child sizes (for Fill calculation and total size)
+            // 2. Measure and accumulate child sizes (for fractional calculation and total size)
             let (_child_width, _child_height) = match self.layout_direction {
                 Layout::Horizontal => {
-                    let width = if child.width.is_fill() {
-                        analysis.fill_count += 1;
+                    let width = if let Some(weight) = child.width.get_fractional_weight() {
+                        analysis.total_fractional_weight += weight;
                         0.0 // Will be calculated after knowing remaining space
                     } else if child.width.is_fit_content() {
                         // Measure once and cache
@@ -1401,15 +1401,15 @@ impl Node {
                             .unwrap()
                     };
 
-                    if !child.width.is_fill() {
-                        analysis.non_fill_size += width;
+                    if child.width.get_fractional_weight().is_none() {
+                        analysis.non_fractional_size += width;
                     }
 
                     (width, 0.0) // Height not needed for horizontal
                 }
                 Layout::Vertical => {
-                    let height = if child.height.is_fill() {
-                        analysis.fill_count += 1;
+                    let height = if let Some(weight) = child.height.get_fractional_weight() {
+                        analysis.total_fractional_weight += weight;
                         0.0
                     } else if child.height.is_fit_content() {
                         let measured = child.measure_node(measurer, effective_scale_factor);
@@ -1425,8 +1425,8 @@ impl Node {
                             .unwrap()
                     };
 
-                    if !child.height.is_fill() {
-                        analysis.non_fill_size += height;
+                    if child.height.get_fractional_weight().is_none() {
+                        analysis.non_fractional_size += height;
                     }
 
                     (0.0, height) // Width not needed for vertical
@@ -1445,25 +1445,25 @@ impl Node {
         let available_width = (content_width - total_horizontal_spacing).max(0.0);
         let available_height = (content_height - total_vertical_spacing).max(0.0);
 
-        // Calculate Fill size
-        let (fill_size_width, fill_size_height) = match self.layout_direction {
+        // Calculate fractional unit size (size of one fractional unit, i.e., 1fr)
+        let (fractional_unit_width, fractional_unit_height) = match self.layout_direction {
             Layout::Horizontal => {
-                let remaining_width = (available_width - analysis.non_fill_size).max(0.0);
-                let fill_width = if analysis.fill_count > 0 {
-                    remaining_width / analysis.fill_count as f32
+                let remaining_width = (available_width - analysis.non_fractional_size).max(0.0);
+                let unit_width = if analysis.total_fractional_weight > 0.0 {
+                    remaining_width / analysis.total_fractional_weight
                 } else {
                     0.0
                 };
-                (fill_width, available_height)
+                (unit_width, available_height)
             }
             Layout::Vertical => {
-                let remaining_height = (available_height - analysis.non_fill_size).max(0.0);
-                let fill_height = if analysis.fill_count > 0 {
-                    remaining_height / analysis.fill_count as f32
+                let remaining_height = (available_height - analysis.non_fractional_size).max(0.0);
+                let unit_height = if analysis.total_fractional_weight > 0.0 {
+                    remaining_height / analysis.total_fractional_weight
                 } else {
                     0.0
                 };
-                (available_width, fill_height)
+                (available_width, unit_height)
             }
             Layout::Stack => (available_width, available_height),
         };
@@ -1471,17 +1471,17 @@ impl Node {
         // Calculate total children size for alignment
         let (total_children_width, total_children_height) = match self.layout_direction {
             Layout::Horizontal => {
-                let fill_total = fill_size_width * analysis.fill_count as f32;
+                let fractional_total = fractional_unit_width * analysis.total_fractional_weight;
                 (
-                    total_horizontal_spacing + analysis.non_fill_size + fill_total,
+                    total_horizontal_spacing + analysis.non_fractional_size + fractional_total,
                     content_height,
                 )
             }
             Layout::Vertical => {
-                let fill_total = fill_size_height * analysis.fill_count as f32;
+                let fractional_total = fractional_unit_height * analysis.total_fractional_weight;
                 (
                     content_width,
-                    total_vertical_spacing + analysis.non_fill_size + fill_total,
+                    total_vertical_spacing + analysis.non_fractional_size + fractional_total,
                 )
             }
             Layout::Stack => (content_width, content_height),
@@ -1583,16 +1583,18 @@ impl Node {
             let (child_margin_left, child_margin_right, child_margin_top, child_margin_bottom) =
                 analysis.resolved_margins[i];
 
-            let child_parent_width = if self.children[i].width.is_fill() {
-                fill_size_width + child_margin_left + child_margin_right
-            } else {
-                available_width + child_margin_left + child_margin_right
-            };
-            let child_parent_height = if self.children[i].height.is_fill() {
-                fill_size_height + child_margin_top + child_margin_bottom
-            } else {
-                available_height + child_margin_top + child_margin_bottom
-            };
+            let child_parent_width =
+                if let Some(weight) = self.children[i].width.get_fractional_weight() {
+                    (fractional_unit_width * weight) + child_margin_left + child_margin_right
+                } else {
+                    available_width + child_margin_left + child_margin_right
+                };
+            let child_parent_height =
+                if let Some(weight) = self.children[i].height.get_fractional_weight() {
+                    (fractional_unit_height * weight) + child_margin_top + child_margin_bottom
+                } else {
+                    available_height + child_margin_top + child_margin_bottom
+                };
 
             self.children[i].compute_layout_with_parent_size_and_measurer(
                 child_available_rect,
@@ -1945,15 +1947,15 @@ impl Node {
         let available_height = (content_height - total_vertical_spacing).max(0.0);
 
         // Calculate remaining space for Fill children
-        let (fill_size_width, fill_size_height) = match self.layout_direction {
+        let (fractional_unit_width, fractional_unit_height) = match self.layout_direction {
             Layout::Horizontal => {
-                // Count Fill children and calculate space used by non-Fill children
-                let mut fill_count = 0;
+                // Count fractional weight and calculate space used by non-fractional children
+                let mut total_fractional_weight = 0.0;
                 let mut used_width = 0.0;
 
                 for child in &self.children {
-                    if child.width.is_fill() {
-                        fill_count += 1;
+                    if let Some(weight) = child.width.get_fractional_weight() {
+                        total_fractional_weight += weight;
                     } else {
                         // For FitContent without measurer, fall back to available width
                         // Apply effective_scale_factor to Fixed sizes
@@ -1964,24 +1966,24 @@ impl Node {
                     }
                 }
 
-                // Fill children divide the remaining space after non-Fill children
+                // Fractional children divide the remaining space proportionally
                 let remaining_width = (available_width - used_width).max(0.0);
-                let fill_width = if fill_count > 0 {
-                    remaining_width / fill_count as f32
+                let unit_width = if total_fractional_weight > 0.0 {
+                    remaining_width / total_fractional_weight
                 } else {
                     0.0
                 };
 
-                (fill_width, available_height)
+                (unit_width, available_height)
             }
             Layout::Vertical => {
-                // Count Fill children and calculate space used by non-Fill children
-                let mut fill_count = 0;
+                // Count fractional weight and calculate space used by non-fractional children
+                let mut total_fractional_weight = 0.0;
                 let mut used_height = 0.0;
 
                 for child in &self.children {
-                    if child.height.is_fill() {
-                        fill_count += 1;
+                    if let Some(weight) = child.height.get_fractional_weight() {
+                        total_fractional_weight += weight;
                     } else {
                         // For FitContent without measurer, fall back to available height
                         // Apply effective_scale_factor to Fixed sizes
@@ -1992,15 +1994,15 @@ impl Node {
                     }
                 }
 
-                // Fill children divide the remaining space after non-Fill children
+                // Fractional children divide the remaining space proportionally
                 let remaining_height = (available_height - used_height).max(0.0);
-                let fill_height = if fill_count > 0 {
-                    remaining_height / fill_count as f32
+                let unit_height = if total_fractional_weight > 0.0 {
+                    remaining_height / total_fractional_weight
                 } else {
                     0.0
                 };
 
-                (available_width, fill_height)
+                (available_width, unit_height)
             }
             Layout::Stack => {
                 // In Stack layout, all children get full available space
@@ -2080,16 +2082,18 @@ impl Node {
                 .try_resolve_with_scale(content_height, effective_scale_factor)
                 .unwrap_or(0.0);
 
-            let child_parent_width = if self.children[i].width.is_fill() {
-                fill_size_width + child_margin_left + child_margin_right
-            } else {
-                available_width + child_margin_left + child_margin_right
-            };
-            let child_parent_height = if self.children[i].height.is_fill() {
-                fill_size_height + child_margin_top + child_margin_bottom
-            } else {
-                available_height + child_margin_top + child_margin_bottom
-            };
+            let child_parent_width =
+                if let Some(weight) = self.children[i].width.get_fractional_weight() {
+                    (fractional_unit_width * weight) + child_margin_left + child_margin_right
+                } else {
+                    available_width + child_margin_left + child_margin_right
+                };
+            let child_parent_height =
+                if let Some(weight) = self.children[i].height.get_fractional_weight() {
+                    (fractional_unit_height * weight) + child_margin_top + child_margin_bottom
+                } else {
+                    available_height + child_margin_top + child_margin_bottom
+                };
 
             self.children[i].compute_layout_with_parent_size(
                 child_available_rect,

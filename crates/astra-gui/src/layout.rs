@@ -9,6 +9,8 @@ pub enum Size {
     Physical(f32),
     /// Relative size as a fraction of parent (0.0 to 1.0)
     Relative(f32),
+    /// Fractional size of the parent's width out of all children at the same level
+    Fractional(f32),
     /// Fill all remaining available space
     Fill,
     /// Size to the minimum that fits content (text metrics or children), plus padding.
@@ -55,12 +57,17 @@ impl Size {
     }
 
     /// Create a relative size as a percentage (0.0 to 1.0)
-    pub const fn fraction(fraction: f32) -> Self {
+    pub const fn rel(fraction: f32) -> Self {
         Self::Relative(fraction)
     }
 
+    /// Create a fractional size of the parent's width out of all children at the same level
+    pub const fn fr(fraction: f32) -> Self {
+        Self::Fractional(fraction)
+    }
+
     /// Size to the minimum that fits content.
-    pub const fn fit_content() -> Self {
+    pub const fn fit() -> Self {
         Self::FitContent
     }
 
@@ -79,6 +86,7 @@ impl Size {
             Size::Physical(px) => *px,
             Size::Relative(fraction) => parent_size * fraction,
             Size::Fill => panic!("Cannot resolve Size::Fill - must be computed by layout algorithm based on remaining space"),
+            Size::Fractional(_) => panic!("Cannot resolve Size::Fractional - must be computed by layout algorithm based on remaining space"),
             Size::FitContent => panic!("Cannot resolve Size::FitContent - must be computed via intrinsic measurement"),
         }
     }
@@ -102,7 +110,7 @@ impl Size {
             Size::Logical(px) => Some(*px * scale_factor),
             Size::Physical(px) => Some(*px),
             Size::Relative(fraction) => Some(parent_size * fraction),
-            Size::Fill | Size::FitContent => None,
+            Size::Fill | Size::FitContent | Size::Fractional(_) => None,
         }
     }
 
@@ -125,12 +133,33 @@ impl Size {
         matches!(self, Size::FitContent)
     }
 
-    /// Check if this size is zero (Fixed(0.0) or Physical(0.0))
+    /// Get the fractional weight for this size, if applicable.
+    ///
+    /// Returns:
+    /// - `Some(1.0)` for `Fill` (treated as `Fractional(1.0)`)
+    /// - `Some(weight)` for `Fractional(weight)` where weight >= 0.0
+    /// - `None` for all other size types
+    pub const fn get_fractional_weight(&self) -> Option<f32> {
+        match self {
+            Size::Fill => Some(1.0),
+            Size::Fractional(weight) => {
+                // Clamp negative to 0.0
+                if *weight < 0.0 {
+                    Some(0.0)
+                } else {
+                    Some(*weight)
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Check if this size is zero (Logical(0.0) or Physical(0.0))
     pub fn is_zero(&self) -> bool {
         matches!(self, Size::Logical(v) | Size::Physical(v) if *v == 0.0)
     }
 
-    /// Check if this size is non-zero (any non-zero Fixed/Physical value, or Relative/Fill/FitContent)
+    /// Check if this size is non-zero (any non-zero Logical/Physical value, or Relative/Fill/FitContent)
     pub fn is_non_zero(&self) -> bool {
         !self.is_zero()
     }

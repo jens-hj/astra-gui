@@ -61,8 +61,8 @@ impl ExampleApp for Alignment {
         // Helper function to create a colored box
         let create_box = |color: Color, text: &str| {
             Node::new()
-                .with_width(Size::fraction(1.0 / 4.0))
-                .with_height(Size::fraction(1.0 / 4.0))
+                .with_width(Size::rel(1.0 / 4.0))
+                .with_height(Size::rel(1.0 / 4.0))
                 .with_style(Style {
                     fill_color: Some(mocha::CRUST),
                     stroke: Some(Stroke::new(Size::lpx(2.0), color)),

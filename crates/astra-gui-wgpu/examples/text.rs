@@ -118,7 +118,7 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                 .with_children(vec![
                     // Left: alignment grid
                     Node::new()
-                        .with_width(Size::fraction(0.55))
+                        .with_width(Size::rel(0.55))
                         .with_padding(Spacing::all(Size::lpx(16.0)))
                         .with_gap(Size::lpx(12.0))
                         .with_shape(panel(mocha::MANTLE))
@@ -144,7 +144,7 @@ fn create_demo_ui(_width: f32, _height: f32, _debug_options: &DebugOptions) -> N
                         ]),
                     // Right: varied sizes and clipping candidate
                     Node::new()
-                        .with_width(Size::fraction(0.45))
+                        .with_width(Size::rel(0.45))
                         .with_padding(Spacing::all(Size::lpx(16.0)))
                         .with_gap(Size::lpx(14.0))
                         .with_shape(panel(mocha::MANTLE))
