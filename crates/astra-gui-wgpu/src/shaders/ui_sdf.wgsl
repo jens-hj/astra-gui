@@ -311,7 +311,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var final_color: vec4<f32>;
 
     let stroke_dist = abs(dist) - in.stroke_width;
-    if stroke_dist < 0.0 {
+    var stroke_condition = stroke_dist < 0.0;
+    if in.stroke_offset > 0.0 {
+        stroke_condition = stroke_dist < -in.stroke_width/2;
+    }
+
+    if stroke_condition {
         // In stroke ring - render stroke with AA
         let alpha = 1.0 - smoothstep(-aa_width, aa_width, stroke_dist);
         final_color = in.stroke_color * alpha;

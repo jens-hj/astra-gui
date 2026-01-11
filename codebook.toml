@@ -10,4 +10,8 @@ words = [
     "tri",
     "wgpu",
     "winit",
+    "dpdx",
+    "dpdy",
+    "superellipse",
+    "ndc"
 ]
