@@ -1354,7 +1354,7 @@ impl Renderer {
                     fill: Color::rgba(0.0, 0.0, 0.0, 0.0), // Transparent fill
                     stroke: Some(stroke),
                     corner_shape: CornerShape::None,
-                    anti_aliasing: AntiAliasing::default(),
+                    anti_aliasing: AntiAliasing::None,
                 };
 
                 // Create a ClippedShape for this debug rectangle with the text's transform

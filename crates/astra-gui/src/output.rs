@@ -1,7 +1,7 @@
 use crate::layout::{Overflow, Size, Transform2D};
 use crate::measure::ContentMeasurer;
 use crate::node::Node;
-use crate::primitives::{ClippedShape, Rect, Shape, Stroke};
+use crate::primitives::{AntiAliasing, ClippedShape, Rect, Shape, Stroke};
 
 /// Output from the UI system containing all shapes to render
 #[derive(Clone, Debug, Default)]
@@ -644,10 +644,10 @@ fn collect_debug_shapes_clipped(
                     [node_rect.max[0] + margin_right, node_rect.min[1]],
                 ),
                 clip_rect,
-                Shape::Rect(StyledRect::new(
-                    Default::default(),
-                    Color::rgba(1.0, 0.0, 0.0, 0.2),
-                )),
+                Shape::Rect(
+                    StyledRect::new(Default::default(), Color::rgba(1.0, 0.0, 0.0, 0.2))
+                        .with_anti_aliasing(AntiAliasing::None),
+                ),
                 *transform,
                 1.0,
                 current_z_index,
@@ -663,10 +663,10 @@ fn collect_debug_shapes_clipped(
                     [node_rect.max[0] + margin_right, node_rect.max[1]],
                 ),
                 clip_rect,
-                Shape::Rect(StyledRect::new(
-                    Default::default(),
-                    Color::rgba(1.0, 0.0, 0.0, 0.2),
-                )),
+                Shape::Rect(
+                    StyledRect::new(Default::default(), Color::rgba(1.0, 0.0, 0.0, 0.2))
+                        .with_anti_aliasing(AntiAliasing::None),
+                ),
                 *transform,
                 1.0,
                 current_z_index,
@@ -685,10 +685,10 @@ fn collect_debug_shapes_clipped(
                     ],
                 ),
                 clip_rect,
-                Shape::Rect(StyledRect::new(
-                    Default::default(),
-                    Color::rgba(1.0, 0.0, 0.0, 0.2),
-                )),
+                Shape::Rect(
+                    StyledRect::new(Default::default(), Color::rgba(1.0, 0.0, 0.0, 0.2))
+                        .with_anti_aliasing(AntiAliasing::None),
+                ),
                 *transform,
                 1.0,
                 current_z_index,
@@ -704,10 +704,10 @@ fn collect_debug_shapes_clipped(
                     [node_rect.min[0], node_rect.max[1]],
                 ),
                 clip_rect,
-                Shape::Rect(StyledRect::new(
-                    Default::default(),
-                    Color::rgba(1.0, 0.0, 0.0, 0.2),
-                )),
+                Shape::Rect(
+                    StyledRect::new(Default::default(), Color::rgba(1.0, 0.0, 0.0, 0.2))
+                        .with_anti_aliasing(AntiAliasing::None),
+                ),
                 *transform,
                 1.0,
                 current_z_index,
@@ -756,7 +756,8 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(
                 StyledRect::new(Default::default(), Color::transparent())
-                    .with_stroke(Stroke::new(Size::lpx(1.0), Color::rgb(1.0, 1.0, 0.0))),
+                    .with_stroke(Stroke::new(Size::lpx(1.0), Color::rgb(1.0, 1.0, 0.0)))
+                    .with_anti_aliasing(AntiAliasing::None),
             ),
             *transform,
             1.0,
@@ -781,10 +782,10 @@ fn collect_debug_shapes_clipped(
                     [node_rect.max[0], node_rect.min[1] + padding_top],
                 ),
                 clip_rect,
-                Shape::Rect(StyledRect::new(
-                    Default::default(),
-                    Color::rgba(0.0, 0.0, 1.0, 0.2),
-                )),
+                Shape::Rect(
+                    StyledRect::new(Default::default(), Color::rgba(0.0, 0.0, 1.0, 0.2))
+                        .with_anti_aliasing(AntiAliasing::None),
+                ),
                 *transform,
                 1.0,
                 current_z_index,
@@ -803,10 +804,10 @@ fn collect_debug_shapes_clipped(
                     [node_rect.max[0], node_rect.max[1] - padding_bottom],
                 ),
                 clip_rect,
-                Shape::Rect(StyledRect::new(
-                    Default::default(),
-                    Color::rgba(0.0, 0.0, 1.0, 0.2),
-                )),
+                Shape::Rect(
+                    StyledRect::new(Default::default(), Color::rgba(0.0, 0.0, 1.0, 0.2))
+                        .with_anti_aliasing(AntiAliasing::None),
+                ),
                 *transform,
                 1.0,
                 current_z_index,
@@ -822,10 +823,10 @@ fn collect_debug_shapes_clipped(
                     [node_rect.max[0], node_rect.max[1]],
                 ),
                 clip_rect,
-                Shape::Rect(StyledRect::new(
-                    Default::default(),
-                    Color::rgba(0.0, 0.0, 1.0, 0.2),
-                )),
+                Shape::Rect(
+                    StyledRect::new(Default::default(), Color::rgba(0.0, 0.0, 1.0, 0.2))
+                        .with_anti_aliasing(AntiAliasing::None),
+                ),
                 *transform,
                 1.0,
                 current_z_index,
@@ -844,10 +845,10 @@ fn collect_debug_shapes_clipped(
                     ],
                 ),
                 clip_rect,
-                Shape::Rect(StyledRect::new(
-                    Default::default(),
-                    Color::rgba(0.0, 0.0, 1.0, 0.2),
-                )),
+                Shape::Rect(
+                    StyledRect::new(Default::default(), Color::rgba(0.0, 0.0, 1.0, 0.2))
+                        .with_anti_aliasing(AntiAliasing::None),
+                ),
                 *transform,
                 1.0,
                 current_z_index,
@@ -864,7 +865,8 @@ fn collect_debug_shapes_clipped(
             clip_rect,
             Shape::Rect(
                 StyledRect::new(Default::default(), Color::transparent())
-                    .with_stroke(Stroke::new(Size::ppx(1.0), Color::rgb(0.0, 1.0, 0.0))),
+                    .with_stroke(Stroke::new(Size::ppx(1.0), Color::rgb(0.0, 1.0, 0.0)))
+                    .with_anti_aliasing(AntiAliasing::None),
             ),
             *transform,
             1.0,
@@ -882,7 +884,8 @@ fn collect_debug_shapes_clipped(
             clip_rect, // Don't clip the clip rect visualization itself
             Shape::Rect(
                 StyledRect::new(Default::default(), Color::transparent())
-                    .with_stroke(Stroke::new(Size::ppx(2.0), Color::rgb(1.0, 0.0, 0.0))),
+                    .with_stroke(Stroke::new(Size::ppx(2.0), Color::rgb(1.0, 0.0, 0.0)))
+                    .with_anti_aliasing(AntiAliasing::None),
             ),
             Transform2D::IDENTITY, // Clip rects are already in world space
             1.0,
@@ -916,10 +919,10 @@ fn collect_debug_shapes_clipped(
                 ],
             ),
             clip_rect,
-            Shape::Rect(StyledRect::new(
-                Default::default(),
-                Color::rgb(1.0, 0.5, 0.0), // Orange
-            )),
+            Shape::Rect(
+                StyledRect::new(Default::default(), Color::rgb(1.0, 0.5, 0.0))
+                    .with_anti_aliasing(AntiAliasing::None),
+            ),
             *transform,
             1.0,
             current_z_index,
@@ -940,10 +943,10 @@ fn collect_debug_shapes_clipped(
                 ],
             ),
             clip_rect,
-            Shape::Rect(StyledRect::new(
-                Default::default(),
-                Color::rgb(1.0, 0.5, 0.0), // Orange
-            )),
+            Shape::Rect(
+                StyledRect::new(Default::default(), Color::rgb(1.0, 0.5, 0.0))
+                    .with_anti_aliasing(AntiAliasing::None),
+            ),
             *transform,
             1.0,
             current_z_index,
@@ -970,7 +973,8 @@ fn collect_debug_shapes_clipped(
             Shape::Rect(
                 StyledRect::new(circle_rect, Color::transparent())
                     .with_corner_shape(CornerShape::Round(Size::ppx(circle_radius)))
-                    .with_stroke(Stroke::new(Size::ppx(2.0), Color::rgb(1.0, 0.5, 0.0))), // Orange stroke
+                    .with_stroke(Stroke::new(Size::ppx(2.0), Color::rgb(1.0, 0.5, 0.0)))
+                    .with_anti_aliasing(AntiAliasing::None), // Orange stroke
             ),
             *transform,
             1.0,
@@ -1052,10 +1056,10 @@ fn collect_gap_debug_shapes(
         out.push((
             gap_rect,
             clip_rect,
-            Shape::Rect(StyledRect::new(
-                Default::default(),
-                Color::rgba(0.5, 0.0, 0.5, 0.3), // Purple with 30% opacity
-            )),
+            Shape::Rect(
+                StyledRect::new(Default::default(), Color::rgba(0.5, 0.0, 0.5, 0.3))
+                    .with_anti_aliasing(AntiAliasing::None), // Purple with 30% opacity
+            ),
             *transform,
             1.0,
             current_z_index,
