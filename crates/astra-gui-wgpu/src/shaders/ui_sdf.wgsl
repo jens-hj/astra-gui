@@ -30,6 +30,7 @@ struct InstanceInput {
     @location(12) params34: vec2<f32>,  // param3, param4
     @location(13) params56: vec2<f32>,  // param5, param6
     @location(14) stroke_offset: f32,
+    @location(15) anti_aliasing: u32,  // 0 = None, 1 = Analytical
 }
 
 struct VertexOutput {
@@ -46,6 +47,7 @@ struct VertexOutput {
     @location(9) scale: f32,
     @location(10) params56: vec2<f32>,
     @location(11) stroke_offset: f32,
+    @location(12) @interpolate(flat) anti_aliasing: u32,
 }
 
 @group(0) @binding(0)
@@ -107,6 +109,7 @@ fn vs_main(vert: VertexInput, inst: InstanceInput) -> VertexOutput {
     out.scale = inst.scale;
     out.params56 = inst.params56;
     out.stroke_offset = inst.stroke_offset;
+    out.anti_aliasing = inst.anti_aliasing;
 
     return out;
 }
@@ -238,6 +241,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var dist: f32;
     var fill_dist: f32;
 
+    let stroke_offset = in.stroke_offset; // + in.stroke_width / 2.0;
+
     if in.shape_corner_type == 100u {
         // Triangle - vertices stored in params as world-space coordinates
         let tri_v0 = in.params12;
@@ -254,11 +259,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // Calculate stroke boundary with offset for alignment
         // The stroke extends stroke_width on each side of dist=0, so we add stroke_width/2
         // to shift the boundary so the stroke aligns correctly
-        let stroke_boundary = in.half_size - in.stroke_offset + in.stroke_width * 0.5;
+        let stroke_boundary = in.half_size - stroke_offset + in.stroke_width * 0.5;
 
         // Scale corner size for stroke to maintain parallel contours
         // When stroke is offset outward, corner size increases proportionally
-        let corner_offset = -in.stroke_offset + in.stroke_width * 0.5;
+        let corner_offset = -stroke_offset + in.stroke_width * 0.5;
         let cut_corner_offset = corner_offset * 0.4023689; // sqrt(2)/2
         let stroke_corner_param1 = max(0.0, corner_param1 + corner_offset);
         let stroke_corner_param2 = corner_param2; // smoothness doesn't scale
@@ -295,14 +300,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Compute AA width using screen-space derivatives for pixel-perfect antialiasing
     // This accounts for rotation, non-uniform scaling, and perspective
     // The gradient magnitude tells us how many pixels per unit of distance
-    let aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist)));
+    var aa_width: f32;
+    if in.anti_aliasing == 1u {
+        // Analytical AA: compute from screen-space derivatives
+        aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist)));
 
-    // Phase 1.2: Early discard for pixels definitely outside shape (10-15% improvement)
-    // When stroke is inset, we need to check against fill boundary, not stroke boundary
-    // Otherwise we'd discard fill pixels that should be visible
-    let outer_dist = min(dist, fill_dist);
-    if outer_dist > aa_width * 1.5 {
-        discard;
+        // Early discard optimization for pixels definitely outside shape
+        // When stroke is inset, we need to check against fill boundary, not stroke boundary
+        // Otherwise we'd discard fill pixels that should be visible
+        let outer_dist = min(dist, fill_dist);
+        if outer_dist > aa_width * 1.5 {
+            discard;
+        }
+    } else {
+        // No AA: zero width = step function
+        aa_width = 0.0;
     }
 
     // Stroke rendering: stroke is a ring, fill is the interior
@@ -310,19 +322,41 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     var final_color: vec4<f32>;
 
-    let stroke_dist = abs(dist) - in.stroke_width;
-    var stroke_condition = stroke_dist < 0.0;
-    if in.stroke_offset > 0.0 {
-        stroke_condition = stroke_dist < -in.stroke_width/2;
-    }
+    var stroke_dist = abs(dist) - in.stroke_width;
 
-    if stroke_condition {
+    let inside_stroke = stroke_dist < 0.0 && dist <= 0.0;
+    if inside_stroke {
         // In stroke ring - render stroke with AA
-        let alpha = 1.0 - smoothstep(-aa_width, aa_width, stroke_dist);
-        final_color = in.stroke_color * alpha;
+        if stroke_dist < -in.stroke_width / 2.0 {
+            stroke_dist = -stroke_dist - in.stroke_width;
+        }
+
+        var stroke_alpha: f32;
+        if in.anti_aliasing == 1u {
+            // Analytical AA: smooth blending
+            stroke_alpha = 1.0 - smoothstep(-aa_width, aa_width, stroke_dist + aa_width * 1.5);
+        } else {
+            // No AA: hard cutoff
+            stroke_alpha = select(0.0, 1.0, stroke_dist <= 0.0);
+        }
+
+        if fill_dist < aa_width * 2.0 {
+            // Inside fill area - blend between fill and stroke colors
+            final_color = mix(in.fill_color, in.stroke_color, stroke_alpha);
+        } else {
+            // Outside fill area - blend stroke with transparency
+            final_color = in.stroke_color * stroke_alpha;
+        }
     } else {
         // Outside stroke ring - render fill (if inside original shape) with AA
-        let alpha = 1.0 - smoothstep(-aa_width, aa_width, fill_dist);
+        var alpha: f32;
+        if in.anti_aliasing == 1u {
+            // Analytical AA: smooth blending
+            alpha = 1.0 - smoothstep(-aa_width, aa_width, fill_dist - aa_width * 1.5);
+        } else {
+            // No AA: hard cutoff
+            alpha = select(0.0, 1.0, fill_dist <= 0.0);
+        }
         final_color = in.fill_color * alpha;
     }
 

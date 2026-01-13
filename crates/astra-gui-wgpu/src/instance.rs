@@ -1,4 +1,4 @@
-use astra_gui::{ClippedShape, CornerShape, Shape};
+use astra_gui::{AntiAliasing, ClippedShape, CornerShape, Shape};
 
 /// Instance data for SDF-based rectangle rendering.
 ///
@@ -43,6 +43,8 @@ pub struct RectInstance {
     pub param6: f32,
     /// Stroke offset for alignment (0 = centered, positive = outward, negative = inward)
     pub stroke_offset: f32,
+    /// Anti-aliasing mode: 0 = None, 1 = Analytical
+    pub anti_aliasing: u32,
 }
 
 impl RectInstance {
@@ -141,6 +143,10 @@ impl RectInstance {
             param5: tri_v2[0],
             param6: tri_v2[1],
             stroke_offset,
+            anti_aliasing: match triangle.anti_aliasing {
+                AntiAliasing::None => 0,
+                AntiAliasing::Analytical => 1,
+            },
         }
     }
 
@@ -230,6 +236,12 @@ impl RectInstance {
                 offset: 80,
                 shader_location: 14,
                 format: wgpu::VertexFormat::Float32,
+            },
+            // anti_aliasing: u32 at location 15
+            wgpu::VertexAttribute {
+                offset: 84,
+                shader_location: 15,
+                format: wgpu::VertexFormat::Uint32,
             },
         ];
 
@@ -348,6 +360,10 @@ impl From<&ClippedShape> for RectInstance {
             param5: 0.0,
             param6: 0.0,
             stroke_offset,
+            anti_aliasing: match rect.anti_aliasing {
+                AntiAliasing::None => 0,
+                AntiAliasing::Analytical => 1,
+            },
         }
     }
 }

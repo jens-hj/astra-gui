@@ -53,6 +53,21 @@ pub enum StrokeAlignment {
     Custom(f32),
 }
 
+/// Defines how anti-aliasing is applied to shape edges
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AntiAliasing {
+    /// No anti-aliasing - sharp pixel-aligned edges
+    None,
+    /// Analytical anti-aliasing using SDF smoothstep blending
+    Analytical,
+}
+
+impl Default for AntiAliasing {
+    fn default() -> Self {
+        AntiAliasing::Analytical // Backward compatibility
+    }
+}
+
 impl StrokeAlignment {
     /// Calculate the offset to apply to the SDF boundary.
     /// Returns the value to SUBTRACT from half_size in the shader.
@@ -252,6 +267,7 @@ pub struct StyledRect {
     pub corner_shape: CornerShape,
     pub fill: Color,
     pub stroke: Option<Stroke>,
+    pub anti_aliasing: AntiAliasing,
 }
 
 impl StyledRect {
@@ -261,6 +277,7 @@ impl StyledRect {
             corner_shape: CornerShape::None,
             fill,
             stroke: None,
+            anti_aliasing: AntiAliasing::default(),
         }
     }
 
@@ -271,6 +288,11 @@ impl StyledRect {
 
     pub fn with_stroke(mut self, stroke: Stroke) -> Self {
         self.stroke = Some(stroke);
+        self
+    }
+
+    pub fn with_anti_aliasing(mut self, anti_aliasing: AntiAliasing) -> Self {
+        self.anti_aliasing = anti_aliasing;
         self
     }
 
@@ -290,6 +312,7 @@ pub struct StyledTriangle {
     pub spec: TriangleSpec,
     pub fill: Color,
     pub stroke: Option<Stroke>,
+    pub anti_aliasing: AntiAliasing,
 }
 
 impl StyledTriangle {
@@ -299,11 +322,17 @@ impl StyledTriangle {
             spec,
             fill,
             stroke: None,
+            anti_aliasing: AntiAliasing::default(),
         }
     }
 
     pub fn with_stroke(mut self, stroke: Stroke) -> Self {
         self.stroke = Some(stroke);
+        self
+    }
+
+    pub fn with_anti_aliasing(mut self, anti_aliasing: AntiAliasing) -> Self {
+        self.anti_aliasing = anti_aliasing;
         self
     }
 
@@ -553,6 +582,7 @@ impl Shape {
             corner_shape: CornerShape::None,
             fill: Color::transparent(),
             stroke: None,
+            anti_aliasing: AntiAliasing::default(),
         })
     }
 
@@ -565,6 +595,7 @@ impl Shape {
             spec: TriangleSpec::Isosceles { orientation },
             fill: Color::transparent(),
             stroke: None,
+            anti_aliasing: AntiAliasing::default(),
         })
     }
 
@@ -575,6 +606,7 @@ impl Shape {
             spec,
             fill: Color::transparent(),
             stroke: None,
+            anti_aliasing: AntiAliasing::default(),
         })
     }
 

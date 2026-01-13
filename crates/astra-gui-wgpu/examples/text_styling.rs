@@ -44,7 +44,7 @@ impl ExampleApp for TextStylingExample {
     }
 
     fn build_ui(&mut self, _ctx: &mut UiContext, width: f32, height: f32) -> Node {
-        create_demo_ui(width, height, &self.debug_options)
+        create_demo_ui(width, height, &self.debug_options).with_zoom(2.0)
     }
 }
 

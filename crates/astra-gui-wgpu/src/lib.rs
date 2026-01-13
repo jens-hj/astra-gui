@@ -27,7 +27,9 @@ pub use winit::event::MouseButton as WinitMouseButton;
 pub use winit::keyboard::{Key as WinitKey, NamedKey as WinitNamedKey};
 
 // Re-export core types from astra-gui for convenience
-pub use astra_gui::{InputState, Key, MouseButton, NamedKey, UiContext, WidgetMemory};
+pub use astra_gui::{
+    AntiAliasing, InputState, Key, MouseButton, NamedKey, UiContext, WidgetMemory,
+};
 
 use astra_gui::{
     ClippedShape, Color, CornerShape, FullOutput, HorizontalAlign, Rect, Shape, Size, Stroke,
@@ -1352,6 +1354,7 @@ impl Renderer {
                     fill: Color::rgba(0.0, 0.0, 0.0, 0.0), // Transparent fill
                     stroke: Some(stroke),
                     corner_shape: CornerShape::None,
+                    anti_aliasing: AntiAliasing::default(),
                 };
 
                 // Create a ClippedShape for this debug rectangle with the text's transform
