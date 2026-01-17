@@ -176,7 +176,7 @@ impl GpuState {
 
         // Clear the screen with mocha::BASE background
         {
-            let background_color = mocha::BASE;
+            let background_color = mocha::OVERLAY2;
             let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Clear Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {

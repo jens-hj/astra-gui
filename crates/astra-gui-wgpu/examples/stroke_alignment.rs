@@ -90,7 +90,6 @@ fn create_demo_ui() -> Node {
         .with_padding(Spacing::all(Size::lpx(20.0)))
         .with_gap(Size::lpx(20.0))
         .with_layout_direction(Layout::Vertical)
-        .with_shape(panel(mocha::BASE))
         .with_height(Size::Fill)
         .with_width(Size::Fill)
         .with_children(vec![
