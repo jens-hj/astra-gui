@@ -29,13 +29,46 @@ use shared::{run_example, ExampleApp};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Style for a caret-demo input: fixed width with the given cursor shape.
+fn caret_input_style(shape: CursorShape) -> TextInputStyle {
+    TextInputStyle {
+        width: 180.0,
+        cursor_style: CursorStyle {
+            shape,
+            thickness: 3.0,
+            ..CursorStyle::default()
+        },
+        ..TextInputStyle::default()
+    }
+}
+
+/// Wrap an input in a labeled vertical column.
+fn labeled_caret_input(label: &str, input: Node) -> Node {
+    Node::new()
+        .with_layout_direction(Layout::Vertical)
+        .with_gap(Size::lpx(6.0))
+        .with_h_align(HorizontalAlign::Center)
+        .with_children(vec![
+            Node::new().with_content(Content::Text(
+                TextContent::new(label.to_string())
+                    .with_font_size(Size::lpx(14.0))
+                    .with_color(mocha::SUBTEXT0)
+                    .with_h_align(HorizontalAlign::Center)
+                    .with_v_align(VerticalAlign::Center),
+            )),
+            input,
+        ])
+}
+
 /// Shared application state that can be modified from callbacks
 struct AppState {
     counter: i32,
     nodes_disabled: bool,
     slider_value: f32,
     continuous_slider_value: f32,
-    text_input_value: String,
+    text_line: String,
+    text_underline: String,
+    text_block: String,
 }
 
 struct Interactive {
@@ -54,7 +87,9 @@ impl ExampleApp for Interactive {
                 nodes_disabled: false,
                 slider_value: 7.0,
                 continuous_slider_value: 50.0,
-                text_input_value: String::new(),
+                text_line: String::new(),
+                text_underline: String::new(),
+                text_block: String::new(),
             })),
         }
     }
@@ -80,14 +115,13 @@ impl ExampleApp for Interactive {
         let state = self.state.clone();
 
         // Read current values for display
-        let (counter, nodes_disabled, slider_value, continuous_slider_value, text_input_value) = {
+        let (counter, nodes_disabled, slider_value, continuous_slider_value) = {
             let s = state.borrow();
             (
                 s.counter,
                 s.nodes_disabled,
                 s.slider_value,
                 s.continuous_slider_value,
-                s.text_input_value.clone(),
             )
         };
 
@@ -210,7 +244,7 @@ impl ExampleApp for Interactive {
                         .with_h_align(HorizontalAlign::Center)
                         .with_v_align(VerticalAlign::Center),
                     )),
-                // Text input section
+                // Text input section - one field per caret type
                 Node::new()
                     .with_width(Size::Fill)
                     .with_layout_direction(Layout::Horizontal)
@@ -218,27 +252,36 @@ impl ExampleApp for Interactive {
                     .with_children(vec![
                         // Spacer
                         Node::new().with_width(Size::Fill),
-                        // Text Input
-                        {
-                            // We need to pass a mutable reference to the string
-                            // Since TextInput takes &mut String, we need to handle this carefully
+                        // Line caret
+                        labeled_caret_input("Line cursor", {
                             let mut s = state_text.borrow_mut();
-                            TextInput::new(&mut s.text_input_value)
-                                .placeholder("Type something...")
+                            TextInput::new(&mut s.text_line)
+                                .placeholder("Line")
                                 .disabled(nodes_disabled)
-                                .with_style(TextInputStyle {
-                                    cursor_style: CursorStyle {
-                                        shape: CursorShape::Underline,
-                                        thickness: 3.0,
-                                        ..CursorStyle::default()
-                                    },
-                                    ..TextInputStyle::default()
-                                })
-                                .on_change(|new_val| {
-                                    println!("Text input value: {}", new_val);
-                                })
+                                .with_style(caret_input_style(CursorShape::Line))
+                                .on_change(|v| println!("Line: {}", v))
                                 .build(ctx)
-                        },
+                        }),
+                        // Underline caret
+                        labeled_caret_input("Underline caret", {
+                            let mut s = state_text.borrow_mut();
+                            TextInput::new(&mut s.text_underline)
+                                .placeholder("Underline")
+                                .disabled(nodes_disabled)
+                                .with_style(caret_input_style(CursorShape::Underline))
+                                .on_change(|v| println!("Underline: {}", v))
+                                .build(ctx)
+                        }),
+                        // Block caret
+                        labeled_caret_input("Block caret", {
+                            let mut s = state_text.borrow_mut();
+                            TextInput::new(&mut s.text_block)
+                                .placeholder("Block")
+                                .disabled(nodes_disabled)
+                                .with_style(caret_input_style(CursorShape::Block))
+                                .on_change(|v| println!("Block: {}", v))
+                                .build(ctx)
+                        }),
                         // Spacer
                         Node::new().with_width(Size::Fill),
                     ]),
