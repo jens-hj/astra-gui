@@ -676,6 +676,30 @@ fn build_text_input_node(
 
     // Add cursor if focused and visible
     if focused && cursor_visible && !disabled {
+        // Measure the width of a single character so the underline/block caret
+        // can size itself to the glyph it covers. Falls back to a fraction of
+        // the font size when there is no measurer or no character to size to.
+        let default_caret_width = style.font_size * 0.6;
+        let measure_char_width = |ctx: &mut UiContext, ch: char| -> f32 {
+            ctx.measurer()
+                .map(|m| {
+                    m.measure_text(MeasureTextRequest {
+                        text: &ch.to_string(),
+                        font_size: style.font_size,
+                        h_align: HorizontalAlign::Left,
+                        v_align: VerticalAlign::Center,
+                        family: None,
+                        max_width: None,
+                        wrap: astra_gui::Wrap::None,
+                        line_height_multiplier: 1.2,
+                        font_weight: astra_gui::FontWeight::Normal,
+                        font_style: astra_gui::FontStyle::Normal,
+                    })
+                    .width
+                })
+                .unwrap_or(default_caret_width)
+        };
+
         let cursor_node = match style.cursor_style.shape {
             CursorShape::Line => Node::new()
                 .with_width(Size::lpx(style.cursor_style.thickness))
@@ -683,7 +707,16 @@ fn build_text_input_node(
                 .with_translation(Translation::x(astra_gui::Size::Logical(cursor_x_offset)))
                 .with_shape(Shape::Rect(StyledRect::new(Rect::default(), cursor_color))),
             CursorShape::Underline => {
-                let cursor_width = style.font_size * 0.6;
+                // Underline the character to the right of the caret.
+                let cursor_width = if cursor_pos == 0 || cursor_pos >= value.len() {
+                    default_caret_width
+                } else {
+                    value
+                        .chars()
+                        .nth(cursor_pos)
+                        .map(|ch| measure_char_width(ctx, ch))
+                        .unwrap_or(default_caret_width)
+                };
                 Node::new()
                     .with_width(Size::lpx(cursor_width))
                     .with_height(Size::lpx(style.cursor_style.thickness))
@@ -694,13 +727,21 @@ fn build_text_input_node(
                     .with_shape(Shape::Rect(StyledRect::new(Rect::default(), cursor_color)))
             }
             CursorShape::Block => {
-                let cursor_width = style.font_size * 0.6;
+                // Cover the character in front of the caret (where the next edit
+                // lands), sitting at the caret position rather than behind it.
+                let cursor_width = if cursor_pos >= value.len() {
+                    default_caret_width
+                } else {
+                    value
+                        .chars()
+                        .nth(cursor_pos)
+                        .map(|ch| measure_char_width(ctx, ch))
+                        .unwrap_or(default_caret_width)
+                };
                 Node::new()
                     .with_width(Size::lpx(cursor_width))
                     .with_height(Size::lpx(style.font_size))
-                    .with_translation(Translation::x(astra_gui::Size::Logical(
-                        (cursor_x_offset - cursor_width).max(0.0),
-                    )))
+                    .with_translation(Translation::x(astra_gui::Size::Logical(cursor_x_offset)))
                     .with_shape(Shape::Rect(StyledRect::new(
                         Rect::default(),
                         cursor_color.with_alpha(0.3),
