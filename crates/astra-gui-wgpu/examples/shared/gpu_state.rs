@@ -45,8 +45,16 @@ impl GpuState {
             })
             .unwrap_or(wgpu::Backends::all());
 
+        // By default keep the Vulkan debug/validation messenger off. Enabling it
+        // (the default in debug builds) installs a debug-utils messenger that
+        // surfaces the Vulkan loader's ICD-scan errors for GPU drivers we don't
+        // use (asahi/panfrost/radeon/...), which is just noise. Opt back in with
+        // WGPU_VALIDATION=1 or WGPU_DEBUG=1 when actually debugging the renderer.
+        let flags = wgpu::InstanceFlags::empty().with_env();
+
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends,
+            flags,
             ..Default::default()
         });
 
