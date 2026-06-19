@@ -241,30 +241,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var dist: f32;
     var fill_dist: f32;
 
-    // Compute AA width using screen-space derivatives for pixel-perfect antialiasing
-    // This accounts for rotation, non-uniform scaling, and perspective
-    // The gradient magnitude tells us how many pixels per unit of distance
-    var aa_width: f32;
-    if in.anti_aliasing == 1u {
-        // Analytical AA: compute from screen-space derivatives
-        aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist)));
-
-        // Early discard optimization for pixels definitely outside shape
-        // When stroke is inset, we need to check against fill boundary, not stroke boundary
-        // Otherwise we'd discard fill pixels that should be visible
-        let outer_dist = min(dist, fill_dist);
-        if outer_dist > aa_width * 1.5 {
-            discard;
-        }
-    } else {
-        // No AA: zero width = step function
-        aa_width = 0.0;
-    }
-
-    var stroke_offset = in.stroke_offset; // + in.stroke_width / 2.0;
-    if stroke_offset < 0.0 && in.anti_aliasing == 1u {
-        stroke_offset += aa_width;
-    }
+    let stroke_offset = in.stroke_offset; // + in.stroke_width / 2.0;
 
     if in.shape_corner_type == 100u {
         // Triangle - vertices stored in params as world-space coordinates
@@ -320,19 +297,35 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
+    // Compute AA width using screen-space derivatives for pixel-perfect antialiasing
+    // This accounts for rotation, non-uniform scaling, and perspective
+    // The gradient magnitude tells us how many pixels per unit of distance.
+    // NOTE: this must run AFTER `dist` is computed above, otherwise the
+    // derivatives are taken of an undefined value (aa_width collapses to 0 and
+    // fill-only shapes disappear).
+    var aa_width: f32;
+    if in.anti_aliasing == 1u {
+        // Analytical AA: compute from screen-space derivatives
+        aa_width = length(vec2<f32>(dpdx(dist), dpdy(dist)));
+
+        // Early discard optimization for pixels definitely outside shape
+        // When stroke is inset, we need to check against fill boundary, not stroke boundary
+        // Otherwise we'd discard fill pixels that should be visible
+        let outer_dist = min(dist, fill_dist);
+        if outer_dist > aa_width * 1.5 {
+            discard;
+        }
+    } else {
+        // No AA: zero width = step function
+        aa_width = 0.0;
+    }
+
     // Stroke rendering: stroke is a ring, fill is the interior
     // We need to choose stroke OR fill, not blend them
 
     var final_color: vec4<f32>;
 
     var stroke_dist = abs(dist) - in.stroke_width;
-    // if stroke_offset < 0.0 {
-    //     // stroke_dist -= aa_width * 3.0;
-    //     stroke_dist = abs(dist - aa_width * 3.0) - in.stroke_width;
-    // } else if stroke_offset > 0.0 {
-    //     // stroke_dist += aa_width * 3.0;
-    //     stroke_dist = abs(dist + aa_width * 3.0) - in.stroke_width;
-    // }
 
     let inside_stroke = stroke_dist < 0.0 && dist <= 0.0;
     if inside_stroke {
@@ -345,36 +338,24 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if in.anti_aliasing == 1u {
             // Analytical AA: smooth blending
             stroke_blending = 1.0 - smoothstep(-aa_width, aa_width, stroke_dist + aa_width * 1.5);
-
-            // final_color.r = -stroke_dist / 20.0;
-            // final_color.g = -stroke_dist / 20.0;
-            // final_color.b = -stroke_dist / 20.0;
         } else {
             // No AA: hard cutoff
             stroke_blending = select(0.0, 1.0, stroke_dist <= 0.0);
         }
 
-        if fill_dist < aa_width * 1.5 { // && stroke_offset < in.stroke_width {
+        if fill_dist < aa_width * 2.0 {
             // Inside fill area - blend between fill and stroke colors
             final_color = mix(in.fill_color, in.stroke_color, stroke_blending);
-
-            // final_color.r = -stroke_dist / 20.0;
-            // final_color.g = -stroke_dist / 20.0;
-            // final_color.b = -stroke_dist / 20.0;
         } else {
             // Outside fill area - blend stroke with transparency
             final_color = in.stroke_color * stroke_blending;
-
-            // final_color.r = -stroke_dist / 20.0;
-            // final_color.g = -stroke_dist / 20.0;
-            // final_color.b = -stroke_dist / 20.0;
         }
     } else {
         // Outside stroke ring - render fill (if inside original shape) with AA
         var alpha: f32;
         if in.anti_aliasing == 1u {
             // Analytical AA: smooth blending
-            alpha = 1.0 - smoothstep(-aa_width, aa_width, fill_dist + aa_width * 1.5);
+            alpha = 1.0 - smoothstep(-aa_width, aa_width, fill_dist - aa_width * 1.5);
         } else {
             // No AA: hard cutoff
             alpha = select(0.0, 1.0, fill_dist <= 0.0);
