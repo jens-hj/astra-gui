@@ -438,7 +438,13 @@ impl EventDispatcher {
 
         // Handle scroll events
         if input.scroll_delta.0.abs() > 0.001 || input.scroll_delta.1.abs() > 0.001 {
-            self.process_scroll_event(root, cursor_pos, input.scroll_delta, &mut events);
+            self.process_scroll_event(
+                root,
+                cursor_pos,
+                input.scroll_delta,
+                input.shift_held,
+                &mut events,
+            );
         }
 
         // Update hovered nodes list
@@ -495,6 +501,7 @@ impl EventDispatcher {
         root: &mut Node,
         position: Point,
         delta: (f32, f32),
+        shift_held: bool,
         events: &mut Vec<TargetedEvent>,
     ) {
         // Find scrollable nodes under cursor
@@ -509,8 +516,43 @@ impl EventDispatcher {
                     let is_scrollable = node.overflow() == Overflow::Scroll;
 
                     if is_scrollable {
+                        // max_scroll is cached on the computed layout during the
+                        // layout pass; it also tells us which axes can scroll.
+                        let max_scroll = node
+                            .computed_layout()
+                            .map(|layout| layout.max_scroll)
+                            .unwrap_or((0.0, 0.0));
+                        let can_x = max_scroll.0 > 0.0;
+                        let can_y = max_scroll.1 > 0.0;
+
+                        // Per-container speed multiplier (tunable via
+                        // `Node::with_scroll_speed`).
+                        let speed = node.scroll_speed();
+                        let scaled = (delta.0 * speed, delta.1 * speed);
+
+                        // Map the wheel delta onto the scroll axes. Mice usually
+                        // only report a vertical delta, so:
+                        // - Holding Shift routes it to horizontal scrolling.
+                        // - A container that can only scroll horizontally routes
+                        //   the vertical wheel to X automatically.
+                        // Any native horizontal delta is always applied to X.
+                        let mut dx = -scaled.0;
+                        let mut dy = -scaled.1;
+                        if shift_held || (!can_y && can_x) {
+                            dx += -scaled.1;
+                            dy = 0.0;
+                        }
+
                         // Apply scroll to this node
-                        node.scroll_by((-delta.0, -delta.1));
+                        node.scroll_by((dx, dy));
+
+                        // Clamp the scroll target to the scrollable range so the
+                        // content can't be scrolled past its bounds.
+                        let target = node.scroll_target();
+                        node.set_scroll_target((
+                            target.0.clamp(0.0, max_scroll.0),
+                            target.1.clamp(0.0, max_scroll.1),
+                        ));
 
                         // Generate scroll event
                         events.push(TargetedEvent {

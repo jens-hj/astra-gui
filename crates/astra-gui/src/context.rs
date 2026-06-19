@@ -73,6 +73,10 @@ pub struct UiContext {
 
     /// Scale factor for the display
     scale_factor: f32,
+
+    /// Timestamp of the previous `end_frame`, used to derive the per-frame
+    /// delta time that drives smooth scroll animations.
+    last_frame_time: Option<std::time::Instant>,
 }
 
 impl UiContext {
@@ -89,6 +93,7 @@ impl UiContext {
             id_stack: Vec::new(),
             id_counter: 0,
             scale_factor: 1.0,
+            last_frame_time: None,
         }
     }
 
@@ -145,6 +150,21 @@ impl UiContext {
         // Update style transitions
         self.state_manager
             .update_transitions(root, &self.interaction_states);
+
+        // Advance smooth scroll animations toward their targets. Derive dt from
+        // the time since the previous frame so the easing is framerate
+        // independent. Without this, scroll_offset never moves toward
+        // scroll_target and scrolling has no visible effect.
+        let now = std::time::Instant::now();
+        let dt = self
+            .last_frame_time
+            .map(|prev| (now - prev).as_secs_f32())
+            .unwrap_or(0.0)
+            .clamp(0.0, 0.1);
+        self.last_frame_time = Some(now);
+        if dt > 0.0 {
+            root.update_all_scroll_animations(dt);
+        }
 
         // Sync scroll state for persistence
         self.dispatcher.sync_scroll_state(root);
@@ -481,6 +501,162 @@ mod tests {
 
         assert_eq!(id, "container/item_0");
         assert!(ctx.id_stack.is_empty());
+    }
+
+    #[test]
+    fn test_scroll_moves_offset_toward_target() {
+        use crate::{Layout, Overflow, Point, Rect, Size};
+
+        // Rebuild a fresh tree every frame (as a real app does), so the test
+        // exercises the restore/dispatch/animate/sync persistence pipeline.
+        let build = || {
+            Node::new()
+                .with_id(NodeId::new("scroller"))
+                .with_width(Size::lpx(100.0))
+                .with_height(Size::lpx(100.0))
+                .with_layout_direction(Layout::Vertical)
+                .with_overflow(Overflow::Scroll)
+                .with_child(
+                    // Content taller than the container -> 400px of scroll range.
+                    Node::new()
+                        .with_width(Size::lpx(100.0))
+                        .with_height(Size::lpx(500.0)),
+                )
+        };
+
+        let window = Rect::from_min_size([0.0, 0.0], [100.0, 100.0]);
+        let mut ctx = UiContext::new();
+
+        // Frame 1: wheel scroll down (negative y delta) with the cursor over the
+        // container. This should set the scroll target but not yet move offset.
+        ctx.begin_frame();
+        let mut root = build();
+        ctx.input_mut().cursor_position = Some(Point::new(50.0, 50.0));
+        // Scroll far past the end to also exercise clamping to max_scroll.
+        ctx.input_mut().scroll_delta = (0.0, -1000.0);
+        root.compute_layout(window);
+        ctx.end_frame(&mut root);
+        ctx.input_mut().begin_frame(); // clear per-frame input (scroll_delta)
+
+        // Subsequent frames: no new input, just let the animation advance. The
+        // easing is driven by real elapsed time, so emulate ~60fps frame pacing.
+        let mut last_offset = 0.0;
+        for _ in 0..30 {
+            std::thread::sleep(std::time::Duration::from_millis(16));
+            ctx.begin_frame();
+            let mut root = build();
+            ctx.input_mut().cursor_position = Some(Point::new(50.0, 50.0));
+            root.compute_layout(window);
+            ctx.end_frame(&mut root);
+            ctx.input_mut().begin_frame();
+            last_offset = root.scroll_offset().1;
+        }
+
+        // The offset must have moved downward and settled within the scroll
+        // range (content 500 - container 100 = 400 max).
+        assert!(
+            last_offset > 1.0,
+            "scroll offset should advance toward target, got {last_offset}"
+        );
+        assert!(
+            last_offset <= 400.0 + 0.01,
+            "scroll offset should be clamped to max_scroll (400), got {last_offset}"
+        );
+        // With a large delta it should approach (but not exceed) the clamp.
+        assert!(
+            last_offset > 300.0,
+            "scroll offset should approach the clamped maximum, got {last_offset}"
+        );
+    }
+
+    #[test]
+    fn test_scroll_axis_routing() {
+        use crate::{Layout, Overflow, Point, Rect, Size};
+
+        let window = Rect::from_min_size([0.0, 0.0], [100.0, 100.0]);
+
+        // Run a single frame with the given content size, shift state, and wheel
+        // delta; return the resulting (target_x, target_y).
+        let run = |child_w: f32, child_h: f32, shift: bool, delta: (f32, f32)| -> (f32, f32) {
+            let mut ctx = UiContext::new();
+            ctx.begin_frame();
+            let mut root = Node::new()
+                .with_id(NodeId::new("s"))
+                .with_width(Size::lpx(100.0))
+                .with_height(Size::lpx(100.0))
+                .with_layout_direction(Layout::Vertical)
+                .with_overflow(Overflow::Scroll)
+                .with_child(
+                    Node::new()
+                        .with_width(Size::lpx(child_w))
+                        .with_height(Size::lpx(child_h)),
+                );
+            ctx.input_mut().cursor_position = Some(Point::new(50.0, 50.0));
+            ctx.input_mut().scroll_delta = delta;
+            ctx.input_mut().shift_held = shift;
+            root.compute_layout(window);
+            ctx.end_frame(&mut root);
+            root.scroll_target()
+        };
+
+        // A mouse wheel reports a vertical delta only.
+        let wheel = (0.0, -100.0);
+
+        // Overflows both axes, no shift -> scrolls Y.
+        let (tx, ty) = run(500.0, 500.0, false, wheel);
+        assert!(ty > 0.0 && tx == 0.0, "2D no-shift should scroll Y, got ({tx},{ty})");
+
+        // Overflows both axes, shift held -> scrolls X.
+        let (tx, ty) = run(500.0, 500.0, true, wheel);
+        assert!(tx > 0.0 && ty == 0.0, "2D shift should scroll X, got ({tx},{ty})");
+
+        // Overflows X only -> vertical wheel routed to X without shift.
+        let (tx, ty) = run(500.0, 100.0, false, wheel);
+        assert!(
+            tx > 0.0 && ty == 0.0,
+            "X-only should scroll X without shift, got ({tx},{ty})"
+        );
+    }
+
+    #[test]
+    fn test_scroll_speed_is_configurable() {
+        use crate::{Layout, Overflow, Point, Rect, Size};
+
+        let window = Rect::from_min_size([0.0, 0.0], [100.0, 100.0]);
+
+        // One frame with an optional explicit scroll speed; return target Y. The
+        // content is tall enough that the result is never clamped.
+        let run = |speed: Option<f32>| -> f32 {
+            let mut ctx = UiContext::new();
+            ctx.begin_frame();
+            let mut node = Node::new()
+                .with_id(NodeId::new("s"))
+                .with_width(Size::lpx(100.0))
+                .with_height(Size::lpx(100.0))
+                .with_layout_direction(Layout::Vertical)
+                .with_overflow(Overflow::Scroll)
+                .with_child(
+                    Node::new()
+                        .with_width(Size::lpx(100.0))
+                        .with_height(Size::lpx(5000.0)),
+                );
+            if let Some(s) = speed {
+                node = node.with_scroll_speed(s);
+            }
+            ctx.input_mut().cursor_position = Some(Point::new(50.0, 50.0));
+            ctx.input_mut().scroll_delta = (0.0, -10.0);
+            node.compute_layout(window);
+            ctx.end_frame(&mut node);
+            node.scroll_target().1
+        };
+
+        let default_speed = run(None); // default 2.0 -> 20
+        let faster = run(Some(8.0)); // 8.0 -> 80
+        assert!(default_speed > 0.0, "default scroll should move, got {default_speed}");
+        assert!(
+            faster > default_speed * 3.0,
+            "with_scroll_speed should scroll further: {faster} vs {default_speed}"
+        );
     }
 
     #[test]

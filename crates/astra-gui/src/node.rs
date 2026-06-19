@@ -217,7 +217,7 @@ impl Node {
             overflow: Overflow::default(),
             scroll_offset: (0.0, 0.0),
             scroll_target: (0.0, 0.0),
-            scroll_speed: 8.0,
+            scroll_speed: 3.0,
             scroll_direction: ScrollDirection::default(),
             opacity: 1.0,
             shape: None,
@@ -378,7 +378,11 @@ impl Node {
         self
     }
 
-    /// Set the scroll speed multiplier (default: 1.0)
+    /// Set the scroll speed multiplier for this `Overflow::Scroll` container.
+    ///
+    /// The incoming (already pixel-normalized) wheel delta is multiplied by this
+    /// value before being applied, so larger numbers scroll faster. Default:
+    /// `2.0`.
     pub fn with_scroll_speed(mut self, speed: f32) -> Self {
         self.scroll_speed = speed;
         self
@@ -1755,6 +1759,17 @@ impl Node {
                         }
                     }
                 }
+            }
+        }
+
+        // After children are laid out, cache max_scroll for scrollable
+        // containers. The non-measurer layout path (compute_layout_with_parent_size)
+        // already does this; without it here, containers laid out with a text
+        // measurer report a zero scroll range and never scroll.
+        if self.overflow == Overflow::Scroll {
+            let max_scroll = self.calculate_max_scroll_for_node();
+            if let Some(computed) = &mut self.computed {
+                computed.max_scroll = max_scroll;
             }
         }
     }
