@@ -53,11 +53,18 @@ pub struct AppRunner<T: ExampleApp> {
 
 impl<T: ExampleApp> AppRunner<T> {
     pub fn new(app: T) -> Self {
+        // Give the context a text measurer so widgets (e.g. TextInput) can
+        // measure glyph widths during UI building. Without it they fall back to
+        // a crude per-character estimate, which misplaces the caret. Uses the
+        // same default fonts as layout/rendering so measurements agree.
+        let mut ctx = UiContext::new();
+        ctx.set_measurer(astra_gui_text::Engine::new_default());
+
         Self {
             window: None,
             gpu_state: None,
             app,
-            ctx: UiContext::new(),
+            ctx,
             last_frame_time: Instant::now(),
             frame_stats: FrameStats::default(),
             #[cfg(feature = "profiling")]
