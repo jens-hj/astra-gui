@@ -320,48 +320,35 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         aa_width = 0.0;
     }
 
-    // Stroke rendering: stroke is a ring, fill is the interior
-    // We need to choose stroke OR fill, not blend them
-
-    var final_color: vec4<f32>;
-
-    var stroke_dist = abs(dist) - in.stroke_width;
-
-    let inside_stroke = stroke_dist < 0.0 && dist <= 0.0;
-    if inside_stroke {
-        // In stroke ring - render stroke with AA
-        if stroke_dist < -in.stroke_width / 2.0 {
-            stroke_dist = -stroke_dist - in.stroke_width;
-        }
-
-        var stroke_blending: f32;
-        if in.anti_aliasing == 1u {
-            // Analytical AA: smooth blending
-            stroke_blending = 1.0 - smoothstep(-aa_width, aa_width, stroke_dist + aa_width * 1.5);
-        } else {
-            // No AA: hard cutoff
-            stroke_blending = select(0.0, 1.0, stroke_dist <= 0.0);
-        }
-
-        if fill_dist < aa_width * 2.0 {
-            // Inside fill area - blend between fill and stroke colors
-            final_color = mix(in.fill_color, in.stroke_color, stroke_blending);
-        } else {
-            // Outside fill area - blend stroke with transparency
-            final_color = in.stroke_color * stroke_blending;
-        }
+    // Composite the fill and the stroke ring with analytic, width-accurate
+    // coverage. The stroke is the band between the outer edge (dist = 0) and the
+    // inner edge (dist = -stroke_width), drawn over the fill. A 1px-wide linear
+    // transition (instead of a wide, offset smoothstep) keeps the edge centered
+    // on the true boundary and keeps a 1px stroke a solid 1px instead of fading
+    // out.
+    var fill_cov: f32;
+    var stroke_cov: f32;
+    if in.anti_aliasing == 1u {
+        let aa = max(aa_width, 1e-5);
+        // Coverage of an iso-contour d <= 0: 1 inside, 0 outside, linear across 1px.
+        fill_cov = clamp(0.5 - fill_dist / aa, 0.0, 1.0);
+        let outer_cov = clamp(0.5 - dist / aa, 0.0, 1.0);
+        let inner_cov = clamp(0.5 - (dist + in.stroke_width) / aa, 0.0, 1.0);
+        stroke_cov = clamp(outer_cov - inner_cov, 0.0, 1.0);
     } else {
-        // Outside stroke ring - render fill (if inside original shape) with AA
-        var alpha: f32;
-        if in.anti_aliasing == 1u {
-            // Analytical AA: smooth blending
-            alpha = 1.0 - smoothstep(-aa_width, aa_width, fill_dist - aa_width * 1.5);
-        } else {
-            // No AA: hard cutoff
-            alpha = select(0.0, 1.0, fill_dist <= 0.0);
-        }
-        final_color = in.fill_color * alpha;
+        fill_cov = select(0.0, 1.0, fill_dist <= 0.0);
+        stroke_cov = select(0.0, 1.0, dist <= 0.0 && dist >= -in.stroke_width);
     }
 
-    return final_color;
+    // Stroke over fill, straight (non-premultiplied) alpha to match the
+    // pipeline's SrcAlpha / OneMinusSrcAlpha blending.
+    let fa = in.fill_color.a * fill_cov;
+    let sa = in.stroke_color.a * stroke_cov;
+    let out_a = sa + fa * (1.0 - sa);
+    var out_rgb = vec3<f32>(0.0, 0.0, 0.0);
+    if out_a > 0.0001 {
+        out_rgb = (in.stroke_color.rgb * sa + in.fill_color.rgb * fa * (1.0 - sa)) / out_a;
+    }
+
+    return vec4<f32>(out_rgb, out_a);
 }
